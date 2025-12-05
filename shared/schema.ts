@@ -68,6 +68,8 @@ export const brands = pgTable("brands", {
   logoUrl: text("logo_url"),
   isDirectDistributor: boolean("is_direct_distributor").default(false),
   isActive: boolean("is_active").default(true),
+  isHomeFeatured: boolean("is_home_featured").default(false),
+  homePosition: integer("home_position"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -213,6 +215,22 @@ export const contactMessages = pgTable("contact_messages", {
   message: text("message").notNull(),
   status: varchar("status", { length: 20 }).default("new"),
   adminNotes: text("admin_notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ============================================
+// HERO SLIDES TABLE
+// ============================================
+export const heroSlides = pgTable("hero_slides", {
+  id: serial("id").primaryKey(),
+  title: varchar("title", { length: 255 }).notNull(),
+  subtitle: text("subtitle"),
+  ctaLabel: varchar("cta_label", { length: 100 }),
+  ctaHref: text("cta_href"),
+  imageUrl: text("image_url").notNull(),
+  position: integer("position").notNull().default(0),
+  isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -399,6 +417,16 @@ export const insertContactMessageSchema = createInsertSchema(contactMessages).om
 export const selectContactMessageSchema = createSelectSchema(contactMessages);
 export type InsertContactMessage = z.infer<typeof insertContactMessageSchema>;
 export type ContactMessage = typeof contactMessages.$inferSelect;
+
+// Hero slides schemas
+export const insertHeroSlideSchema = createInsertSchema(heroSlides).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const selectHeroSlideSchema = createSelectSchema(heroSlides);
+export type InsertHeroSlide = z.infer<typeof insertHeroSlideSchema>;
+export type HeroSlide = typeof heroSlides.$inferSelect;
 
 // ============================================
 // FORM VALIDATION SCHEMAS

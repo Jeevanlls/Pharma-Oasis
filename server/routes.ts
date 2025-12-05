@@ -1067,4 +1067,94 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
       res.status(500).json({ message: "Failed to fetch stats" });
     }
   });
+
+  // ==================== HOMEPAGE CONTENT (PUBLIC) ====================
+  app.get("/api/home/slides", async (req, res) => {
+    try {
+      const slides = await storage.getActiveHeroSlides();
+      res.json(slides);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch slides" });
+    }
+  });
+
+  app.get("/api/home/brands", async (req, res) => {
+    try {
+      const brands = await storage.getFeaturedBrands();
+      res.json(brands);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch featured brands" });
+    }
+  });
+
+  // ==================== ADMIN - HERO SLIDES ====================
+  app.get("/api/admin/hero-slides", requireAdmin, async (req, res) => {
+    try {
+      const slides = await storage.getAllHeroSlides();
+      res.json(slides);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch hero slides" });
+    }
+  });
+
+  app.post("/api/admin/hero-slides", requireAdmin, async (req, res) => {
+    try {
+      const slide = await storage.createHeroSlide(req.body);
+      res.status(201).json(slide);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create hero slide" });
+    }
+  });
+
+  app.patch("/api/admin/hero-slides/:id", requireAdmin, async (req, res) => {
+    try {
+      const slide = await storage.updateHeroSlide(Number(req.params.id), req.body);
+      if (!slide) {
+        return res.status(404).json({ message: "Slide not found" });
+      }
+      res.json(slide);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update hero slide" });
+    }
+  });
+
+  app.delete("/api/admin/hero-slides/:id", requireAdmin, async (req, res) => {
+    try {
+      await storage.deleteHeroSlide(Number(req.params.id));
+      res.json({ message: "Slide deleted" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete slide" });
+    }
+  });
+
+  app.post("/api/admin/hero-slides/reorder", requireAdmin, async (req, res) => {
+    try {
+      const { orderedIds } = req.body;
+      if (!Array.isArray(orderedIds)) {
+        return res.status(400).json({ message: "orderedIds must be an array" });
+      }
+      await storage.reorderHeroSlides(orderedIds);
+      res.json({ message: "Slides reordered successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to reorder slides" });
+    }
+  });
+
+  // ==================== ADMIN - FEATURED BRANDS ====================
+  app.patch("/api/admin/brands/:id/home-featured", requireAdmin, async (req, res) => {
+    try {
+      const { isHomeFeatured, homePosition } = req.body;
+      const brand = await storage.updateBrandHomeFeatured(
+        Number(req.params.id),
+        isHomeFeatured,
+        homePosition
+      );
+      if (!brand) {
+        return res.status(404).json({ message: "Brand not found" });
+      }
+      res.json(brand);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update brand homepage status" });
+    }
+  });
 }

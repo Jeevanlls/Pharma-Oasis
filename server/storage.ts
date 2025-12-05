@@ -1,6 +1,6 @@
 import { 
   users, brands, categories, products, quotes, quoteItems, 
-  supplierLeads, cmsBlocks, siteSettings, contactMessages,
+  supplierLeads, cmsBlocks, siteSettings, contactMessages, heroSlides,
   type User, type InsertUser,
   type Brand, type InsertBrand,
   type Category, type InsertCategory,
@@ -11,6 +11,7 @@ import {
   type CmsBlock, type InsertCmsBlock,
   type SiteSetting, type InsertSiteSetting,
   type ContactMessage, type InsertContactMessage,
+  type HeroSlide, type InsertHeroSlide,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, ilike, desc, asc, sql, isNull, inArray } from "drizzle-orm";
@@ -97,6 +98,19 @@ export interface IStorage {
   updateContactMessage(id: number, updates: Partial<InsertContactMessage>): Promise<ContactMessage | undefined>;
   getAllContactMessages(): Promise<ContactMessage[]>;
   getContactMessagesByStatus(status: string): Promise<ContactMessage[]>;
+
+  // Hero Slides
+  getHeroSlide(id: number): Promise<HeroSlide | undefined>;
+  createHeroSlide(slide: InsertHeroSlide): Promise<HeroSlide>;
+  updateHeroSlide(id: number, updates: Partial<InsertHeroSlide>): Promise<HeroSlide | undefined>;
+  deleteHeroSlide(id: number): Promise<void>;
+  getAllHeroSlides(): Promise<HeroSlide[]>;
+  getActiveHeroSlides(): Promise<HeroSlide[]>;
+  reorderHeroSlides(orderedIds: number[]): Promise<void>;
+
+  // Featured Brands (for homepage)
+  getFeaturedBrands(): Promise<Brand[]>;
+  updateBrandHomeFeatured(id: number, isHomeFeatured: boolean, homePosition?: number): Promise<Brand | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -580,6 +594,78 @@ export class DatabaseStorage implements IStorage {
       }
     }
     return this.getSiteSettings();
+  }
+
+  // ==================== HERO SLIDES ====================
+  async getHeroSlide(id: number): Promise<HeroSlide | undefined> {
+    const [slide] = await db.select().from(heroSlides).where(eq(heroSlides.id, id));
+    return slide;
+  }
+
+  async createHeroSlide(slide: InsertHeroSlide): Promise<HeroSlide> {
+    const maxPosition = await db.select({ max: sql<number>`COALESCE(MAX(position), 0)` })
+      .from(heroSlides);
+    const position = (maxPosition[0]?.max ?? 0) + 1;
+    
+    const [created] = await db.insert(heroSlides).values({
+      ...slide,
+      position: slide.position ?? position,
+    }).returning();
+    return created;
+  }
+
+  async updateHeroSlide(id: number, updates: Partial<InsertHeroSlide>): Promise<HeroSlide | undefined> {
+    const [updated] = await db.update(heroSlides)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(heroSlides.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteHeroSlide(id: number): Promise<void> {
+    await db.delete(heroSlides).where(eq(heroSlides.id, id));
+  }
+
+  async getAllHeroSlides(): Promise<HeroSlide[]> {
+    return db.select().from(heroSlides).orderBy(asc(heroSlides.position));
+  }
+
+  async getActiveHeroSlides(): Promise<HeroSlide[]> {
+    return db.select().from(heroSlides)
+      .where(eq(heroSlides.isActive, true))
+      .orderBy(asc(heroSlides.position));
+  }
+
+  async reorderHeroSlides(orderedIds: number[]): Promise<void> {
+    await db.transaction(async (tx) => {
+      for (let i = 0; i < orderedIds.length; i++) {
+        await tx.update(heroSlides)
+          .set({ position: i, updatedAt: new Date() })
+          .where(eq(heroSlides.id, orderedIds[i]));
+      }
+    });
+  }
+
+  // ==================== FEATURED BRANDS ====================
+  async getFeaturedBrands(): Promise<Brand[]> {
+    return db.select().from(brands)
+      .where(and(
+        eq(brands.isActive, true),
+        eq(brands.isHomeFeatured, true)
+      ))
+      .orderBy(asc(brands.homePosition), asc(brands.name));
+  }
+
+  async updateBrandHomeFeatured(id: number, isHomeFeatured: boolean, homePosition?: number): Promise<Brand | undefined> {
+    const [updated] = await db.update(brands)
+      .set({ 
+        isHomeFeatured, 
+        homePosition: homePosition ?? null,
+        updatedAt: new Date() 
+      })
+      .where(eq(brands.id, id))
+      .returning();
+    return updated;
   }
 }
 
