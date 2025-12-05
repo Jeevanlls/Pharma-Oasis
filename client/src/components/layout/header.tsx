@@ -121,6 +121,12 @@ export function Header() {
                       <DropdownMenuSeparator />
                     </>
                   )}
+                  <Link href="/dashboard">
+                    <DropdownMenuItem className="cursor-pointer" data-testid="link-dashboard">
+                      <User className="mr-2 h-4 w-4" />
+                      My Dashboard
+                    </DropdownMenuItem>
+                  </Link>
                   <Link href="/my-quotes">
                     <DropdownMenuItem className="cursor-pointer" data-testid="link-my-quotes">
                       <ShoppingCart className="mr-2 h-4 w-4" />
@@ -201,6 +207,16 @@ export function Header() {
                                 {itemCount}
                               </Badge>
                             )}
+                          </Button>
+                        </Link>
+                        <Link href="/dashboard">
+                          <Button
+                            variant="ghost"
+                            className="w-full justify-start gap-2"
+                            onClick={() => setMobileMenuOpen(false)}
+                          >
+                            <User className="h-4 w-4" />
+                            My Dashboard
                           </Button>
                         </Link>
                         <Link href="/my-quotes">

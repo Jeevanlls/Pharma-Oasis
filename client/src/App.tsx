@@ -18,6 +18,7 @@ import HowToOrderPage from "@/pages/how-to-order";
 import QuotePage from "@/pages/quote";
 import MyQuotesPage from "@/pages/my-quotes";
 import SupplierRegistrationPage from "@/pages/supplier-registration";
+import DashboardPage from "@/pages/dashboard";
 
 import AdminDashboard from "@/pages/admin/index";
 import AdminUsersPage from "@/pages/admin/users";
@@ -65,6 +66,7 @@ function Router() {
       <Route path="/how-to-order" component={HowToOrderPage} />
       <Route path="/quote" component={QuotePage} />
       <Route path="/my-quotes" component={MyQuotesPage} />
+      <Route path="/dashboard" component={DashboardPage} />
       <Route path="/supplier-registration" component={SupplierRegistrationPage} />
       
       <Route path="/admin">{() => <AdminRoute component={AdminDashboard} />}</Route>

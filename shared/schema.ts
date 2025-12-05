@@ -287,6 +287,27 @@ export const selectUserSchema = createSelectSchema(users);
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 
+// Profile update schema - customer-editable fields only
+export const profileUpdateSchema = z.object({
+  primaryContactName: z.string().max(255).optional(),
+  jobTitle: z.string().max(100).optional(),
+  phoneNumber: z.string().max(50).optional(),
+  mobileNumber: z.string().max(50).optional(),
+  billingAddressLine1: z.string().max(255).optional(),
+  billingAddressLine2: z.string().max(255).optional(),
+  billingCity: z.string().max(100).optional(),
+  billingPostcode: z.string().max(20).optional(),
+  deliveryAddressLine1: z.string().max(255).optional(),
+  deliveryAddressLine2: z.string().max(255).optional(),
+  deliveryCity: z.string().max(100).optional(),
+  deliveryPostcode: z.string().max(20).optional(),
+  deliverySameAsBilling: z.boolean().optional(),
+  orderingContactEmail: z.string().email().max(255).optional().or(z.literal("")),
+  accountsPayableEmail: z.string().email().max(255).optional().or(z.literal("")),
+  preferredOrderMethod: z.string().max(50).optional(),
+}).strict();
+export type ProfileUpdate = z.infer<typeof profileUpdateSchema>;
+
 // Brand schemas
 export const insertBrandSchema = createInsertSchema(brands).omit({
   id: true,

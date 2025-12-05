@@ -8,6 +8,7 @@ import {
   supplierRegistrationSchema,
   contactFormSchema,
   insertProductSchema,
+  profileUpdateSchema,
 } from "@shared/schema";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
@@ -28,6 +29,7 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
       cookie: {
         secure: process.env.NODE_ENV === "production",
         httpOnly: true,
+        sameSite: "strict", // CSRF protection
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       },
     })
@@ -103,9 +105,16 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
         return res.status(403).json({ message: "Your account application was not approved. Please contact support for more information." });
       }
 
-      req.session.userId = user.id;
-      const { passwordHash, ...safeUser } = user;
-      res.json({ user: safeUser });
+      // Regenerate session to prevent session fixation attacks
+      req.session.regenerate((err) => {
+        if (err) {
+          console.error("Session regeneration error:", err);
+          return res.status(500).json({ message: "Login failed" });
+        }
+        req.session.userId = user.id;
+        const { passwordHash, ...safeUser } = user;
+        res.json({ user: safeUser });
+      });
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid input", errors: error.errors });
@@ -186,6 +195,42 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
       }
       res.json({ message: "Logged out successfully" });
     });
+  });
+
+  // Profile update endpoint for customers
+  app.patch("/api/profile", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      
+      // Validate request body with strict schema
+      const validatedData = profileUpdateSchema.parse(req.body);
+      
+      // Filter out undefined values
+      const updates: Record<string, any> = {};
+      for (const [key, value] of Object.entries(validatedData)) {
+        if (value !== undefined) {
+          updates[key] = value;
+        }
+      }
+
+      if (Object.keys(updates).length === 0) {
+        return res.status(400).json({ message: "No valid fields to update" });
+      }
+
+      const user = await storage.updateUser(userId, updates);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const { passwordHash, ...safeUser } = user;
+      res.json({ user: safeUser });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Profile update error:", error);
+      res.status(500).json({ message: "Failed to update profile" });
+    }
   });
 
   // ==================== PUBLIC PRODUCT ROUTES ====================
