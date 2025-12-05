@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { users, brands, categories, products, siteSettings, cmsBlocks } from "@shared/schema";
+import { users, brands, categories, products, siteSettings, cmsBlocks, heroSlides } from "@shared/schema";
 import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 
@@ -29,16 +29,16 @@ async function seed() {
     console.log("Admin user already exists");
   }
 
-  // Create sample brands
+  // Create sample brands with placeholder logos
   const brandData = [
-    { name: "PharmaCare Plus", description: "Premium pharmaceutical products for everyday health", isDirectDistributor: true, isActive: true },
-    { name: "WellnessFirst", description: "Leading wellness and supplement brand", isDirectDistributor: true, isActive: true },
-    { name: "MediCore", description: "Hospital-grade medical supplies and devices", isDirectDistributor: false, isActive: true },
-    { name: "HealthGuard", description: "First aid and wound care specialists", isDirectDistributor: false, isActive: true },
-    { name: "VitaBoost", description: "Vitamins and nutritional supplements", isDirectDistributor: false, isActive: true },
-    { name: "DermaSkin", description: "Professional skincare and dermatology products", isDirectDistributor: true, isActive: true },
-    { name: "OralCare Pro", description: "Dental and oral hygiene products", isDirectDistributor: false, isActive: true },
-    { name: "CardioHealth", description: "Cardiovascular health monitoring devices", isDirectDistributor: false, isActive: true },
+    { name: "PharmaCare Plus", description: "Premium pharmaceutical products for everyday health", isDirectDistributor: true, isActive: true, logoUrl: "https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=200&h=80&fit=crop&auto=format", isHomeFeatured: true, homePosition: 1 },
+    { name: "WellnessFirst", description: "Leading wellness and supplement brand", isDirectDistributor: true, isActive: true, logoUrl: "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=200&h=80&fit=crop&auto=format", isHomeFeatured: true, homePosition: 2 },
+    { name: "MediCore", description: "Hospital-grade medical supplies and devices", isDirectDistributor: false, isActive: true, logoUrl: "https://images.unsplash.com/photo-1579154204601-01588f351e67?w=200&h=80&fit=crop&auto=format", isHomeFeatured: true, homePosition: 3 },
+    { name: "HealthGuard", description: "First aid and wound care specialists", isDirectDistributor: false, isActive: true, logoUrl: "https://images.unsplash.com/photo-1587854692152-cbe660dbde88?w=200&h=80&fit=crop&auto=format", isHomeFeatured: true, homePosition: 4 },
+    { name: "VitaBoost", description: "Vitamins and nutritional supplements", isDirectDistributor: false, isActive: true, logoUrl: "https://images.unsplash.com/photo-1550572017-4fcdbb59cc32?w=200&h=80&fit=crop&auto=format", isHomeFeatured: true, homePosition: 5 },
+    { name: "DermaSkin", description: "Professional skincare and dermatology products", isDirectDistributor: true, isActive: true, logoUrl: "https://images.unsplash.com/photo-1612817288484-6f916006741a?w=200&h=80&fit=crop&auto=format", isHomeFeatured: true, homePosition: 6 },
+    { name: "OralCare Pro", description: "Dental and oral hygiene products", isDirectDistributor: false, isActive: true, logoUrl: null, isHomeFeatured: false, homePosition: null },
+    { name: "CardioHealth", description: "Cardiovascular health monitoring devices", isDirectDistributor: false, isActive: true, logoUrl: "https://images.unsplash.com/photo-1559757175-5700dde675bc?w=200&h=80&fit=crop&auto=format", isHomeFeatured: true, homePosition: 7 },
   ];
 
   for (const brand of brandData) {
@@ -46,6 +46,16 @@ async function seed() {
     if (existing.length === 0) {
       await db.insert(brands).values(brand);
       console.log(`Brand created: ${brand.name}`);
+    } else {
+      // Update existing brands with logo URL and home featured settings
+      await db.update(brands)
+        .set({ 
+          logoUrl: brand.logoUrl, 
+          isHomeFeatured: brand.isHomeFeatured, 
+          homePosition: brand.homePosition 
+        })
+        .where(eq(brands.name, brand.name));
+      console.log(`Brand updated: ${brand.name}`);
     }
   }
 
@@ -197,6 +207,55 @@ async function seed() {
       await db.insert(cmsBlocks).values(block);
       console.log(`CMS block created: ${block.key}`);
     }
+  }
+
+  // Create hero slides - clear existing and add new ones
+  const heroSlidesData = [
+    {
+      title: "Keeping UK Pharmacies Stocked & Ready",
+      subtitle: "Reliable, fast distribution to ensure you have the right products when your patients need them most.",
+      ctaLabel: "Partner With Us",
+      ctaHref: "/supplier-registration",
+      imageUrl: "/assets/Banner1.jpg",
+      position: 1,
+      isActive: true,
+    },
+    {
+      title: "A Comprehensive Healthcare Portfolio",
+      subtitle: "From Pharmaceuticals and OTC medicine to Vitamins, Medical Devices, and Skincare. Everything your customers need.",
+      ctaLabel: "Browse Categories",
+      ctaHref: "/products",
+      imageUrl: "/assets/banner2.jpg",
+      position: 2,
+      isActive: true,
+    },
+    {
+      title: "MHRA Licensed & GDP Compliant",
+      subtitle: "Ensuring regulatory compliance and total supply chain integrity from our warehouse to your pharmacy door.",
+      ctaLabel: "View our Credentials",
+      ctaHref: "/about",
+      imageUrl: "/assets/banner3.jpg",
+      position: 3,
+      isActive: true,
+    },
+    {
+      title: "Your Wholesale Partner for Healthcare Excellence",
+      subtitle: "Access 20,000+ healthcare products at competitive wholesale prices. Trusted by pharmacies across the UK.",
+      ctaLabel: "Explore the Range",
+      ctaHref: "/products",
+      imageUrl: "/assets/banner4.jpg",
+      position: 4,
+      isActive: true,
+    },
+  ];
+
+  // Delete existing hero slides and insert new ones
+  await db.delete(heroSlides);
+  console.log("Cleared existing hero slides");
+  
+  for (const slide of heroSlidesData) {
+    await db.insert(heroSlides).values(slide);
+    console.log(`Hero slide created: ${slide.title}`);
   }
 
   console.log("Database seed completed!");
