@@ -508,12 +508,12 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="py-16 sm:py-24 bg-sidebar">
+      <section className="py-16 sm:py-24 bg-muted">
         <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl mb-6 text-sidebar-foreground" style={{ fontFamily: "DM Sans, sans-serif" }}>
+          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl mb-6 text-foreground" style={{ fontFamily: "DM Sans, sans-serif" }}>
             Ready to Get Started?
           </h2>
-          <p className="text-lg text-sidebar-foreground/70 mb-8 max-w-2xl mx-auto">
+          <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
             Join thousands of UK pharmacies who trust Pharma Oasis for their wholesale healthcare needs.
             Register today and get access to competitive pricing.
           </p>
@@ -532,7 +532,7 @@ export default function HomePage() {
               <Button 
                 size="lg" 
                 variant="outline" 
-                className="w-full sm:w-auto border-sidebar-foreground/30 text-sidebar-foreground"
+                className="w-full sm:w-auto"
               >
                 Contact Sales
               </Button>

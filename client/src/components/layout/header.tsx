@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/lib/auth";
 import { useQuoteBasket } from "@/lib/quote-basket";
 import { ThemeSelector } from "@/components/theme-selector";
+import logoImage from "@assets/01_1764977214745.png";
 import {
   Menu,
   X,
@@ -48,13 +49,12 @@ export function Header() {
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between gap-4">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <Package className="h-5 w-5" />
-            </div>
-            <span className="hidden font-semibold text-lg sm:inline-block" style={{ fontFamily: "DM Sans, sans-serif" }}>
-              Pharma Oasis
-            </span>
+          <Link href="/" className="flex items-center gap-2" data-testid="link-home-logo">
+            <img 
+              src={logoImage} 
+              alt="Pharma Oasis" 
+              className="h-10 w-auto"
+            />
           </Link>
 
           <nav className="hidden md:flex items-center gap-1">
@@ -173,12 +173,11 @@ export function Header() {
               <SheetContent side="right" className="w-[300px] sm:w-[350px]">
                 <div className="flex flex-col gap-4 mt-6">
                   <div className="flex items-center gap-2 pb-4 border-b">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                      <Package className="h-5 w-5" />
-                    </div>
-                    <span className="font-semibold text-lg" style={{ fontFamily: "DM Sans, sans-serif" }}>
-                      Pharma Oasis
-                    </span>
+                    <img 
+                      src={logoImage} 
+                      alt="Pharma Oasis" 
+                      className="h-8 w-auto"
+                    />
                   </div>
 
                   <nav className="flex flex-col gap-1">

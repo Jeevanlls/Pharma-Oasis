@@ -1,5 +1,6 @@
 import { Link } from "wouter";
-import { Package, Mail, Phone, MapPin, Shield, Award, Truck } from "lucide-react";
+import { Mail, Phone, MapPin, Shield, Award, Truck } from "lucide-react";
+import logoImage from "@assets/01_1764977214745.png";
 
 export function Footer() {
   return (
@@ -9,12 +10,11 @@ export function Footer() {
           <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-4">
             <div className="space-y-4">
               <div className="flex items-center gap-2">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                  <Package className="h-5 w-5" />
-                </div>
-                <span className="font-semibold text-lg" style={{ fontFamily: "DM Sans, sans-serif" }}>
-                  Pharma Oasis
-                </span>
+                <img 
+                  src={logoImage} 
+                  alt="Pharma Oasis" 
+                  className="h-10 w-auto brightness-0 invert"
+                />
               </div>
               <p className="text-sm text-sidebar-foreground/80 leading-relaxed">
                 Trusted wholesale partner to 3,000+ UK pharmacies. Licensed healthcare,
