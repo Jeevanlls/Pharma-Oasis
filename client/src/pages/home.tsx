@@ -25,6 +25,12 @@ import {
   Building2,
   ChevronLeft,
   ChevronRight,
+  Globe,
+  Handshake,
+  Ship,
+  FileCheck,
+  Boxes,
+  BadgeCheck,
 } from "lucide-react";
 
 const stats = [
@@ -255,35 +261,42 @@ function BrandStrip() {
   }
 
   return (
-    <section className="py-8 bg-muted/50 border-y" data-testid="brand-strip">
+    <section className="py-10 bg-background border-y" data-testid="brand-strip">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <p className="text-center text-sm text-muted-foreground mb-6 uppercase tracking-wider font-medium" data-testid="text-brand-strip-title">
+        <p className="text-center text-sm text-muted-foreground mb-8 uppercase tracking-wider font-medium" data-testid="text-brand-strip-title">
           Trusted Brands We Distribute
         </p>
         <div className="relative overflow-hidden">
           <div 
-            className="flex gap-12 animate-marquee"
+            className="flex gap-16 animate-marquee"
             style={{
-              animation: "marquee 30s linear infinite",
+              animation: "marquee 40s linear infinite",
             }}
           >
             {[...brands, ...brands].map((brand, index) => (
               <div
                 key={`${brand.id}-${index}`}
-                className="flex-shrink-0 flex items-center justify-center h-16 w-32"
+                className="flex-shrink-0 flex flex-col items-center justify-center gap-2"
                 data-testid={`brand-item-${index}`}
               >
                 {brand.logoUrl ? (
-                  <img
-                    src={brand.logoUrl}
-                    alt={brand.name}
-                    className="max-h-12 max-w-full object-contain grayscale opacity-70 hover:grayscale-0 hover:opacity-100 transition-all duration-300"
-                  />
+                  <div className="h-14 w-36 flex items-center justify-center bg-card rounded-lg p-2 border shadow-sm">
+                    <img
+                      src={brand.logoUrl}
+                      alt={brand.name}
+                      className="max-h-10 max-w-full object-contain"
+                    />
+                  </div>
                 ) : (
-                  <span className="text-lg font-semibold text-muted-foreground/60" data-testid={`brand-name-${index}`}>
-                    {brand.name}
-                  </span>
+                  <div className="h-14 w-36 flex items-center justify-center bg-card rounded-lg p-2 border shadow-sm">
+                    <span className="text-sm font-semibold text-foreground">
+                      {brand.name}
+                    </span>
+                  </div>
                 )}
+                <span className="text-xs font-medium text-muted-foreground" data-testid={`brand-name-${index}`}>
+                  {brand.name}
+                </span>
               </div>
             ))}
           </div>
@@ -312,6 +325,186 @@ function StatsBar() {
   );
 }
 
+function BrandPartnershipSection() {
+  const partnerBenefits = [
+    "Food Supplements & Nutraceuticals",
+    "Cosmetics & Skincare Products",
+    "Health Foods & Wellness Products",
+    "Generic Medicines & Pharmaceuticals",
+    "Medical Devices & Health Equipment",
+  ];
+
+  return (
+    <section className="py-16 sm:py-20 bg-gradient-to-br from-primary/5 via-background to-accent/5" data-testid="brand-partnership-section">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 gap-12 lg:grid-cols-2 items-center">
+          <div>
+            <Badge className="mb-4 bg-primary/10 text-primary border-primary/20">
+              <Globe className="mr-1.5 h-3 w-3" />
+              Global Brands Welcome
+            </Badge>
+            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl mb-4" style={{ fontFamily: "DM Sans, sans-serif" }}>
+              Expand Your Brand into the UK Market
+            </h2>
+            <p className="text-lg text-muted-foreground mb-6">
+              Are you a brand from anywhere in the world looking to enter the UK healthcare and wellness market? 
+              Pharma Oasis is your trusted gateway to reaching pharmacies, retailers, and wholesalers across the United Kingdom.
+            </p>
+            <p className="text-muted-foreground mb-6">
+              We welcome partnerships with international manufacturers and brands in these sectors:
+            </p>
+            <ul className="space-y-3 mb-8">
+              {partnerBenefits.map((item) => (
+                <li key={item} className="flex items-center gap-3">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10">
+                    <CheckCircle2 className="h-4 w-4 text-primary" />
+                  </div>
+                  <span className="text-foreground font-medium">{item}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <Link href="/contact">
+                <Button size="lg" className="w-full sm:w-auto gap-2" data-testid="button-brand-partner">
+                  <Handshake className="h-4 w-4" />
+                  Discuss Partnership
+                </Button>
+              </Link>
+              <Link href="/supplier-registration">
+                <Button size="lg" variant="outline" className="w-full sm:w-auto gap-2" data-testid="button-supplier-apply">
+                  Apply as Supplier
+                </Button>
+              </Link>
+            </div>
+          </div>
+          <div className="relative">
+            <Card className="p-8 bg-card border shadow-lg">
+              <div className="text-center mb-6">
+                <Globe className="h-12 w-12 mx-auto text-primary mb-4" />
+                <h3 className="text-xl font-semibold mb-2">Why Partner With Us?</h3>
+                <p className="text-sm text-muted-foreground">Unlock the UK healthcare market</p>
+              </div>
+              <div className="space-y-4">
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
+                  <BadgeCheck className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="font-medium text-sm">MHRA Compliance Support</p>
+                    <p className="text-xs text-muted-foreground">Navigate UK regulations with expert guidance</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
+                  <Users className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="font-medium text-sm">3,000+ Pharmacy Network</p>
+                    <p className="text-xs text-muted-foreground">Direct access to UK retail pharmacies</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
+                  <Truck className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="font-medium text-sm">Nationwide Distribution</p>
+                    <p className="text-xs text-muted-foreground">GDP-compliant logistics across the UK</p>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ExportServicesSection() {
+  const exportBenefits = [
+    "Genuine UK-sourced healthcare products",
+    "MHRA & GDP certified supply chain",
+    "Competitive wholesale export pricing",
+    "Temperature-controlled shipping options",
+    "Documentation for customs clearance",
+  ];
+
+  return (
+    <section className="py-16 sm:py-20 bg-muted/30" data-testid="export-services-section">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 gap-12 lg:grid-cols-2 items-center">
+          <div className="order-2 lg:order-1">
+            <Card className="p-8 bg-card border shadow-lg">
+              <div className="text-center mb-6">
+                <Ship className="h-12 w-12 mx-auto text-primary mb-4" />
+                <h3 className="text-xl font-semibold mb-2">Export Ready</h3>
+                <p className="text-sm text-muted-foreground">Serving international buyers worldwide</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="text-center p-4 rounded-lg bg-muted/50">
+                  <Boxes className="h-8 w-8 mx-auto mb-2 text-primary" />
+                  <p className="font-semibold">20,000+</p>
+                  <p className="text-xs text-muted-foreground">Products</p>
+                </div>
+                <div className="text-center p-4 rounded-lg bg-muted/50">
+                  <Globe className="h-8 w-8 mx-auto mb-2 text-primary" />
+                  <p className="font-semibold">Worldwide</p>
+                  <p className="text-xs text-muted-foreground">Shipping</p>
+                </div>
+                <div className="text-center p-4 rounded-lg bg-muted/50">
+                  <FileCheck className="h-8 w-8 mx-auto mb-2 text-primary" />
+                  <p className="font-semibold">Full</p>
+                  <p className="text-xs text-muted-foreground">Documentation</p>
+                </div>
+                <div className="text-center p-4 rounded-lg bg-muted/50">
+                  <Shield className="h-8 w-8 mx-auto mb-2 text-primary" />
+                  <p className="font-semibold">Genuine</p>
+                  <p className="text-xs text-muted-foreground">UK Products</p>
+                </div>
+              </div>
+            </Card>
+          </div>
+          <div className="order-1 lg:order-2">
+            <Badge className="mb-4 bg-primary/10 text-primary border-primary/20">
+              <Ship className="mr-1.5 h-3 w-3" />
+              International Export
+            </Badge>
+            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl mb-4" style={{ fontFamily: "DM Sans, sans-serif" }}>
+              Import Genuine UK Products
+            </h2>
+            <p className="text-lg text-muted-foreground mb-6">
+              Are you a wholesaler, pharmacy distributor, or importer looking for genuine UK healthcare products? 
+              Pharma Oasis supplies authentic British brands to customers worldwide.
+            </p>
+            <p className="text-muted-foreground mb-6">
+              Whether you're sourcing vitamins, cosmetics, health foods, or pharmaceuticals, 
+              we provide the documentation and logistics support you need for seamless international import.
+            </p>
+            <ul className="space-y-3 mb-8">
+              {exportBenefits.map((item) => (
+                <li key={item} className="flex items-center gap-3">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10">
+                    <CheckCircle2 className="h-4 w-4 text-primary" />
+                  </div>
+                  <span className="text-foreground font-medium">{item}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <Link href="/contact">
+                <Button size="lg" className="w-full sm:w-auto gap-2" data-testid="button-export-inquiry">
+                  <Ship className="h-4 w-4" />
+                  Request Export Quote
+                </Button>
+              </Link>
+              <Link href="/register">
+                <Button size="lg" variant="outline" className="w-full sm:w-auto gap-2" data-testid="button-register-importer">
+                  Register as Importer
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function HomePage() {
   return (
     <PublicLayout>
@@ -328,6 +521,8 @@ export default function HomePage() {
       <HeroCarousel />
       <BrandStrip />
       <StatsBar />
+      <BrandPartnershipSection />
+      <ExportServicesSection />
 
       <section className="py-16 sm:py-24 bg-muted/30">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">

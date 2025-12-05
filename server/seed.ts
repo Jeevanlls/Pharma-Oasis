@@ -29,16 +29,29 @@ async function seed() {
     console.log("Admin user already exists");
   }
 
-  // Create sample brands with placeholder logos
+  // Create sample brands - includes both product brands and homepage featured UK brands
+  // Using placeholder API for colorful brand logos with names
   const brandData = [
-    { name: "PharmaCare Plus", description: "Premium pharmaceutical products for everyday health", isDirectDistributor: true, isActive: true, logoUrl: "https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=200&h=80&fit=crop&auto=format", isHomeFeatured: true, homePosition: 1 },
-    { name: "WellnessFirst", description: "Leading wellness and supplement brand", isDirectDistributor: true, isActive: true, logoUrl: "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=200&h=80&fit=crop&auto=format", isHomeFeatured: true, homePosition: 2 },
-    { name: "MediCore", description: "Hospital-grade medical supplies and devices", isDirectDistributor: false, isActive: true, logoUrl: "https://images.unsplash.com/photo-1579154204601-01588f351e67?w=200&h=80&fit=crop&auto=format", isHomeFeatured: true, homePosition: 3 },
-    { name: "HealthGuard", description: "First aid and wound care specialists", isDirectDistributor: false, isActive: true, logoUrl: "https://images.unsplash.com/photo-1587854692152-cbe660dbde88?w=200&h=80&fit=crop&auto=format", isHomeFeatured: true, homePosition: 4 },
-    { name: "VitaBoost", description: "Vitamins and nutritional supplements", isDirectDistributor: false, isActive: true, logoUrl: "https://images.unsplash.com/photo-1550572017-4fcdbb59cc32?w=200&h=80&fit=crop&auto=format", isHomeFeatured: true, homePosition: 5 },
-    { name: "DermaSkin", description: "Professional skincare and dermatology products", isDirectDistributor: true, isActive: true, logoUrl: "https://images.unsplash.com/photo-1612817288484-6f916006741a?w=200&h=80&fit=crop&auto=format", isHomeFeatured: true, homePosition: 6 },
-    { name: "OralCare Pro", description: "Dental and oral hygiene products", isDirectDistributor: false, isActive: true, logoUrl: null, isHomeFeatured: false, homePosition: null },
-    { name: "CardioHealth", description: "Cardiovascular health monitoring devices", isDirectDistributor: false, isActive: true, logoUrl: "https://images.unsplash.com/photo-1559757175-5700dde675bc?w=200&h=80&fit=crop&auto=format", isHomeFeatured: true, homePosition: 7 },
+    // Original product brands (required for product references)
+    { name: "PharmaCare Plus", description: "Premium pharmaceutical products for everyday health", isDirectDistributor: true, isActive: true, logoUrl: "https://placehold.co/200x60/0077b6/ffffff?text=PharmaCare&font=montserrat", isHomeFeatured: false, homePosition: null },
+    { name: "WellnessFirst", description: "Leading wellness and supplement brand", isDirectDistributor: true, isActive: true, logoUrl: "https://placehold.co/200x60/2d6a4f/ffffff?text=WellnessFirst&font=montserrat", isHomeFeatured: false, homePosition: null },
+    { name: "MediCore", description: "Hospital-grade medical supplies and devices", isDirectDistributor: false, isActive: true, logoUrl: "https://placehold.co/200x60/457b9d/ffffff?text=MediCore&font=montserrat", isHomeFeatured: false, homePosition: null },
+    { name: "HealthGuard", description: "First aid and wound care specialists", isDirectDistributor: false, isActive: true, logoUrl: "https://placehold.co/200x60/e63946/ffffff?text=HealthGuard&font=montserrat", isHomeFeatured: false, homePosition: null },
+    { name: "VitaBoost", description: "Vitamins and nutritional supplements", isDirectDistributor: false, isActive: true, logoUrl: "https://placehold.co/200x60/f4a261/1d3557?text=VitaBoost&font=montserrat", isHomeFeatured: false, homePosition: null },
+    { name: "DermaSkin", description: "Professional skincare and dermatology products", isDirectDistributor: true, isActive: true, logoUrl: "https://placehold.co/200x60/d4a5a5/ffffff?text=DermaSkin&font=montserrat", isHomeFeatured: false, homePosition: null },
+    { name: "OralCare Pro", description: "Dental and oral hygiene products", isDirectDistributor: false, isActive: true, logoUrl: "https://placehold.co/200x60/3a86ff/ffffff?text=OralCare&font=montserrat", isHomeFeatured: false, homePosition: null },
+    { name: "CardioHealth", description: "Cardiovascular health monitoring devices", isDirectDistributor: false, isActive: true, logoUrl: "https://placehold.co/200x60/d62828/ffffff?text=CardioHealth&font=montserrat", isHomeFeatured: false, homePosition: null },
+    // Popular UK health & wellness brands for homepage display
+    { name: "Vitabiotics", description: "UK's No.1 vitamin company - supplements for the whole family", isDirectDistributor: true, isActive: true, logoUrl: "https://placehold.co/200x60/e63946/ffffff?text=Vitabiotics&font=montserrat", isHomeFeatured: true, homePosition: 1 },
+    { name: "Holland & Barrett", description: "Health food retailer - vitamins, supplements and natural products", isDirectDistributor: true, isActive: true, logoUrl: "https://placehold.co/200x60/2d6a4f/ffffff?text=H%26B&font=montserrat", isHomeFeatured: true, homePosition: 2 },
+    { name: "Boots", description: "Trusted pharmacy brand - healthcare essentials", isDirectDistributor: true, isActive: true, logoUrl: "https://placehold.co/200x60/1d3557/ffffff?text=Boots&font=montserrat", isHomeFeatured: true, homePosition: 3 },
+    { name: "Seven Seas", description: "Omega-3 and vitamin specialists since 1935", isDirectDistributor: false, isActive: true, logoUrl: "https://placehold.co/200x60/0077b6/ffffff?text=Seven+Seas&font=montserrat", isHomeFeatured: true, homePosition: 4 },
+    { name: "Pukka Herbs", description: "Organic herbal teas and supplements", isDirectDistributor: false, isActive: true, logoUrl: "https://placehold.co/200x60/6b705c/ffffff?text=Pukka&font=montserrat", isHomeFeatured: true, homePosition: 5 },
+    { name: "Simple", description: "Sensitive skin specialists - kind to skin", isDirectDistributor: true, isActive: true, logoUrl: "https://placehold.co/200x60/a8dadc/1d3557?text=Simple&font=montserrat", isHomeFeatured: true, homePosition: 6 },
+    { name: "Grenade", description: "Sports nutrition and protein supplements", isDirectDistributor: false, isActive: true, logoUrl: "https://placehold.co/200x60/000000/00ff00?text=Grenade&font=montserrat", isHomeFeatured: true, homePosition: 7 },
+    { name: "The Body Shop", description: "Ethical beauty and skincare products", isDirectDistributor: false, isActive: true, logoUrl: "https://placehold.co/200x60/386641/ffffff?text=Body+Shop&font=montserrat", isHomeFeatured: true, homePosition: 8 },
+    { name: "Solgar", description: "Premium quality vitamins and supplements", isDirectDistributor: false, isActive: true, logoUrl: "https://placehold.co/200x60/9b2335/ffd700?text=Solgar&font=montserrat", isHomeFeatured: true, homePosition: 9 },
+    { name: "Floradix", description: "Natural iron and vitamin supplements", isDirectDistributor: false, isActive: true, logoUrl: "https://placehold.co/200x60/780000/ffffff?text=Floradix&font=montserrat", isHomeFeatured: true, homePosition: 10 },
   ];
 
   for (const brand of brandData) {
