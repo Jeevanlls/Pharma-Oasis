@@ -1,18 +1,472 @@
-import { sql } from "drizzle-orm";
-import { pgTable, text, varchar } from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
+import { pgTable, text, serial, integer, boolean, timestamp, decimal, varchar } from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
+import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// ============================================
+// USERS TABLE
+// ============================================
 export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
+  id: serial("id").primaryKey(),
+  email: varchar("email", { length: 255 }).notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  role: varchar("role", { length: 20 }).notNull().default("customer"),
+  status: varchar("status", { length: 20 }).notNull().default("pending"),
+  
+  businessType: varchar("business_type", { length: 100 }),
+  companyName: varchar("company_name", { length: 255 }),
+  tradingName: varchar("trading_name", { length: 255 }),
+  gphcNumber: varchar("gphc_number", { length: 50 }),
+  companyRegistrationNumber: varchar("company_registration_number", { length: 50 }),
+  vatNumber: varchar("vat_number", { length: 50 }),
+  
+  primaryContactName: varchar("primary_contact_name", { length: 255 }),
+  jobTitle: varchar("job_title", { length: 100 }),
+  phoneNumber: varchar("phone_number", { length: 50 }),
+  mobileNumber: varchar("mobile_number", { length: 50 }),
+  
+  billingAddressLine1: varchar("billing_address_line_1", { length: 255 }),
+  billingAddressLine2: varchar("billing_address_line_2", { length: 255 }),
+  billingCity: varchar("billing_city", { length: 100 }),
+  billingPostcode: varchar("billing_postcode", { length: 20 }),
+  billingCountry: varchar("billing_country", { length: 100 }).default("United Kingdom"),
+  
+  deliverySameAsBilling: boolean("delivery_same_as_billing").default(true),
+  deliveryAddressLine1: varchar("delivery_address_line_1", { length: 255 }),
+  deliveryAddressLine2: varchar("delivery_address_line_2", { length: 255 }),
+  deliveryCity: varchar("delivery_city", { length: 100 }),
+  deliveryPostcode: varchar("delivery_postcode", { length: 20 }),
+  deliveryCountry: varchar("delivery_country", { length: 100 }),
+  
+  mhraLicenceType: varchar("mhra_licence_type", { length: 100 }),
+  mhraLicenceNumber: varchar("mhra_licence_number", { length: 100 }),
+  responsiblePersonName: varchar("responsible_person_name", { length: 255 }),
+  responsiblePersonEmail: varchar("responsible_person_email", { length: 255 }),
+  coldChainCapability: boolean("cold_chain_capability").default(false),
+  interestedInControlledProducts: boolean("interested_in_controlled_products").default(false),
+  
+  estimatedMonthlySpend: varchar("estimated_monthly_spend", { length: 50 }),
+  orderingContactEmail: varchar("ordering_contact_email", { length: 255 }),
+  accountsPayableEmail: varchar("accounts_payable_email", { length: 255 }),
+  preferredOrderMethod: varchar("preferred_order_method", { length: 50 }),
+  
+  howDidYouHear: varchar("how_did_you_hear", { length: 100 }),
+  notes: text("notes"),
+  marketingConsent: boolean("marketing_consent").default(false),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
+// ============================================
+// BRANDS TABLE
+// ============================================
+export const brands = pgTable("brands", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull().unique(),
+  description: text("description"),
+  logoUrl: text("logo_url"),
+  isDirectDistributor: boolean("is_direct_distributor").default(false),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// ============================================
+// CATEGORIES TABLE
+// ============================================
+export const categories = pgTable("categories", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  parentId: integer("parent_id"),
+  description: text("description"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ============================================
+// PRODUCTS TABLE
+// ============================================
+export const products = pgTable("products", {
+  id: serial("id").primaryKey(),
+  sku: varchar("sku", { length: 100 }).notNull().unique(),
+  ean: varchar("ean", { length: 50 }),
+  brandId: integer("brand_id").notNull(),
+  productName: varchar("product_name", { length: 500 }).notNull(),
+  shortDescription: text("short_description"),
+  longDescription: text("long_description"),
+  categoryId: integer("category_id").notNull(),
+  subcategoryId: integer("subcategory_id"),
+  packSize: varchar("pack_size", { length: 100 }),
+  uom: varchar("uom", { length: 50 }),
+  rrp: decimal("rrp", { precision: 10, scale: 2 }),
+  wholesalePrice: decimal("wholesale_price", { precision: 10, scale: 2 }).notNull(),
+  moq: integer("moq").default(1),
+  vatRate: decimal("vat_rate", { precision: 5, scale: 4 }),
+  isActive: boolean("is_active").default(true),
+  isFeatured: boolean("is_featured").default(false),
+  imageUrl: text("image_url"),
+  countryOfOrigin: varchar("country_of_origin", { length: 100 }),
+  productType: varchar("product_type", { length: 100 }),
+  storageConditions: text("storage_conditions"),
+  notesInternal: text("notes_internal"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ============================================
+// QUOTES TABLE
+// ============================================
+export const quotes = pgTable("quotes", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  status: varchar("status", { length: 20 }).notNull().default("pending"),
+  customerNotes: text("customer_notes"),
+  adminNotes: text("admin_notes"),
+  totalEstimate: decimal("total_estimate", { precision: 12, scale: 2 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ============================================
+// QUOTE ITEMS TABLE
+// ============================================
+export const quoteItems = pgTable("quote_items", {
+  id: serial("id").primaryKey(),
+  quoteId: integer("quote_id").notNull(),
+  productId: integer("product_id").notNull(),
+  quantity: integer("quantity").notNull(),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }),
+  lineTotal: decimal("line_total", { precision: 12, scale: 2 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ============================================
+// SUPPLIER LEADS TABLE
+// ============================================
+export const supplierLeads = pgTable("supplier_leads", {
+  id: serial("id").primaryKey(),
+  status: varchar("status", { length: 20 }).notNull().default("new"),
+  companyName: varchar("company_name", { length: 255 }).notNull(),
+  tradingName: varchar("trading_name", { length: 255 }),
+  website: text("website"),
+  country: varchar("country", { length: 100 }).notNull(),
+  businessType: varchar("business_type", { length: 100 }).notNull(),
+  contactName: varchar("contact_name", { length: 255 }).notNull(),
+  jobTitle: varchar("job_title", { length: 100 }),
+  email: varchar("email", { length: 255 }).notNull(),
+  phoneNumber: varchar("phone_number", { length: 50 }).notNull(),
+  mhraGdpLicences: text("mhra_gdp_licences"),
+  gdpAccredited: boolean("gdp_accredited").default(false),
+  productCategoriesSupply: text("product_categories_supply").notNull(),
+  brandNamesRepresent: text("brand_names_represent").notNull(),
+  licensedUkEu: varchar("licensed_uk_eu", { length: 20 }),
+  exclusivityInterest: boolean("exclusivity_interest").default(false),
+  stockLocations: text("stock_locations"),
+  minimumOrderQuantities: text("minimum_order_quantities"),
+  logisticsCapability: text("logistics_capability"),
+  proposalSummary: text("proposal_summary").notNull(),
+  additionalNotes: text("additional_notes"),
+  marketingConsent: boolean("marketing_consent").default(false),
+  adminNotes: text("admin_notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ============================================
+// CMS BLOCKS TABLE
+// ============================================
+export const cmsBlocks = pgTable("cms_blocks", {
+  id: serial("id").primaryKey(),
+  key: varchar("key", { length: 100 }).notNull().unique(),
+  section: varchar("section", { length: 50 }).notNull(),
+  content: text("content").notNull(),
+  contentType: varchar("content_type", { length: 20 }).default("text"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ============================================
+// SITE SETTINGS TABLE
+// ============================================
+export const siteSettings = pgTable("site_settings", {
+  id: serial("id").primaryKey(),
+  key: varchar("key", { length: 100 }).notNull().unique(),
+  value: text("value").notNull(),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ============================================
+// CONTACT MESSAGES TABLE
+// ============================================
+export const contactMessages = pgTable("contact_messages", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  email: varchar("email", { length: 255 }).notNull(),
+  phone: varchar("phone", { length: 50 }),
+  message: text("message").notNull(),
+  status: varchar("status", { length: 20 }).default("new"),
+  adminNotes: text("admin_notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ============================================
+// RELATIONS
+// ============================================
+export const usersRelations = relations(users, ({ many }) => ({
+  quotes: many(quotes),
+}));
+
+export const brandsRelations = relations(brands, ({ many }) => ({
+  products: many(products),
+}));
+
+export const categoriesRelations = relations(categories, ({ one, many }) => ({
+  parent: one(categories, {
+    fields: [categories.parentId],
+    references: [categories.id],
+    relationName: "categoryParent",
+  }),
+  children: many(categories, { relationName: "categoryParent" }),
+  products: many(products, { relationName: "productCategory" }),
+  productSubcategories: many(products, { relationName: "productSubcategory" }),
+}));
+
+export const productsRelations = relations(products, ({ one, many }) => ({
+  brand: one(brands, {
+    fields: [products.brandId],
+    references: [brands.id],
+  }),
+  category: one(categories, {
+    fields: [products.categoryId],
+    references: [categories.id],
+    relationName: "productCategory",
+  }),
+  subcategory: one(categories, {
+    fields: [products.subcategoryId],
+    references: [categories.id],
+    relationName: "productSubcategory",
+  }),
+  quoteItems: many(quoteItems),
+}));
+
+export const quotesRelations = relations(quotes, ({ one, many }) => ({
+  user: one(users, {
+    fields: [quotes.userId],
+    references: [users.id],
+  }),
+  items: many(quoteItems),
+}));
+
+export const quoteItemsRelations = relations(quoteItems, ({ one }) => ({
+  quote: one(quotes, {
+    fields: [quoteItems.quoteId],
+    references: [quotes.id],
+  }),
+  product: one(products, {
+    fields: [quoteItems.productId],
+    references: [products.id],
+  }),
+}));
+
+// ============================================
+// ZOD SCHEMAS & TYPES
+// ============================================
+
+// User schemas
+export const insertUserSchema = createInsertSchema(users).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const selectUserSchema = createSelectSchema(users);
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
+
+// Brand schemas
+export const insertBrandSchema = createInsertSchema(brands).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const selectBrandSchema = createSelectSchema(brands);
+export type InsertBrand = z.infer<typeof insertBrandSchema>;
+export type Brand = typeof brands.$inferSelect;
+
+// Category schemas
+export const insertCategorySchema = createInsertSchema(categories).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const selectCategorySchema = createSelectSchema(categories);
+export type InsertCategory = z.infer<typeof insertCategorySchema>;
+export type Category = typeof categories.$inferSelect;
+
+// Product schemas
+export const insertProductSchema = createInsertSchema(products).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const selectProductSchema = createSelectSchema(products);
+export type InsertProduct = z.infer<typeof insertProductSchema>;
+export type Product = typeof products.$inferSelect;
+
+// Quote schemas
+export const insertQuoteSchema = createInsertSchema(quotes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const selectQuoteSchema = createSelectSchema(quotes);
+export type InsertQuote = z.infer<typeof insertQuoteSchema>;
+export type Quote = typeof quotes.$inferSelect;
+
+// Quote item schemas
+export const insertQuoteItemSchema = createInsertSchema(quoteItems).omit({
+  id: true,
+  createdAt: true,
+});
+export const selectQuoteItemSchema = createSelectSchema(quoteItems);
+export type InsertQuoteItem = z.infer<typeof insertQuoteItemSchema>;
+export type QuoteItem = typeof quoteItems.$inferSelect;
+
+// Supplier lead schemas
+export const insertSupplierLeadSchema = createInsertSchema(supplierLeads).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const selectSupplierLeadSchema = createSelectSchema(supplierLeads);
+export type InsertSupplierLead = z.infer<typeof insertSupplierLeadSchema>;
+export type SupplierLead = typeof supplierLeads.$inferSelect;
+
+// CMS block schemas
+export const insertCmsBlockSchema = createInsertSchema(cmsBlocks).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const selectCmsBlockSchema = createSelectSchema(cmsBlocks);
+export type InsertCmsBlock = z.infer<typeof insertCmsBlockSchema>;
+export type CmsBlock = typeof cmsBlocks.$inferSelect;
+
+// Site settings schemas
+export const insertSiteSettingSchema = createInsertSchema(siteSettings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const selectSiteSettingSchema = createSelectSchema(siteSettings);
+export type InsertSiteSetting = z.infer<typeof insertSiteSettingSchema>;
+export type SiteSetting = typeof siteSettings.$inferSelect;
+
+// Contact message schemas
+export const insertContactMessageSchema = createInsertSchema(contactMessages).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const selectContactMessageSchema = createSelectSchema(contactMessages);
+export type InsertContactMessage = z.infer<typeof insertContactMessageSchema>;
+export type ContactMessage = typeof contactMessages.$inferSelect;
+
+// ============================================
+// FORM VALIDATION SCHEMAS
+// ============================================
+
+// Customer registration validation schema
+export const customerRegistrationSchema = z.object({
+  email: z.string().email("Valid email is required"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+  confirmPassword: z.string(),
+  businessType: z.string().min(1, "Business type is required"),
+  companyName: z.string().min(1, "Company name is required"),
+  tradingName: z.string().optional(),
+  gphcNumber: z.string().optional(),
+  companyRegistrationNumber: z.string().optional(),
+  vatNumber: z.string().optional(),
+  primaryContactName: z.string().min(1, "Contact name is required"),
+  jobTitle: z.string().optional(),
+  phoneNumber: z.string().min(1, "Phone number is required"),
+  mobileNumber: z.string().optional(),
+  billingAddressLine1: z.string().min(1, "Billing address is required"),
+  billingAddressLine2: z.string().optional(),
+  billingCity: z.string().min(1, "City is required"),
+  billingPostcode: z.string().min(1, "Postcode is required"),
+  billingCountry: z.string().default("United Kingdom"),
+  deliverySameAsBilling: z.boolean().default(true),
+  deliveryAddressLine1: z.string().optional(),
+  deliveryAddressLine2: z.string().optional(),
+  deliveryCity: z.string().optional(),
+  deliveryPostcode: z.string().optional(),
+  deliveryCountry: z.string().optional(),
+  mhraLicenceType: z.string().optional(),
+  mhraLicenceNumber: z.string().optional(),
+  responsiblePersonName: z.string().optional(),
+  responsiblePersonEmail: z.string().email().optional().or(z.literal("")),
+  coldChainCapability: z.boolean().default(false),
+  interestedInControlledProducts: z.boolean().default(false),
+  estimatedMonthlySpend: z.string().optional(),
+  orderingContactEmail: z.string().email().optional().or(z.literal("")),
+  accountsPayableEmail: z.string().email().optional().or(z.literal("")),
+  preferredOrderMethod: z.string().optional(),
+  howDidYouHear: z.string().optional(),
+  notes: z.string().optional(),
+  marketingConsent: z.boolean().default(false),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords do not match",
+  path: ["confirmPassword"],
+});
+
+export type CustomerRegistrationData = z.infer<typeof customerRegistrationSchema>;
+
+// Supplier registration validation schema
+export const supplierRegistrationSchema = z.object({
+  companyName: z.string().min(1, "Company name is required"),
+  tradingName: z.string().optional(),
+  website: z.string().url().optional().or(z.literal("")),
+  country: z.string().min(1, "Country is required"),
+  businessType: z.string().min(1, "Business type is required"),
+  contactName: z.string().min(1, "Contact name is required"),
+  jobTitle: z.string().optional(),
+  email: z.string().email("Valid email is required"),
+  phoneNumber: z.string().min(1, "Phone number is required"),
+  mhraGdpLicences: z.string().optional(),
+  gdpAccredited: z.boolean().default(false),
+  productCategoriesSupply: z.string().min(1, "Product categories are required"),
+  brandNamesRepresent: z.string().min(1, "Brand names are required"),
+  licensedUkEu: z.string().optional(),
+  exclusivityInterest: z.boolean().default(false),
+  stockLocations: z.string().optional(),
+  minimumOrderQuantities: z.string().optional(),
+  logisticsCapability: z.string().optional(),
+  proposalSummary: z.string().min(1, "Proposal summary is required"),
+  additionalNotes: z.string().optional(),
+  marketingConsent: z.boolean().default(false),
+});
+
+export type SupplierRegistrationData = z.infer<typeof supplierRegistrationSchema>;
+
+// Login schema
+export const loginSchema = z.object({
+  email: z.string().email("Valid email is required"),
+  password: z.string().min(1, "Password is required"),
+});
+
+export type LoginData = z.infer<typeof loginSchema>;
+
+// Contact form schema
+export const contactFormSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  email: z.string().email("Valid email is required"),
+  phone: z.string().optional(),
+  message: z.string().min(10, "Message must be at least 10 characters"),
+});
+
+export type ContactFormData = z.infer<typeof contactFormSchema>;

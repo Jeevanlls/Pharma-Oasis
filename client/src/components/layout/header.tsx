@@ -1,0 +1,270 @@
+import { useState } from "react";
+import { Link, useLocation } from "wouter";
+import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/lib/auth";
+import { useQuoteBasket } from "@/lib/quote-basket";
+import {
+  Menu,
+  X,
+  ShoppingCart,
+  User,
+  LogOut,
+  LayoutDashboard,
+  Package,
+  Building2,
+  HelpCircle,
+  Phone,
+} from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+const publicNavItems = [
+  { href: "/products", label: "Products", icon: Package },
+  { href: "/brands", label: "Brands", icon: Building2 },
+  { href: "/how-to-order", label: "How to Order", icon: HelpCircle },
+  { href: "/contact", label: "Contact", icon: Phone },
+];
+
+export function Header() {
+  const [location] = useLocation();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { user, isAuthenticated, isAdmin, logout } = useAuth();
+  const { itemCount } = useQuoteBasket();
+
+  const handleLogout = async () => {
+    await logout();
+    window.location.href = "/";
+  };
+
+  return (
+    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="flex h-16 items-center justify-between gap-4">
+          <Link href="/" className="flex items-center gap-2">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              <Package className="h-5 w-5" />
+            </div>
+            <span className="hidden font-semibold text-lg sm:inline-block" style={{ fontFamily: "DM Sans, sans-serif" }}>
+              Pharma Oasis
+            </span>
+          </Link>
+
+          <nav className="hidden md:flex items-center gap-1">
+            {publicNavItems.map((item) => (
+              <Link key={item.href} href={item.href}>
+                <Button
+                  variant={location === item.href ? "secondary" : "ghost"}
+                  size="sm"
+                  className="gap-2"
+                  data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
+                >
+                  <item.icon className="h-4 w-4" />
+                  {item.label}
+                </Button>
+              </Link>
+            ))}
+          </nav>
+
+          <div className="flex items-center gap-2">
+            {isAuthenticated && (
+              <Link href="/quote">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="relative"
+                  data-testid="button-quote-basket"
+                >
+                  <ShoppingCart className="h-5 w-5" />
+                  {itemCount > 0 && (
+                    <Badge
+                      variant="default"
+                      className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs"
+                    >
+                      {itemCount > 99 ? "99+" : itemCount}
+                    </Badge>
+                  )}
+                </Button>
+              </Link>
+            )}
+
+            {isAuthenticated ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="gap-2"
+                    data-testid="button-user-menu"
+                  >
+                    <User className="h-4 w-4" />
+                    <span className="hidden sm:inline-block max-w-[120px] truncate">
+                      {user?.companyName || user?.email}
+                    </span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  {isAdmin && (
+                    <>
+                      <Link href="/admin">
+                        <DropdownMenuItem className="cursor-pointer" data-testid="link-admin-panel">
+                          <LayoutDashboard className="mr-2 h-4 w-4" />
+                          Admin Panel
+                        </DropdownMenuItem>
+                      </Link>
+                      <DropdownMenuSeparator />
+                    </>
+                  )}
+                  <Link href="/my-quotes">
+                    <DropdownMenuItem className="cursor-pointer" data-testid="link-my-quotes">
+                      <ShoppingCart className="mr-2 h-4 w-4" />
+                      My Quotes
+                    </DropdownMenuItem>
+                  </Link>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="cursor-pointer text-destructive"
+                    onClick={handleLogout}
+                    data-testid="button-logout"
+                  >
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Logout
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <div className="hidden sm:flex items-center gap-2">
+                <Link href="/login">
+                  <Button variant="ghost" size="sm" data-testid="button-login">
+                    Login
+                  </Button>
+                </Link>
+                <Link href="/register">
+                  <Button size="sm" data-testid="button-register">
+                    Register
+                  </Button>
+                </Link>
+              </div>
+            )}
+
+            <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+              <SheetTrigger asChild className="md:hidden">
+                <Button variant="ghost" size="icon" data-testid="button-mobile-menu">
+                  <Menu className="h-5 w-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-[300px] sm:w-[350px]">
+                <div className="flex flex-col gap-4 mt-6">
+                  <div className="flex items-center gap-2 pb-4 border-b">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+                      <Package className="h-5 w-5" />
+                    </div>
+                    <span className="font-semibold text-lg" style={{ fontFamily: "DM Sans, sans-serif" }}>
+                      Pharma Oasis
+                    </span>
+                  </div>
+
+                  <nav className="flex flex-col gap-1">
+                    {publicNavItems.map((item) => (
+                      <Link key={item.href} href={item.href}>
+                        <Button
+                          variant={location === item.href ? "secondary" : "ghost"}
+                          className="w-full justify-start gap-2"
+                          onClick={() => setMobileMenuOpen(false)}
+                        >
+                          <item.icon className="h-4 w-4" />
+                          {item.label}
+                        </Button>
+                      </Link>
+                    ))}
+                  </nav>
+
+                  <div className="border-t pt-4">
+                    {isAuthenticated ? (
+                      <div className="flex flex-col gap-1">
+                        <Link href="/quote">
+                          <Button
+                            variant="ghost"
+                            className="w-full justify-start gap-2"
+                            onClick={() => setMobileMenuOpen(false)}
+                          >
+                            <ShoppingCart className="h-4 w-4" />
+                            Quote Basket
+                            {itemCount > 0 && (
+                              <Badge variant="default" className="ml-auto">
+                                {itemCount}
+                              </Badge>
+                            )}
+                          </Button>
+                        </Link>
+                        <Link href="/my-quotes">
+                          <Button
+                            variant="ghost"
+                            className="w-full justify-start gap-2"
+                            onClick={() => setMobileMenuOpen(false)}
+                          >
+                            <Package className="h-4 w-4" />
+                            My Quotes
+                          </Button>
+                        </Link>
+                        {isAdmin && (
+                          <Link href="/admin">
+                            <Button
+                              variant="ghost"
+                              className="w-full justify-start gap-2"
+                              onClick={() => setMobileMenuOpen(false)}
+                            >
+                              <LayoutDashboard className="h-4 w-4" />
+                              Admin Panel
+                            </Button>
+                          </Link>
+                        )}
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start gap-2 text-destructive"
+                          onClick={() => {
+                            setMobileMenuOpen(false);
+                            handleLogout();
+                          }}
+                        >
+                          <LogOut className="h-4 w-4" />
+                          Logout
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-2">
+                        <Link href="/login">
+                          <Button
+                            variant="outline"
+                            className="w-full"
+                            onClick={() => setMobileMenuOpen(false)}
+                          >
+                            Login
+                          </Button>
+                        </Link>
+                        <Link href="/register">
+                          <Button
+                            className="w-full"
+                            onClick={() => setMobileMenuOpen(false)}
+                          >
+                            Register as Customer
+                          </Button>
+                        </Link>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </SheetContent>
+            </Sheet>
+          </div>
+        </div>
+      </div>
+    </header>
+  );
+}
