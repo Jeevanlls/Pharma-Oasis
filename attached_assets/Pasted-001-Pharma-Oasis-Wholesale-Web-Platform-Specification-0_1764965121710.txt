@@ -1,0 +1,120 @@
+001: Pharma Oasis – Wholesale Web Platform Specification
+002: ----------------------------------------------------
+003:
+004: 1. Project Overview
+005: This document defines the complete requirements for the new Pharma Oasis
+006: wholesale web platform to be built and hosted in one Replit project.
+007: The platform is a B2B quote-based wholesale portal, not a consumer e-commerce shop.
+008:
+009: Registered and approved customers (primarily pharmacies, online pharmacies,
+010: and wholesalers) will log in, browse the catalogue, see pricing, assemble a
+011: quote basket and submit quote requests to Pharma Oasis.
+012:
+013: Suppliers and brand owners will be able to submit partnership enquiries
+014: via a dedicated supplier registration form.
+015:
+016: The internal admin panel will allow the business to manage customers,
+017: suppliers, products, brands, categories and incoming quote requests.
+018:
+019: The visual style must be modern, clean and trustworthy, similar to a
+020: contemporary B2B SaaS platform. The site should reflect Pharma Oasis
+021: as a strong distributor supplying over 3,000 UK pharmacies and working
+022: directly with key brands.
+023:
+024:
+025: 2. Technical & Stack Requirements
+026: ---------------------------------
+027: The entire application (frontend, backend, database and admin panel)
+028: must live in a single Replit project.
+029:
+030: Recommended stack:
+031: - Frontend: React + TypeScript + Vite (or Next.js) with TailwindCSS.
+032: - Backend: Node.js + Express, or Next.js API routes, written in TypeScript.
+033: - Database: SQLite with Prisma (or equivalent) running entirely within Replit.
+034: - Auth: Email + password authentication, passwords hashed, using JWT or sessions.
+035: - Architecture: Monorepo / single project structure for easy operation.
+036:
+037: Required project outputs:
+038: - A clear README explaining installation and migration steps.
+039: - A seed script creating one admin user plus sample brands, categories, products.
+040: - Basic form validation and error handling across the stack.
+041:
+042:
+043: 3. Content & Data Requirements – No Hardcoding
+044: ----------------------------------------------
+045: This is NOT a demo or mockup. It must be a fully functional, production-ready
+046: wholesale platform. All text and content must be dynamic and database-driven.
+047:
+048: The following must be stored in the database:
+049: - Homepage text (hero headline, subheadline, why-us cards, etc.)
+050: - Navigation labels (Products, Brands, How to Order, etc.)
+051: - Static pages (How to Order, Brands & Distribution, Contact Us)
+052: - Brands, categories and full product catalogue
+053: - Site-wide settings (theme, notification emails)
+054:
+055: Avoid hard-coded strings. Use CMS-like tables such as:
+056: - cms_blocks
+057: - site_settings
+058:
+059:
+060: 4. Theming & Design Requirements
+061: --------------------------------
+062: The design must feel like a modern B2B SaaS platform, not a typical shop.
+063: TailwindCSS is required for styling, with consistent spacing, typography and tokens.
+064:
+065: A theme system must support three switchable visual themes.
+066: Themes must be implemented via CSS variables or Tailwind theme classes.
+067: No component may hard-code colours.
+068:
+069:
+070: 4.1 Theme System – Theme Keys
+071: -----------------------------
+072: Themes stored via site_settings table:
+073: - theme_clinical_blue
+074: - theme_premium_offwhite
+075: - theme_tech_slate
+076:
+077: The admin panel includes a dropdown to select the active theme.
+078: The selection updates the UI globally.
+079:
+080:
+081: 4.2 Theme 1 – Clinical Blue
+082: ---------------------------
+083: Key: theme_clinical_blue
+084: Clean, trustworthy, clinical styling.
+085: Primary: #2A6FF2
+086: Primary Hover: #2056C0
+087: Secondary: #0F1D40
+088: Accent: #4FC3F7
+089: Background Main: #F7FAFF
+090: Background Card: #FFFFFF
+091: Text Main: #111827
+092: Muted Text: #6B7280
+093: Border: #E5E7EB
+094:
+095:
+096: 4.3 Theme 2 – Premium Off-White
+097: -------------------------------
+098: Key: theme_premium_offwhite
+099: Warm, premium distributor look.
+100: Primary: #1E5DFE
+101: Gradient: #1E5DFE → #6AA8FF
+102: Background Main: #FAFAF5
+103: Cards: #FFFFFF
+104: Accent: #D4AF37 (subtle, minimal use)
+105:
+106:
+107: 4.4 Theme 3 – Tech Slate
+108: ------------------------
+109: Key: theme_tech_slate
+110: Modern B2B SaaS startup style.
+111: Primary: #2D6EE8
+112: Secondary: #14B8A6
+113: Background Main: #F8FAFC
+114: Header Dark: #0F172A
+115: Cards: #FFFFFF
+116: Text on Dark: #F9FAFB
+117: Border: #E2E8F0
+118:
+119:
+120: 5. User Roles & Permissions

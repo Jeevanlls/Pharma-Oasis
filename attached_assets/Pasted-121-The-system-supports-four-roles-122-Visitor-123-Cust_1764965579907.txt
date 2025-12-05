@@ -1,0 +1,120 @@
+121: The system supports four roles:
+122: - Visitor
+123: - Customer (approved)
+124: - Supplier lead (no login)
+125: - Admin
+126:
+127:
+128: Visitor (Not Logged In)
+129: -----------------------
+130: • Can view homepage, brands, limited product list (no prices)
+131: • Can submit customer registration form
+132: • Can submit supplier registration form
+133:
+134:
+135: Customer (Approved Trade Account)
+136: ---------------------------------
+137: • Logs in after admin approval (status=active)
+138: • Can browse full catalogue with pricing
+139: • Can add items to quote basket
+140: • Can submit quote requests
+141: • Can view previous quotes and status
+142:
+143:
+144: Supplier (Lead Only)
+145: --------------------
+146: • Can submit supplier registration form
+147: • No login required in v1
+148: • Admin manages progress/status
+149:
+150:
+151: Admin
+152: -----
+153: • Access to protected admin panel (/admin)
+154: • Manage customers, suppliers, brands, categories, products
+155: • Review and respond to quote requests
+156: • Manage site settings and themes
+157:
+158:
+159: 6. Public Site – Pages & Content
+160: --------------------------------
+161:
+162: 6.1 Homepage Content (Database Driven)
+163: --------------------------------------
+164: Hero Section:
+165: Headline: "Trusted Wholesale Partner to 3,000+ UK Pharmacies"
+166: Subheadline:
+167: "Pharma Oasis is a licensed healthcare, wellness and beauty
+168: distributor, supplying pharmacies, online retailers and wholesalers
+169: across the UK and beyond."
+170:
+171: Supporting bullets:
+172: - MHRA WDA(H) licensed wholesale distributor
+173: - Direct relationships with leading global brands
+174: - Fast, reliable delivery and competitive pricing
+175:
+176: Buttons:
+177: - Become a Customer
+178: - View Product Catalogue
+179:
+180: Search placeholder:
+181: "Search by product name, EAN or SKU…"
+182:
+183:
+184: Brands Strip:
+185: Title: "Brands You Know. Service You Trust."
+186: Text: "We work directly with a wide range of leading health,
+187: wellness, beauty and OTC brands."
+188:
+189:
+190: Why Work With Pharma Oasis:
+191: Section title: "Why Pharmacies Choose Pharma Oasis"
+192:
+193: Four cards:
+194: 1. 3,000+ UK Pharmacies Supplied
+195: 2. Licensed & GDP-Focused
+196: 3. Strong Sourcing & Competitive Pricing
+197: 4. Flexible Wholesale Support
+198:
+199:
+200: For Pharmacies & Wholesalers:
+201: Title: "For Pharmacies & Wholesalers"
+202: Text:
+203: "Register for a Pharma Oasis trade account. Approved customers can
+204: browse the full catalogue, see pricing, build and submit quote
+205: requests, and work with our team on range planning and promotions."
+206: CTA: Register as a Customer
+207:
+208:
+209: For Brands & Suppliers:
+210: Title: "For Brand Owners & Suppliers"
+211: Text:
+212: "We partner with brand owners and manufacturers who want to reach
+213: more UK pharmacies and healthcare retailers."
+214: CTA: Become a Supplier
+215:
+216:
+217: How We Work:
+218: Title: "Simple, Transparent Wholesale"
+219: Steps:
+220: 1. Register & Get Approved
+221: 2. Browse & Request Quotes Online
+222: 3. We Confirm & Deliver
+223:
+224:
+225: Compliance Strip:
+226: Title: "Compliance First"
+227: Text:
+228: "Pharma Oasis operates under MHRA Wholesale Dealer Authorisation
+229: (WDA(H)) and follows GDP guidelines across our supply chain."
+230:
+231:
+232: 6.2 Product Catalogue Page (/products)
+233: --------------------------------------
+234: • Paginated grid of product cards
+235: • Filters: category, brand, free text, SKU, EAN
+236: • Supports 4,000+ products
+237:
+238: Visitor view:
+239: - Price hidden
+240: - Add to Quote triggers login/register

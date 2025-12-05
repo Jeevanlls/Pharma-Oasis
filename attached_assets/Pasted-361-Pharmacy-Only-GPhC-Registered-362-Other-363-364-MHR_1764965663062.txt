@@ -1,0 +1,115 @@
+361: - Pharmacy Only (GPhC Registered)
+362: - Other
+363:
+364: MHRA Licence Number (optional)
+365: Responsible Person Name (optional)
+366: Responsible Person Email (optional)
+367: Cold Chain Capability (checkbox)
+368: Interested in Controlled/Special Products (checkbox)
+369:
+370:
+371: TRADING DETAILS (optional)
+372: --------------------------
+373: Estimated Monthly Spend (dropdown bands)
+374: Ordering Contact Email (optional)
+375: Accounts Payable Email (optional)
+376: Preferred Order Method (Online Portal, Email, Phone)
+377:
+378:
+379: ADDITIONAL INFORMATION
+380: ----------------------
+381: How did you hear about us (dropdown)
+382: Notes (free-text)
+383: Marketing Consent (checkbox)
+384:
+385:
+386: On submission:
+387: - Create user with role = customer
+388: - Set status = pending
+389: - Do NOT allow login until admin approves
+390: - Show success message
+391:
+392:
+393: 8. Supplier Registration Specification
+394: --------------------------------------
+395: Supplier registration collects company and product information
+396: from manufacturers, brand owners and distributors.
+397: Suppliers do NOT receive logins in v1.
+398: Submissions become supplier_leads records.
+399:
+400:
+401: 8.1 Field List & Labels
+402: -----------------------
+403: Company Name (required)
+404: Trading Name (optional)
+405: Website (optional)
+406: Country (required)
+407: Business Type (required):
+408: - Manufacturer
+409: - Brand Owner
+410: - Distributor
+411: - Wholesaler
+412: - Other
+413:
+414: Contact Name (required)
+415: Job Title (optional)
+416: Email Address (required)
+417: Phone Number (required)
+418:
+419: MHRA / GDP Licences (optional)
+420: GDP Accredited (checkbox)
+421:
+422: Product Categories You Supply (required)
+423: Brand Names You Represent (required)
+424:
+425: Licensed in UK/EU? (dropdown: Yes / Partly / No / N/A)
+426: Exclusivity Interest (checkbox)
+427:
+428: Stock Locations (optional)
+429: Minimum Order Quantities (optional)
+430: Logistics Capability (optional)
+431:
+432: Proposal Summary (required)
+433: Additional Notes (optional)
+434: Marketing Consent (optional)
+435:
+436: On submission:
+437: - Create supplier_leads record
+438: - Set status = new
+439: - Email notification to admin
+440:
+441:
+442: 9. Product Data & CSV Import
+443: ----------------------------
+444: System must support import of 4,000+ products via CSV.
+445: Bulk import lives inside admin panel.
+446: No manual entry for large datasets.
+447:
+448: CSV Columns:
+449: sku
+450: ean
+451: brand_name
+452: product_name
+453: short_description
+454: long_description
+455: category_name
+456: subcategory_name
+457: pack_size
+458: uom
+459: rrp
+460: wholesale_price
+461: moq
+462: vat_rate
+463: is_active
+464: is_featured
+465: image_url
+466: country_of_origin
+467: product_type
+468: storage_conditions
+469: notes_internal
+470:
+471: Import rules:
+472: - Map brand_name → brands table
+473: - Map category_name → categories table
+474: - sku = unique identifier; update if exists
+475: - Accept missing images; show placeholder

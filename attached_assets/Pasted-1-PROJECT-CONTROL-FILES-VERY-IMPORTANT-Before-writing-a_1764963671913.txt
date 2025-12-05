@@ -1,0 +1,119 @@
+1. PROJECT CONTROL FILES (VERY IMPORTANT)
+Before writing any application code, create the following files in the repo:
+DATABASE_FIELD_INDEX.md (Rule #1 – highest priority)
+TASK_LIST.md
+DECISIONS_LOG.md
+1.1 DATABASE_FIELD_INDEX.md (Rule #1)
+This file is the master index of all database tables and fields.
+Rules:
+Before writing or changing any database schema (Prisma models, SQL, etc.), you MUST:
+Open DATABASE_FIELD_INDEX.md
+Add or update the table and field definitions there first.
+Only then update your actual Prisma schema / models / migrations.
+Do NOT randomly invent new field names in the code.
+If you need a new table or field:
+Add it to DATABASE_FIELD_INDEX.md with:
+table name
+field name
+type
+short description
+The DB schema used in code must always match this file.
+Initial content you must create in DATABASE_FIELD_INDEX.md:
+Based on the Word spec, define at least these tables and their fields:
+users
+products
+brands
+categories
+quotes
+quote_items
+supplier_leads
+contact_messages
+cms_blocks
+site_settings
+Use the exact field names described in the document (company_name, sku, ean, etc.).
+If a field already exists in the document, do not rename it.
+1.2 TASK_LIST.md
+This file will contain a checklist of tasks derived from the Word specification.
+Rules:
+Step 1: read the Word document and create a structured task list in TASK_LIST.md with Markdown checkboxes:
+Example:
+ Set up project structure & tooling
+ Implement DB schema & migrations
+ Implement auth (users, roles, sessions)
+ Implement public pages (homepage, catalogue, etc.)
+ Implement admin panel (customers, suppliers, products, quotes, settings)
+ Implement CSV import, etc.
+Group tasks by major sections of the spec:
+e.g. Technical Setup, Database, Public Site, Customer Flows, Supplier Flows, Admin Panel, Theming, Content/CMS.
+Every time you complete a task, update TASK_LIST.md by ticking the checkbox and briefly mentioning what you did.
+Before starting any new coding step, look at TASK_LIST.md and clearly state which item you are working on.
+1.3 DECISIONS_LOG.md
+This file records any non-trivial technical decisions you make.
+Rules:
+Every time you choose one of multiple options (e.g. “Express vs Next.js API routes”, “how to store themes”, etc.), append an entry:
+Date
+Decision
+Reason
+Any impact on the spec
+If you ever deviate slightly from the spec, you must explain the deviation here and keep it as small as possible.
+2. WORKFLOW RULES
+Step 1 – Read & Summarise Spec
+Read PharmaOasis_Wholesale_Platform_Specification.docx.
+Write a short summary of the system in the chat.
+Create DATABASE_FIELD_INDEX.md, TASK_LIST.md, and DECISIONS_LOG.md as described.
+Step 2 – Build & Confirm Task List
+Build a detailed task list in TASK_LIST.md based entirely on the Word document.
+Show me the task list in the chat so I can see what you plan to do.
+Do NOT start coding app features until the task list is written.
+Step 3 – Implement in Small, Clear Steps
+Always say which task you are working on.
+After each stage:
+Update TASK_LIST.md (tick items).
+Update DATABASE_FIELD_INDEX.md if DB fields changed.
+Note important decisions in DECISIONS_LOG.md.
+Step 4 – Stay in Scope
+Implement only what is in the Word spec or what I explicitly ask for.
+If something is unclear, ask for clarification instead of guessing.
+Do NOT create:
+Example/demo themes that don’t match the three themes in the spec.
+Extra pages or flows not requested.
+Multiple separate backends or “demo versions”.
+3. FUNCTIONAL & DESIGN REQUIREMENTS (FROM WORD DOC)
+Use the Word file as the full details, but here is a short reminder so you don’t forget key points:
+Single Replit project – frontend + backend + DB + admin.
+Stack: React + TypeScript + Tailwind; Node/Express or Next.js API; Prisma + SQLite (or equivalent).
+Roles: Visitor, Customer (approved), Supplier lead, Admin.
+Features:
+Public marketing site + product catalogue (no prices for visitors).
+Customer registration & admin approval flow.
+Login for approved customers only.
+Quote basket + quote request flow.
+Supplier registration lead form (no login).
+Admin panel: customers, suppliers, products, brands, categories, quotes, site settings.
+CSV bulk import for 4,000+ products with mapping from brand_name/category_name.
+All content dynamic / database-driven (homepage texts, static pages, etc.).
+Theming system with three switchable themes defined exactly as in the spec.
+Every time there is a clash between your own idea and the document, the document wins.
+4. RULES ABOUT DATABASE & FIELD NAMES
+Follow Rule #1: DATABASE_FIELD_INDEX.md is the master.
+Do NOT:
+invent different names for the same concept (e.g. company vs organisation vs business_name);
+create multiple slightly different tables unless the spec requires it.
+Use consistent naming as given in the spec:
+e.g. company_name, contact_name, estimated_monthly_spend, is_direct_distributor, wholesale_price, etc.
+When adding new fields:
+Add to DATABASE_FIELD_INDEX.md first.
+Then implement in Prisma / schema / migrations.
+Then use in the code.
+5. WHAT TO DO NOW
+Confirm you see PharmaOasis_Wholesale_Platform_Specification.docx in the project.
+Read it fully.
+Create and populate:
+DATABASE_FIELD_INDEX.md
+TASK_LIST.md
+DECISIONS_LOG.md
+Show me:
+Your understanding of the project (short summary),
+The initial database index,
+And the first version of TASK_LIST.md.
+Do not start implementing frontend pages or backend APIs until those three files are done and aligned with the spec.

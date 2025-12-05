@@ -1,0 +1,120 @@
+241: Logged-in customer view:
+242: - Price visible
+243: - MOQ visible
+244: - Quantity selector + Add to Quote button
+245:
+246:
+247: 6.3 Product Detail Page (/products/:id)
+248: ---------------------------------------
+249: Displays:
+250: - Brand
+251: - Product name
+252: - Pack size
+253: - SKU
+254: - EAN
+255: - Category
+256: - Description
+257: - Price (only if logged in)
+258: - Add to Quote button
+259:
+260:
+261: 6.4 Quote Basket & Quote Request (/quote)
+262: ----------------------------------------
+263: The quote basket shows:
+264: - Item list
+265: - Quantities
+266: - Price (if logged in)
+267:
+268: Customer actions:
+269: - Update quantity
+270: - Add general note
+271: - Submit quote request
+272:
+273: On submission:
+274: - Create quote record
+275: - Create quote_items records
+276: - Set quote status = Pending
+277: - Notify admin email
+278: - Show confirmation screen
+279: - Store quote for customer history
+280:
+281:
+282: 6.5 Static Content Pages
+283: -------------------------
+284: Stored in cms_blocks table.
+285: Editable in admin panel.
+286:
+287: Required static pages:
+288: - How to Order
+289: - Brands & Distribution
+290: - Contact Us
+291:
+292:
+293: 7. Customer Registration Specification
+294: --------------------------------------
+295: Customer registration collects extensive business info.
+296: All fields must have validation.
+297: Customer cannot log in until manually approved.
+298:
+299:
+300: 7.1 Field List & Labels
+301: -----------------------
+302:
+303: BUSINESS INFORMATION
+304: --------------------
+305: Business Type (required)
+306: Options:
+307: - Community Pharmacy
+308: - Online Pharmacy
+309: - Wholesaler
+310: - Retailer
+311: - Healthcare Business
+312: - Other
+313:
+314: Company Name (required)
+315: Trading Name (optional)
+316: GPhC Number (required for pharmacies)
+317: Company Registration Number (optional)
+318: VAT Number (optional)
+319:
+320:
+321: CONTACT DETAILS
+322: ----------------
+323: Primary Contact Name (required)
+324: Job Title (optional)
+325: Email Address (required, login email)
+326: Phone Number (required)
+327: Mobile Number (optional)
+328:
+329:
+330: LOGIN SECURITY
+331: --------------
+332: Password (required)
+333: Confirm Password (required)
+334:
+335:
+336: BILLING ADDRESS
+337: ----------------
+338: Billing Address Line 1 (required)
+339: Address Line 2 (optional)
+340: City (required)
+341: Postcode (required)
+342: Country (required, default UK)
+343:
+344:
+345: DELIVERY ADDRESS
+346: -----------------
+347: Same As Billing (checkbox)
+348: If not same:
+349: - Delivery Address Line 1 (required)
+350: - Delivery Address Line 2 (optional)
+351: - Delivery City (required)
+352: - Delivery Postcode (required)
+353: - Delivery Country (required)
+354:
+355:
+356: COMPLIANCE & LICENSING (optional)
+357: ---------------------------------
+358: MHRA Licence Type dropdown:
+359: - None
+360: - Wholesale Dealer (WDA(H))

@@ -1,0 +1,96 @@
+Here are my answers to your clarification questions:
+1️⃣ Email Notifications
+Use a simple SMTP/nodemailer setup.
+Implement a generic email utility using Nodemailer.
+Read SMTP settings from environment variables:
+SMTP_HOST
+SMTP_PORT
+SMTP_USER
+SMTP_PASS
+NOTIFICATION_EMAIL (admin recipient)
+In development, if SMTP is not configured, you can:
+Log the email payload to the console
+And not throw an error (just warn).
+Emails should be sent for:
+New customer registration (to admin)
+New supplier registration (to admin)
+New quote submission (to admin)
+Optionally contact form submissions (see point 4).
+2️⃣ Image Storage
+For v1:
+Store only external URLs in image_url (string).
+No file upload required in v1.
+Frontend must:
+Show a neutral placeholder if image_url is empty.
+Render the provided URL when present.
+Later we can extend with uploads, but for now stick to URLs only.
+3️⃣ Categories & Subcategories
+Use one categories table with parent/child relationships – no separate subcategories table.
+categories:
+id
+name
+parent_id (nullable – NULL = top-level category)
+Mapping logic for CSV:
+category_name → parent category (parent_id = NULL)
+subcategory_name (if present) → child record whose parent_id = parent category id
+In products:
+Store both:
+category_id (top-level)
+subcategory_id (nullable, child)
+If subcategory_name is empty, just use category_id.
+4️⃣ Contact Us Page
+Yes, I want a working contact form, not just static text.
+Implement a contact form with these fields:
+name
+email
+phone (optional)
+message
+On submit:
+Create a contact_messages record
+Send an email to NOTIFICATION_EMAIL
+Show a success message to the user
+So: Contact Us = static content plus a functional form.
+5️⃣ Quote Status Values
+Let’s define a simple, clear status workflow:
+Allowed statuses for quotes.status:
+pending – created by customer, awaiting review (default)
+quoted – admin has prepared/sent a quote
+accepted – customer has accepted the quote (set manually by admin)
+declined – quote declined / not proceeding
+closed – completed/archived (final state)
+Default on creation: pending.
+Admin UI should allow changing between these values.
+6️⃣ Admin Seed User
+Yes, create an initial admin user in the seed script:
+Email: admin@pharmaoasis.com
+Password: Admin!234 (or similar)
+Role: admin
+Status: active
+Document this clearly in the README so it can be changed immediately in production.
+NEXT STEP – CONTROL FILES (VERY IMPORTANT)
+Now please proceed with the master process:
+Create DATABASE_FIELD_INDEX.md
+List all tables and fields exactly as per the spec + the clarifications above.
+This file is the master reference for schema and must be updated before any schema change.
+Create TASK_LIST.md
+Full checklist of work, grouped by:
+Setup & tooling
+Database & Prisma schema
+Auth
+Public site pages
+Customer flows
+Supplier flows
+Quote flows
+Admin panel (customers, suppliers, products, brands, categories, quotes, settings, CMS)
+CSV import
+Theming
+Email notifications
+Use markdown checkboxes (- [ ]).
+Create DECISIONS_LOG.md
+Log any non-trivial decisions not explicitly defined above.
+👉 Do NOT start writing application code yet.
+First show me:
+The contents of DATABASE_FIELD_INDEX.md
+The contents of TASK_LIST.md
+The initial DECISIONS_LOG.md
+I will review and then approve before you start implementation.
