@@ -1,8 +1,17 @@
+import * as React from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PublicLayout } from "@/components/layout/public-layout";
+import { useQuery } from "@tanstack/react-query";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  type CarouselApi,
+} from "@/components/ui/carousel";
+import type { HeroSlide, Brand } from "@shared/schema";
 import {
   Package,
   Shield,
@@ -14,6 +23,8 @@ import {
   Zap,
   Clock,
   Building2,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
 const stats = [
@@ -62,13 +73,42 @@ const processSteps = [
   { step: 4, title: "Receive & Order", description: "Our team reviews your request and provides a formal quote. Accept and place your order." },
 ];
 
-export default function HomePage() {
-  return (
-    <PublicLayout>
-      <section className="relative overflow-hidden bg-gradient-to-br from-sidebar via-sidebar to-sidebar/95">
-        <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSA2MCAwIEwgMCAwIDAgNjAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjAzKSIgc3Ryb2tlLXdpZHRoPSIxIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI2dyaWQpIi8+PC9zdmc+')] opacity-50" />
-        
+function HeroCarousel() {
+  const { data: slides = [], isLoading } = useQuery<HeroSlide[]>({
+    queryKey: ["/api/home/slides"],
+  });
+
+  const [api, setApi] = React.useState<CarouselApi>();
+  const [current, setCurrent] = React.useState(0);
+
+  React.useEffect(() => {
+    if (!api) return;
+
+    const onSelect = () => {
+      setCurrent(api.selectedScrollSnap());
+    };
+
+    api.on("select", onSelect);
+    onSelect();
+
+    const autoplay = setInterval(() => {
+      if (api.canScrollNext()) {
+        api.scrollNext();
+      } else {
+        api.scrollTo(0);
+      }
+    }, 5000);
+
+    return () => {
+      api.off("select", onSelect);
+      clearInterval(autoplay);
+    };
+  }, [api]);
+
+  if (isLoading || slides.length === 0) {
+    return (
+      <section className="relative overflow-hidden bg-gradient-to-br from-sidebar via-sidebar to-sidebar/95 min-h-[500px]">
+        <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
         <div className="relative mx-auto max-w-7xl px-4 py-24 sm:px-6 sm:py-32 lg:px-8">
           <div className="mx-auto max-w-3xl text-center">
             <Badge variant="outline" className="mb-6 bg-white/10 text-white border-white/20 backdrop-blur-sm">
@@ -94,7 +134,7 @@ export default function HomePage() {
                 <Button 
                   size="lg" 
                   variant="outline" 
-                  className="w-full sm:w-auto bg-white/10 text-white border-white/20 hover:bg-white/20 backdrop-blur-sm"
+                  className="w-full sm:w-auto bg-white/10 text-white border-white/20 backdrop-blur-sm"
                   data-testid="button-hero-browse"
                 >
                   Browse Products
@@ -102,19 +142,193 @@ export default function HomePage() {
               </Link>
             </div>
           </div>
+        </div>
+      </section>
+    );
+  }
 
-          <div className="mt-16 grid grid-cols-2 gap-4 sm:grid-cols-4 sm:gap-8">
-            {stats.map((stat) => (
-              <div key={stat.label} className="text-center">
-                <p className="text-3xl font-bold text-white sm:text-4xl" style={{ fontFamily: "DM Sans, sans-serif" }}>
-                  {stat.value}
-                </p>
-                <p className="mt-1 text-sm text-white/70">{stat.label}</p>
+  return (
+    <section className="relative" data-testid="hero-carousel">
+      <Carousel 
+        opts={{ loop: true }} 
+        setApi={setApi}
+        className="w-full"
+      >
+        <CarouselContent className="ml-0">
+          {slides.map((slide) => (
+            <CarouselItem
+              key={slide.id}
+              className="pl-0 relative min-h-[500px] sm:min-h-[550px]"
+            >
+              {slide.imageUrl && (
+                <img
+                  src={slide.imageUrl}
+                  alt={slide.title}
+                  className="absolute inset-0 w-full h-full object-cover"
+                />
+              )}
+              <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-transparent" />
+              <div className="relative mx-auto max-w-7xl px-4 py-24 sm:px-6 sm:py-32 lg:px-8 h-full flex items-center min-h-[500px] sm:min-h-[550px]">
+                <div className="max-w-2xl">
+                  <Badge variant="outline" className="mb-6 bg-white/10 text-white border-white/20 backdrop-blur-sm">
+                    <Zap className="mr-1.5 h-3 w-3" />
+                    Trusted by 3,000+ UK Pharmacies
+                  </Badge>
+                  <h1 
+                    className="text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-5xl mb-4" 
+                    style={{ fontFamily: "DM Sans, sans-serif" }}
+                    data-testid={`hero-title-${slide.id}`}
+                  >
+                    {slide.title}
+                  </h1>
+                  {slide.subtitle && (
+                    <p className="text-lg leading-8 text-white/90 mb-6" data-testid={`hero-subtitle-${slide.id}`}>
+                      {slide.subtitle}
+                    </p>
+                  )}
+                  {slide.ctaLabel && slide.ctaHref && (
+                    <Link href={slide.ctaHref}>
+                      <Button 
+                        size="lg" 
+                        className="gap-2"
+                        data-testid={`hero-cta-${slide.id}`}
+                      >
+                        {slide.ctaLabel}
+                        <ArrowRight className="h-4 w-4" />
+                      </Button>
+                    </Link>
+                  )}
+                </div>
+              </div>
+            </CarouselItem>
+          ))}
+        </CarouselContent>
+      </Carousel>
+
+      {slides.length > 1 && (
+        <>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/30 text-white backdrop-blur-sm z-10"
+            onClick={() => api?.scrollPrev()}
+            data-testid="button-hero-prev"
+          >
+            <ChevronLeft className="h-6 w-6" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/30 text-white backdrop-blur-sm z-10"
+            onClick={() => api?.scrollNext()}
+            data-testid="button-hero-next"
+          >
+            <ChevronRight className="h-6 w-6" />
+          </Button>
+
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2 z-10">
+            {slides.map((_, index) => (
+              <button
+                key={index}
+                className={`w-3 h-3 rounded-full transition-all ${
+                  index === current 
+                    ? "bg-white w-8" 
+                    : "bg-white/50"
+                }`}
+                onClick={() => api?.scrollTo(index)}
+                data-testid={`hero-dot-${index}`}
+              />
+            ))}
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
+function BrandStrip() {
+  const { data: brands = [], isLoading } = useQuery<Brand[]>({
+    queryKey: ["/api/home/brands"],
+  });
+
+  if (isLoading || brands.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className="py-8 bg-muted/50 border-y" data-testid="brand-strip">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <p className="text-center text-sm text-muted-foreground mb-6 uppercase tracking-wider font-medium" data-testid="text-brand-strip-title">
+          Trusted Brands We Distribute
+        </p>
+        <div className="relative overflow-hidden">
+          <div 
+            className="flex gap-12 animate-marquee"
+            style={{
+              animation: "marquee 30s linear infinite",
+            }}
+          >
+            {[...brands, ...brands].map((brand, index) => (
+              <div
+                key={`${brand.id}-${index}`}
+                className="flex-shrink-0 flex items-center justify-center h-16 w-32"
+                data-testid={`brand-item-${index}`}
+              >
+                {brand.logoUrl ? (
+                  <img
+                    src={brand.logoUrl}
+                    alt={brand.name}
+                    className="max-h-12 max-w-full object-contain grayscale opacity-70 hover:grayscale-0 hover:opacity-100 transition-all duration-300"
+                  />
+                ) : (
+                  <span className="text-lg font-semibold text-muted-foreground/60" data-testid={`brand-name-${index}`}>
+                    {brand.name}
+                  </span>
+                )}
               </div>
             ))}
           </div>
         </div>
-      </section>
+      </div>
+    </section>
+  );
+}
+
+function StatsBar() {
+  return (
+    <section className="py-12 bg-sidebar text-white" data-testid="stats-bar">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-2 gap-8 sm:grid-cols-4">
+          {stats.map((stat, index) => (
+            <div key={stat.label} className="text-center" data-testid={`stat-item-${index}`}>
+              <p className="text-3xl font-bold sm:text-4xl" style={{ fontFamily: "DM Sans, sans-serif" }} data-testid={`stat-value-${index}`}>
+                {stat.value}
+              </p>
+              <p className="mt-1 text-sm text-white/70" data-testid={`stat-label-${index}`}>{stat.label}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+export default function HomePage() {
+  return (
+    <PublicLayout>
+      <style>{`
+        @keyframes marquee {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
+        .animate-marquee {
+          width: max-content;
+        }
+      `}</style>
+
+      <HeroCarousel />
+      <BrandStrip />
+      <StatsBar />
 
       <section className="py-16 sm:py-24 bg-muted/30">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -308,7 +522,7 @@ export default function HomePage() {
               <Button 
                 size="lg" 
                 variant="secondary"
-                className="w-full sm:w-auto gap-2 bg-white text-primary hover:bg-white/90"
+                className="w-full sm:w-auto gap-2 bg-white text-primary"
                 data-testid="button-cta-register"
               >
                 Register Now
@@ -319,7 +533,7 @@ export default function HomePage() {
               <Button 
                 size="lg" 
                 variant="outline" 
-                className="w-full sm:w-auto bg-transparent text-white border-white/30 hover:bg-white/10"
+                className="w-full sm:w-auto bg-transparent text-white border-white/30"
               >
                 Contact Sales
               </Button>
