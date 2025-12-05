@@ -296,15 +296,15 @@ function BrandStrip() {
 
 function StatsBar() {
   return (
-    <section className="py-12 bg-sidebar text-white" data-testid="stats-bar">
+    <section className="py-12 bg-sidebar" data-testid="stats-bar">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-2 gap-8 sm:grid-cols-4">
           {stats.map((stat, index) => (
             <div key={stat.label} className="text-center" data-testid={`stat-item-${index}`}>
-              <p className="text-3xl font-bold sm:text-4xl" style={{ fontFamily: "DM Sans, sans-serif" }} data-testid={`stat-value-${index}`}>
+              <p className="text-3xl font-bold sm:text-4xl text-sidebar-foreground" style={{ fontFamily: "DM Sans, sans-serif" }} data-testid={`stat-value-${index}`}>
                 {stat.value}
               </p>
-              <p className="mt-1 text-sm text-white/70" data-testid={`stat-label-${index}`}>{stat.label}</p>
+              <p className="mt-1 text-sm text-sidebar-foreground/70" data-testid={`stat-label-${index}`}>{stat.label}</p>
             </div>
           ))}
         </div>
@@ -508,12 +508,12 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="py-16 sm:py-24 bg-primary text-primary-foreground">
+      <section className="py-16 sm:py-24 bg-sidebar">
         <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl mb-6" style={{ fontFamily: "DM Sans, sans-serif" }}>
+          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl mb-6 text-sidebar-foreground" style={{ fontFamily: "DM Sans, sans-serif" }}>
             Ready to Get Started?
           </h2>
-          <p className="text-lg text-primary-foreground/80 mb-8 max-w-2xl mx-auto">
+          <p className="text-lg text-sidebar-foreground/70 mb-8 max-w-2xl mx-auto">
             Join thousands of UK pharmacies who trust Pharma Oasis for their wholesale healthcare needs.
             Register today and get access to competitive pricing.
           </p>
@@ -521,8 +521,7 @@ export default function HomePage() {
             <Link href="/register">
               <Button 
                 size="lg" 
-                variant="secondary"
-                className="w-full sm:w-auto gap-2 bg-white text-primary"
+                className="w-full sm:w-auto gap-2"
                 data-testid="button-cta-register"
               >
                 Register Now
@@ -533,7 +532,7 @@ export default function HomePage() {
               <Button 
                 size="lg" 
                 variant="outline" 
-                className="w-full sm:w-auto bg-transparent text-white border-white/30"
+                className="w-full sm:w-auto border-sidebar-foreground/30 text-sidebar-foreground"
               >
                 Contact Sales
               </Button>
