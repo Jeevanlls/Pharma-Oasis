@@ -63,6 +63,8 @@ export interface IStorage {
   getQuotesByUser(userId: number): Promise<Quote[]>;
   getAllQuotes(): Promise<Quote[]>;
   getQuotesByStatus(status: string): Promise<Quote[]>;
+  getQuoteVersionHistory(quoteId: number): Promise<Quote[]>;
+  createQuoteVersion(quoteId: number): Promise<Quote>;
 
   // Quote Items
   createQuoteItem(item: InsertQuoteItem): Promise<QuoteItem>;
@@ -345,6 +347,63 @@ export class DatabaseStorage implements IStorage {
 
   async getQuotesByStatus(status: string): Promise<Quote[]> {
     return db.select().from(quotes).where(eq(quotes.status, status)).orderBy(desc(quotes.createdAt));
+  }
+
+  async getQuoteVersionHistory(quoteId: number): Promise<Quote[]> {
+    const quote = await this.getQuote(quoteId);
+    if (!quote) return [];
+    
+    const rootQuoteId = quote.parentQuoteId ?? quote.id;
+    
+    const allVersions = await db.select().from(quotes)
+      .where(or(eq(quotes.id, rootQuoteId), eq(quotes.parentQuoteId, rootQuoteId)))
+      .orderBy(asc(quotes.version));
+    
+    return allVersions;
+  }
+
+  async createQuoteVersion(quoteId: number): Promise<Quote> {
+    return await db.transaction(async (tx) => {
+      const [originalQuote] = await tx.select().from(quotes).where(eq(quotes.id, quoteId));
+      if (!originalQuote) {
+        throw new Error("Quote not found");
+      }
+      
+      const originalItems = await tx.select().from(quoteItems).where(eq(quoteItems.quoteId, quoteId));
+      
+      const rootQuoteId = originalQuote.parentQuoteId ?? originalQuote.id;
+      
+      const existingVersions = await tx.select({ version: quotes.version }).from(quotes)
+        .where(or(eq(quotes.id, rootQuoteId), eq(quotes.parentQuoteId, rootQuoteId)));
+      
+      const maxVersion = Math.max(...existingVersions.map(q => q.version || 1), 0);
+      const newVersion = maxVersion + 1;
+      
+      const [newQuote] = await tx.insert(quotes).values({
+        userId: originalQuote.userId,
+        status: "pending",
+        customerNotes: originalQuote.customerNotes,
+        adminNotes: null,
+        totalEstimate: originalQuote.totalEstimate,
+        expiryDate: null,
+        version: newVersion,
+        parentQuoteId: rootQuoteId,
+      }).returning();
+      
+      if (originalItems.length > 0) {
+        await tx.insert(quoteItems).values(
+          originalItems.map(item => ({
+            quoteId: newQuote.id,
+            productId: item.productId,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            lineTotal: item.lineTotal,
+          }))
+        );
+      }
+      
+      return newQuote;
+    });
   }
 
   // ==================== QUOTE ITEMS ====================

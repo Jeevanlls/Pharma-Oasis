@@ -125,6 +125,9 @@ export const quotes = pgTable("quotes", {
   customerNotes: text("customer_notes"),
   adminNotes: text("admin_notes"),
   totalEstimate: decimal("total_estimate", { precision: 12, scale: 2 }),
+  expiryDate: timestamp("expiry_date"),
+  version: integer("version").notNull().default(1),
+  parentQuoteId: integer("parent_quote_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

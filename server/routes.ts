@@ -723,15 +723,158 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     }
   });
 
+  // Quote ID param schema for validation
+  const quoteIdParamSchema = z.object({
+    id: z.coerce.number().int().positive(),
+  });
+
+  // Valid status transitions (used by both single and bulk update)
+  const validQuoteStatusTransitions: Record<string, string[]> = {
+    pending: ["quoted", "declined"],
+    quoted: ["accepted", "declined", "closed"],
+    accepted: ["closed"],
+    declined: ["closed"],
+    closed: [],
+  };
+
+  // Single quote update schema
+  const singleQuoteUpdateSchema = z.object({
+    status: z.enum(["pending", "quoted", "accepted", "declined", "closed"]).optional(),
+    adminNotes: z.string().max(5000).optional(),
+    expiryDate: z.coerce.date().optional().refine(
+      date => !date || date > new Date(),
+      "Expiry date must be in the future"
+    ),
+  });
+
   app.patch("/api/admin/quotes/:id", requireAdmin, async (req, res) => {
     try {
-      const quote = await storage.updateQuote(Number(req.params.id), req.body);
+      const { id } = quoteIdParamSchema.parse(req.params);
+      const updates = singleQuoteUpdateSchema.parse(req.body);
+      
+      if (updates.status) {
+        const existingQuote = await storage.getQuote(id);
+        if (!existingQuote) {
+          return res.status(404).json({ message: "Quote not found" });
+        }
+        
+        const allowed = validQuoteStatusTransitions[existingQuote.status] || [];
+        if (!allowed.includes(updates.status)) {
+          return res.status(400).json({ 
+            message: `Invalid status transition from ${existingQuote.status} to ${updates.status}` 
+          });
+        }
+        
+        if (updates.status === "quoted" && !updates.expiryDate) {
+          return res.status(400).json({ message: "Expiry date is required when setting status to quoted" });
+        }
+      }
+      
+      const quote = await storage.updateQuote(id, updates);
       if (!quote) {
         return res.status(404).json({ message: "Quote not found" });
       }
       res.json(quote);
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
       res.status(500).json({ message: "Failed to update quote" });
+    }
+  });
+
+  // Get quote version history
+  app.get("/api/admin/quotes/:id/versions", requireAdmin, async (req, res) => {
+    try {
+      const { id } = quoteIdParamSchema.parse(req.params);
+      const versions = await storage.getQuoteVersionHistory(id);
+      res.json(versions);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid quote ID" });
+      }
+      console.error("Failed to get version history:", error);
+      res.status(500).json({ message: "Failed to fetch version history" });
+    }
+  });
+
+  // Create new version of a quote
+  app.post("/api/admin/quotes/:id/version", requireAdmin, async (req, res) => {
+    try {
+      const { id } = quoteIdParamSchema.parse(req.params);
+      const newVersion = await storage.createQuoteVersion(id);
+      res.status(201).json(newVersion);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid quote ID" });
+      }
+      console.error("Failed to create version:", error);
+      if (error instanceof Error && error.message === "Quote not found") {
+        return res.status(404).json({ message: "Quote not found" });
+      }
+      res.status(500).json({ message: "Failed to create new version" });
+    }
+  });
+
+  // Bulk update schema for validation
+  const bulkQuoteUpdateSchema = z.object({
+    quoteIds: z.array(z.number().int().positive()).min(1, "At least one quote ID required"),
+    updates: z.object({
+      status: z.enum(["pending", "quoted", "accepted", "declined", "closed"]).optional(),
+      adminNotes: z.string().max(5000).optional(),
+      expiryDate: z.coerce.date().optional().refine(
+        date => !date || date > new Date(),
+        "Expiry date must be in the future"
+      ),
+    }).refine(data => Object.keys(data).length > 0, "At least one update field required"),
+  });
+
+  // Bulk update quotes (for bulk approval)
+  app.post("/api/admin/quotes/bulk-update", requireAdmin, async (req, res) => {
+    try {
+      const validatedData = bulkQuoteUpdateSchema.parse(req.body);
+      const { quoteIds, updates } = validatedData;
+      
+      const existingQuotes = await Promise.all(
+        quoteIds.map(id => storage.getQuote(id))
+      );
+      
+      const invalidTransitions: number[] = [];
+      if (updates.status) {
+        for (let i = 0; i < existingQuotes.length; i++) {
+          const quote = existingQuotes[i];
+          if (quote) {
+            const allowed = validQuoteStatusTransitions[quote.status] || [];
+            if (!allowed.includes(updates.status)) {
+              invalidTransitions.push(quoteIds[i]);
+            }
+          }
+        }
+      }
+      
+      if (invalidTransitions.length > 0) {
+        return res.status(400).json({ 
+          message: `Invalid status transition for quote(s): ${invalidTransitions.join(", ")}`,
+          invalidQuotes: invalidTransitions
+        });
+      }
+      
+      if (updates.status === "quoted" && !updates.expiryDate) {
+        return res.status(400).json({ message: "Expiry date is required when setting status to quoted" });
+      }
+      
+      const results = await Promise.all(
+        quoteIds.map(id => storage.updateQuote(id, updates))
+      );
+      
+      const successCount = results.filter(Boolean).length;
+      res.json({ updated: successCount, quotes: results.filter(Boolean) });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Bulk update error:", error);
+      res.status(500).json({ message: "Failed to bulk update quotes" });
     }
   });
 
