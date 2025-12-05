@@ -17,6 +17,7 @@ import ContactPage from "@/pages/contact";
 import HowToOrderPage from "@/pages/how-to-order";
 import QuotePage from "@/pages/quote";
 import MyQuotesPage from "@/pages/my-quotes";
+import QuoteDetailPage from "@/pages/quote-detail";
 import SupplierRegistrationPage from "@/pages/supplier-registration";
 import DashboardPage from "@/pages/dashboard";
 
@@ -66,6 +67,7 @@ function Router() {
       <Route path="/how-to-order" component={HowToOrderPage} />
       <Route path="/quote" component={QuotePage} />
       <Route path="/my-quotes" component={MyQuotesPage} />
+      <Route path="/my-quotes/:id" component={QuoteDetailPage} />
       <Route path="/dashboard" component={DashboardPage} />
       <Route path="/supplier-registration" component={SupplierRegistrationPage} />
       

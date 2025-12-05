@@ -449,6 +449,51 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     }
   });
 
+  // Customer quote response (accept/decline)
+  const customerQuoteResponseSchema = z.object({
+    status: z.enum(["accepted", "declined"]),
+  });
+
+  app.patch("/api/quotes/:id", requireActiveCustomer, async (req: any, res) => {
+    try {
+      const quoteId = Number(req.params.id);
+      const { status } = customerQuoteResponseSchema.parse(req.body);
+      
+      const quote = await storage.getQuote(quoteId);
+      if (!quote) {
+        return res.status(404).json({ message: "Quote not found" });
+      }
+      
+      if (quote.userId !== req.user.id) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      if (quote.status !== "quoted") {
+        return res.status(400).json({ 
+          message: "Only quotes with 'quoted' status can be accepted or declined" 
+        });
+      }
+      
+      if (quote.expiryDate && new Date(quote.expiryDate) < new Date()) {
+        return res.status(400).json({ 
+          message: "This quote has expired. Please request a new quote." 
+        });
+      }
+      
+      const updatedQuote = await storage.updateQuote(quoteId, { status });
+      
+      console.log(`[EMAIL] Quote #${quoteId} ${status} by ${req.user.companyName}`);
+      
+      res.json(updatedQuote);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid status. Must be 'accepted' or 'declined'" });
+      }
+      console.error("Error updating quote:", error);
+      res.status(500).json({ message: "Failed to update quote" });
+    }
+  });
+
   // ==================== CMS & SETTINGS (PUBLIC) ====================
   app.get("/api/cms/:key", async (req, res) => {
     try {
@@ -921,7 +966,7 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
 
   app.patch("/api/admin/messages/:id/read", requireAdmin, async (req, res) => {
     try {
-      const message = await storage.updateContactMessage(Number(req.params.id), { isRead: true });
+      const message = await storage.updateContactMessage(Number(req.params.id), { status: "read" });
       if (!message) {
         return res.status(404).json({ message: "Message not found" });
       }
