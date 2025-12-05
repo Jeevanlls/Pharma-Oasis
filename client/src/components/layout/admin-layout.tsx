@@ -27,8 +27,9 @@ import {
   MessageSquare,
   Settings,
   LogOut,
-  ChevronLeft,
   Home,
+  Image,
+  Star,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 
@@ -36,7 +37,7 @@ interface AdminLayoutProps {
   children: React.ReactNode;
 }
 
-const menuItems = [
+const mainMenuItems = [
   { title: "Dashboard", href: "/admin", icon: LayoutDashboard },
   { title: "Users", href: "/admin/users", icon: Users },
   { title: "Products", href: "/admin/products", icon: Package },
@@ -46,6 +47,14 @@ const menuItems = [
   { title: "CSV Import", href: "/admin/import", icon: Upload },
   { title: "Suppliers", href: "/admin/suppliers", icon: Globe },
   { title: "Messages", href: "/admin/messages", icon: MessageSquare },
+];
+
+const homepageMenuItems = [
+  { title: "Hero Slides", href: "/admin/hero-slides", icon: Image },
+  { title: "Featured Brands", href: "/admin/featured-brands", icon: Star },
+];
+
+const siteMenuItems = [
   { title: "CMS", href: "/admin/cms", icon: LayoutDashboard },
   { title: "Settings", href: "/admin/settings", icon: Settings },
 ];
@@ -82,7 +91,49 @@ export function AdminLayout({ children }: AdminLayoutProps) {
               <SidebarGroupLabel>Management</SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
-                  {menuItems.map((item) => (
+                  {mainMenuItems.map((item) => (
+                    <SidebarMenuItem key={item.href}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={location === item.href}
+                      >
+                        <Link href={item.href}>
+                          <item.icon className="h-4 w-4" />
+                          <span>{item.title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+
+            <SidebarGroup>
+              <SidebarGroupLabel>Homepage</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {homepageMenuItems.map((item) => (
+                    <SidebarMenuItem key={item.href}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={location === item.href}
+                      >
+                        <Link href={item.href}>
+                          <item.icon className="h-4 w-4" />
+                          <span>{item.title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+
+            <SidebarGroup>
+              <SidebarGroupLabel>Site</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {siteMenuItems.map((item) => (
                     <SidebarMenuItem key={item.href}>
                       <SidebarMenuButton
                         asChild

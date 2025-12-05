@@ -46,10 +46,7 @@ export default function AdminBrandsPage() {
 
   const createMutation = useMutation({
     mutationFn: async (data: InsertBrand) => {
-      return apiRequest("/api/admin/brands", {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
+      return apiRequest("POST", "/api/admin/brands", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/brands"] });
@@ -65,10 +62,7 @@ export default function AdminBrandsPage() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: Partial<InsertBrand> }) => {
-      return apiRequest(`/api/admin/brands/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify(data),
-      });
+      return apiRequest("PATCH", `/api/admin/brands/${id}`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/brands"] });
@@ -85,9 +79,7 @@ export default function AdminBrandsPage() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      return apiRequest(`/api/admin/brands/${id}`, {
-        method: "DELETE",
-      });
+      return apiRequest("DELETE", `/api/admin/brands/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/brands"] });
@@ -314,7 +306,7 @@ export default function AdminBrandsPage() {
                   render={({ field }) => (
                     <FormItem className="flex items-center gap-2">
                       <FormControl>
-                        <Switch checked={field.value} onCheckedChange={field.onChange} />
+                        <Switch checked={field.value ?? true} onCheckedChange={field.onChange} />
                       </FormControl>
                       <FormLabel className="!mt-0">Active</FormLabel>
                     </FormItem>
@@ -326,7 +318,7 @@ export default function AdminBrandsPage() {
                   render={({ field }) => (
                     <FormItem className="flex items-center gap-2">
                       <FormControl>
-                        <Switch checked={field.value} onCheckedChange={field.onChange} />
+                        <Switch checked={field.value ?? false} onCheckedChange={field.onChange} />
                       </FormControl>
                       <FormLabel className="!mt-0">Direct Distributor</FormLabel>
                     </FormItem>
