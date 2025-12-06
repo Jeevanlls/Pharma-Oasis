@@ -8,14 +8,35 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { contactFormSchema, type ContactFormData } from "@shared/schema";
+import { contactFormSchema, type ContactFormData, type CompanyLocation } from "@shared/schema";
 import { Mail, Phone, MapPin, Clock, Loader2, CheckCircle2 } from "lucide-react";
+
+interface SiteSettings {
+  site_name?: string;
+  site_tagline?: string;
+  contact_email?: string;
+  contact_phone?: string;
+  active_theme?: string;
+}
 
 export default function ContactPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const { toast } = useToast();
+
+  const { data: siteSettings } = useQuery<SiteSettings>({
+    queryKey: ["/api/site-settings"],
+  });
+
+  const { data: locations = [] } = useQuery<CompanyLocation[]>({
+    queryKey: ["/api/company-locations"],
+  });
+
+  const contactEmail = siteSettings?.contact_email || "trade@pharmaoasis.com";
+  const contactPhone = siteSettings?.contact_phone || "+44 7481 640640";
+  const headquarters = locations.find(l => l.locationType === "headquarters");
 
   const form = useForm<ContactFormData>({
     resolver: zodResolver(contactFormSchema),
@@ -170,8 +191,8 @@ export default function ContactPage() {
                       <div>
                         <h3 className="font-medium">Email</h3>
                         <p className="mt-1 text-sm text-muted-foreground">General enquiries</p>
-                        <a href="mailto:trade@pharmaoasis.com" className="text-sm text-primary hover:underline">
-                          trade@pharmaoasis.com
+                        <a href={`mailto:${contactEmail}`} className="text-sm text-primary hover:underline">
+                          {contactEmail}
                         </a>
                       </div>
                     </div>
@@ -183,8 +204,8 @@ export default function ContactPage() {
                       <div>
                         <h3 className="font-medium">Phone</h3>
                         <p className="mt-1 text-sm text-muted-foreground">Customer support</p>
-                        <a href="tel:+442012345678" className="text-sm text-primary hover:underline">
-                          +44 (0) 20 1234 5678
+                        <a href={`tel:${contactPhone.replace(/\s+/g, "")}`} className="text-sm text-primary hover:underline">
+                          {contactPhone}
                         </a>
                       </div>
                     </div>
@@ -196,9 +217,18 @@ export default function ContactPage() {
                       <div>
                         <h3 className="font-medium">Address</h3>
                         <p className="mt-1 text-sm text-muted-foreground">
-                          Pharma Oasis Ltd<br />
-                          123 Healthcare Way<br />
-                          London, UK EC1A 1BB
+                          {headquarters ? (
+                            <>
+                              {headquarters.companyName}<br />
+                              {headquarters.addressLine1}<br />
+                              {headquarters.city}, {headquarters.postcode}
+                            </>
+                          ) : (
+                            <>
+                              Pharma Oasis Ltd<br />
+                              United Kingdom
+                            </>
+                          )}
                         </p>
                       </div>
                     </div>
@@ -231,7 +261,7 @@ export default function ContactPage() {
                     className="w-full bg-white text-primary hover:bg-white/90"
                     asChild
                   >
-                    <a href="tel:+442012345678">Call Priority Line</a>
+                    <a href={`tel:${contactPhone.replace(/\s+/g, "")}`}>Call {contactPhone}</a>
                   </Button>
                 </CardContent>
               </Card>

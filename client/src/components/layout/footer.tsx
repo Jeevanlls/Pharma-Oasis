@@ -1,8 +1,16 @@
 import { Link } from "wouter";
-import { Mail, Truck, Building2, Globe, Shield, Award } from "lucide-react";
+import { Mail, Phone, Truck, Building2, Globe, Shield, Award } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import logoImage from "@assets/01_1764977214745.png";
 import type { CompanyLocation } from "@shared/schema";
+
+interface SiteSettings {
+  site_name?: string;
+  site_tagline?: string;
+  contact_email?: string;
+  contact_phone?: string;
+  active_theme?: string;
+}
 
 function MHRALogo() {
   return (
@@ -47,6 +55,13 @@ export function Footer() {
   const { data: locations = [] } = useQuery<CompanyLocation[]>({
     queryKey: ["/api/company-locations"],
   });
+
+  const { data: siteSettings } = useQuery<SiteSettings>({
+    queryKey: ["/api/site-settings"],
+  });
+
+  const contactEmail = siteSettings?.contact_email || "trade@pharmaoasis.com";
+  const contactPhone = siteSettings?.contact_phone || "+44 7481 640640";
 
   const headquarters = locations.find(l => l.locationType === "headquarters");
   const otherLocations = locations.filter(l => l.locationType !== "headquarters");
@@ -147,8 +162,16 @@ export function Footer() {
                 <li className="flex items-start gap-2">
                   <Mail className="h-4 w-4 mt-0.5 text-sidebar-foreground/70 flex-shrink-0" />
                   <div>
-                    <a href="mailto:trade@pharmaoasis.com" className="text-sidebar-primary hover:underline">
-                      trade@pharmaoasis.com
+                    <a href={`mailto:${contactEmail}`} className="text-sidebar-primary hover:underline">
+                      {contactEmail}
+                    </a>
+                  </div>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Phone className="h-4 w-4 mt-0.5 text-sidebar-foreground/70 flex-shrink-0" />
+                  <div>
+                    <a href={`tel:${contactPhone.replace(/\s+/g, "")}`} className="text-sidebar-primary hover:underline">
+                      {contactPhone}
                     </a>
                   </div>
                 </li>

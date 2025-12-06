@@ -1087,6 +1087,16 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     }
   });
 
+  // Public site settings (contact info, etc.)
+  app.get("/api/site-settings", async (req, res) => {
+    try {
+      const settings = await storage.getSiteSettings();
+      res.json(settings);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch site settings" });
+    }
+  });
+
   // Company locations (public - for footer/contact page)
   app.get("/api/company-locations", async (req, res) => {
     try {
