@@ -29,29 +29,51 @@ async function seed() {
     console.log("Admin user already exists");
   }
 
-  // Create sample brands - includes both product brands and homepage featured UK brands
-  // Using placeholder API for colorful brand logos with names
+  // Create sample brands - Real UK pharmaceutical and healthcare brands
   const brandData = [
-    // Original product brands (required for product references)
-    { name: "PharmaCare Plus", description: "Premium pharmaceutical products for everyday health", isDirectDistributor: true, isActive: true, logoUrl: "https://placehold.co/200x60/0077b6/ffffff?text=PharmaCare&font=montserrat", isHomeFeatured: false, homePosition: null },
-    { name: "WellnessFirst", description: "Leading wellness and supplement brand", isDirectDistributor: true, isActive: true, logoUrl: "https://placehold.co/200x60/2d6a4f/ffffff?text=WellnessFirst&font=montserrat", isHomeFeatured: false, homePosition: null },
-    { name: "MediCore", description: "Hospital-grade medical supplies and devices", isDirectDistributor: false, isActive: true, logoUrl: "https://placehold.co/200x60/457b9d/ffffff?text=MediCore&font=montserrat", isHomeFeatured: false, homePosition: null },
-    { name: "HealthGuard", description: "First aid and wound care specialists", isDirectDistributor: false, isActive: true, logoUrl: "https://placehold.co/200x60/e63946/ffffff?text=HealthGuard&font=montserrat", isHomeFeatured: false, homePosition: null },
-    { name: "VitaBoost", description: "Vitamins and nutritional supplements", isDirectDistributor: false, isActive: true, logoUrl: "https://placehold.co/200x60/f4a261/1d3557?text=VitaBoost&font=montserrat", isHomeFeatured: false, homePosition: null },
-    { name: "DermaSkin", description: "Professional skincare and dermatology products", isDirectDistributor: true, isActive: true, logoUrl: "https://placehold.co/200x60/d4a5a5/ffffff?text=DermaSkin&font=montserrat", isHomeFeatured: false, homePosition: null },
-    { name: "OralCare Pro", description: "Dental and oral hygiene products", isDirectDistributor: false, isActive: true, logoUrl: "https://placehold.co/200x60/3a86ff/ffffff?text=OralCare&font=montserrat", isHomeFeatured: false, homePosition: null },
-    { name: "CardioHealth", description: "Cardiovascular health monitoring devices", isDirectDistributor: false, isActive: true, logoUrl: "https://placehold.co/200x60/d62828/ffffff?text=CardioHealth&font=montserrat", isHomeFeatured: false, homePosition: null },
-    // Popular UK health & wellness brands for homepage display
-    { name: "Vitabiotics", description: "UK's No.1 vitamin company - supplements for the whole family", isDirectDistributor: true, isActive: true, logoUrl: "https://placehold.co/200x60/e63946/ffffff?text=Vitabiotics&font=montserrat", isHomeFeatured: true, homePosition: 1 },
-    { name: "Holland & Barrett", description: "Health food retailer - vitamins, supplements and natural products", isDirectDistributor: true, isActive: true, logoUrl: "https://placehold.co/200x60/2d6a4f/ffffff?text=H%26B&font=montserrat", isHomeFeatured: true, homePosition: 2 },
-    { name: "Boots", description: "Trusted pharmacy brand - healthcare essentials", isDirectDistributor: true, isActive: true, logoUrl: "https://placehold.co/200x60/1d3557/ffffff?text=Boots&font=montserrat", isHomeFeatured: true, homePosition: 3 },
-    { name: "Seven Seas", description: "Omega-3 and vitamin specialists since 1935", isDirectDistributor: false, isActive: true, logoUrl: "https://placehold.co/200x60/0077b6/ffffff?text=Seven+Seas&font=montserrat", isHomeFeatured: true, homePosition: 4 },
-    { name: "Pukka Herbs", description: "Organic herbal teas and supplements", isDirectDistributor: false, isActive: true, logoUrl: "https://placehold.co/200x60/6b705c/ffffff?text=Pukka&font=montserrat", isHomeFeatured: true, homePosition: 5 },
-    { name: "Simple", description: "Sensitive skin specialists - kind to skin", isDirectDistributor: true, isActive: true, logoUrl: "https://placehold.co/200x60/a8dadc/1d3557?text=Simple&font=montserrat", isHomeFeatured: true, homePosition: 6 },
-    { name: "Grenade", description: "Sports nutrition and protein supplements", isDirectDistributor: false, isActive: true, logoUrl: "https://placehold.co/200x60/000000/00ff00?text=Grenade&font=montserrat", isHomeFeatured: true, homePosition: 7 },
-    { name: "The Body Shop", description: "Ethical beauty and skincare products", isDirectDistributor: false, isActive: true, logoUrl: "https://placehold.co/200x60/386641/ffffff?text=Body+Shop&font=montserrat", isHomeFeatured: true, homePosition: 8 },
-    { name: "Solgar", description: "Premium quality vitamins and supplements", isDirectDistributor: false, isActive: true, logoUrl: "https://placehold.co/200x60/9b2335/ffd700?text=Solgar&font=montserrat", isHomeFeatured: true, homePosition: 9 },
-    { name: "Floradix", description: "Natural iron and vitamin supplements", isDirectDistributor: false, isActive: true, logoUrl: "https://placehold.co/200x60/780000/ffffff?text=Floradix&font=montserrat", isHomeFeatured: true, homePosition: 10 },
+    // Major UK OTC Medicine Brands
+    { name: "Nurofen", description: "Leading ibuprofen-based pain relief brand - trusted for headaches, muscle pain and fever", isDirectDistributor: true, isActive: true, logoUrl: "https://placehold.co/200x60/e63946/ffffff?text=Nurofen&font=montserrat", isHomeFeatured: true, homePosition: 1 },
+    { name: "Panadol", description: "Trusted paracetamol brand for effective pain relief", isDirectDistributor: true, isActive: true, logoUrl: "https://placehold.co/200x60/0077b6/ffffff?text=Panadol&font=montserrat", isHomeFeatured: true, homePosition: 2 },
+    { name: "Calpol", description: "UK's most trusted children's paracetamol brand since 1972", isDirectDistributor: true, isActive: true, logoUrl: "https://placehold.co/200x60/9c27b0/ffffff?text=Calpol&font=montserrat", isHomeFeatured: true, homePosition: 3 },
+    { name: "Lemsip", description: "Cold and flu remedies - fighting cold symptoms for over 50 years", isDirectDistributor: true, isActive: true, logoUrl: "https://placehold.co/200x60/ff9800/ffffff?text=Lemsip&font=montserrat", isHomeFeatured: true, homePosition: 4 },
+    { name: "Strepsils", description: "Sore throat lozenges - the UK's leading throat care brand", isDirectDistributor: true, isActive: true, logoUrl: "https://placehold.co/200x60/f44336/ffffff?text=Strepsils&font=montserrat", isHomeFeatured: true, homePosition: 5 },
+    { name: "Gaviscon", description: "Heartburn and indigestion relief - fast-acting antacid", isDirectDistributor: true, isActive: true, logoUrl: "https://placehold.co/200x60/4caf50/ffffff?text=Gaviscon&font=montserrat", isHomeFeatured: true, homePosition: 6 },
+    { name: "Rennie", description: "Fast-acting antacid tablets for heartburn and indigestion", isDirectDistributor: false, isActive: true, logoUrl: "https://placehold.co/200x60/2196f3/ffffff?text=Rennie&font=montserrat", isHomeFeatured: true, homePosition: 7 },
+    { name: "Imodium", description: "Diarrhoea relief - get back to normal faster", isDirectDistributor: false, isActive: true, logoUrl: "https://placehold.co/200x60/009688/ffffff?text=Imodium&font=montserrat", isHomeFeatured: true, homePosition: 8 },
+    { name: "Benylin", description: "Cough and cold remedies for all the family", isDirectDistributor: true, isActive: true, logoUrl: "https://placehold.co/200x60/673ab7/ffffff?text=Benylin&font=montserrat", isHomeFeatured: true, homePosition: 9 },
+    { name: "Berocca", description: "Effervescent vitamin tablets for energy support", isDirectDistributor: false, isActive: true, logoUrl: "https://placehold.co/200x60/ff5722/ffffff?text=Berocca&font=montserrat", isHomeFeatured: true, homePosition: 10 },
+    // Additional pharmaceutical brands
+    { name: "Piriteze", description: "Allergy relief - one-a-day antihistamines", isDirectDistributor: false, isActive: true, logoUrl: "https://placehold.co/200x60/3f51b5/ffffff?text=Piriteze&font=montserrat", isHomeFeatured: false, homePosition: null },
+    { name: "Piriton", description: "Fast-acting chlorphenamine antihistamine tablets", isDirectDistributor: false, isActive: true, logoUrl: "https://placehold.co/200x60/00bcd4/ffffff?text=Piriton&font=montserrat", isHomeFeatured: false, homePosition: null },
+    { name: "Anbesol", description: "Teething gel and mouth ulcer treatment", isDirectDistributor: false, isActive: true, logoUrl: "https://placehold.co/200x60/795548/ffffff?text=Anbesol&font=montserrat", isHomeFeatured: false, homePosition: null },
+    { name: "Bonjela", description: "Mouth ulcer and teething gel treatment", isDirectDistributor: false, isActive: true, logoUrl: "https://placehold.co/200x60/e91e63/ffffff?text=Bonjela&font=montserrat", isHomeFeatured: false, homePosition: null },
+    { name: "Sudocrem", description: "Nappy rash cream and healing ointment", isDirectDistributor: true, isActive: true, logoUrl: "https://placehold.co/200x60/9e9e9e/ffffff?text=Sudocrem&font=montserrat", isHomeFeatured: false, homePosition: null },
+    { name: "Bepanthen", description: "Nappy care ointment with provitamin B5", isDirectDistributor: false, isActive: true, logoUrl: "https://placehold.co/200x60/00acc1/ffffff?text=Bepanthen&font=montserrat", isHomeFeatured: false, homePosition: null },
+    { name: "Infacol", description: "Colic relief drops for babies", isDirectDistributor: false, isActive: true, logoUrl: "https://placehold.co/200x60/8bc34a/ffffff?text=Infacol&font=montserrat", isHomeFeatured: false, homePosition: null },
+    { name: "Dentinox", description: "Teething gel and colic drops for infants", isDirectDistributor: false, isActive: true, logoUrl: "https://placehold.co/200x60/ffc107/333333?text=Dentinox&font=montserrat", isHomeFeatured: false, homePosition: null },
+    // Vitamins & Supplements brands
+    { name: "Seven Seas", description: "Omega-3 and vitamin specialists since 1935", isDirectDistributor: true, isActive: true, logoUrl: "https://placehold.co/200x60/0077b6/ffffff?text=Seven+Seas&font=montserrat", isHomeFeatured: false, homePosition: null },
+    { name: "Vitabiotics", description: "UK's No.1 vitamin company - Wellman, Wellwoman, Pregnacare", isDirectDistributor: true, isActive: true, logoUrl: "https://placehold.co/200x60/e63946/ffffff?text=Vitabiotics&font=montserrat", isHomeFeatured: false, homePosition: null },
+    { name: "Centrum", description: "Complete A-Z multivitamin range", isDirectDistributor: true, isActive: true, logoUrl: "https://placehold.co/200x60/1976d2/ffffff?text=Centrum&font=montserrat", isHomeFeatured: false, homePosition: null },
+    { name: "Solgar", description: "Premium quality vitamins and supplements since 1947", isDirectDistributor: false, isActive: true, logoUrl: "https://placehold.co/200x60/9b2335/ffd700?text=Solgar&font=montserrat", isHomeFeatured: false, homePosition: null },
+    { name: "Floradix", description: "Natural iron and vitamin supplements - liquid iron formula", isDirectDistributor: false, isActive: true, logoUrl: "https://placehold.co/200x60/780000/ffffff?text=Floradix&font=montserrat", isHomeFeatured: false, homePosition: null },
+    // Skincare brands
+    { name: "E45", description: "Dermatological skincare for dry and sensitive skin", isDirectDistributor: true, isActive: true, logoUrl: "https://placehold.co/200x60/81c784/ffffff?text=E45&font=montserrat", isHomeFeatured: false, homePosition: null },
+    { name: "CeraVe", description: "Developed with dermatologists - ceramide skincare", isDirectDistributor: true, isActive: true, logoUrl: "https://placehold.co/200x60/0d47a1/ffffff?text=CeraVe&font=montserrat", isHomeFeatured: false, homePosition: null },
+    { name: "La Roche-Posay", description: "French dermatological skincare brand", isDirectDistributor: false, isActive: true, logoUrl: "https://placehold.co/200x60/1565c0/ffffff?text=LRP&font=montserrat", isHomeFeatured: false, homePosition: null },
+    { name: "Simple", description: "Sensitive skin specialists - kind to skin", isDirectDistributor: true, isActive: true, logoUrl: "https://placehold.co/200x60/a8dadc/1d3557?text=Simple&font=montserrat", isHomeFeatured: false, homePosition: null },
+    { name: "Nivea", description: "Trusted skincare and body care since 1911", isDirectDistributor: true, isActive: true, logoUrl: "https://placehold.co/200x60/1a237e/ffffff?text=Nivea&font=montserrat", isHomeFeatured: false, homePosition: null },
+    // Oral care brands
+    { name: "Sensodyne", description: "Sensitivity relief toothpaste - for sensitive teeth", isDirectDistributor: true, isActive: true, logoUrl: "https://placehold.co/200x60/0288d1/ffffff?text=Sensodyne&font=montserrat", isHomeFeatured: false, homePosition: null },
+    { name: "Corsodyl", description: "Gum care and treatment products", isDirectDistributor: false, isActive: true, logoUrl: "https://placehold.co/200x60/c62828/ffffff?text=Corsodyl&font=montserrat", isHomeFeatured: false, homePosition: null },
+    { name: "Colgate", description: "Oral care products - toothpaste and mouthwash", isDirectDistributor: true, isActive: true, logoUrl: "https://placehold.co/200x60/d32f2f/ffffff?text=Colgate&font=montserrat", isHomeFeatured: false, homePosition: null },
+    // First aid brands
+    { name: "Savlon", description: "Antiseptic creams, wipes and wound care", isDirectDistributor: false, isActive: true, logoUrl: "https://placehold.co/200x60/388e3c/ffffff?text=Savlon&font=montserrat", isHomeFeatured: false, homePosition: null },
+    { name: "Dettol", description: "Antiseptic liquid and hygiene products", isDirectDistributor: true, isActive: true, logoUrl: "https://placehold.co/200x60/2e7d32/ffffff?text=Dettol&font=montserrat", isHomeFeatured: false, homePosition: null },
+    { name: "Elastoplast", description: "Plasters, bandages and wound healing products", isDirectDistributor: true, isActive: true, logoUrl: "https://placehold.co/200x60/ef5350/ffffff?text=Elastoplast&font=montserrat", isHomeFeatured: false, homePosition: null },
+    // Medical devices brands
+    { name: "Omron", description: "Blood pressure monitors and health monitoring devices", isDirectDistributor: false, isActive: true, logoUrl: "https://placehold.co/200x60/263238/ffffff?text=Omron&font=montserrat", isHomeFeatured: false, homePosition: null },
+    { name: "Accu-Chek", description: "Blood glucose monitoring systems for diabetes", isDirectDistributor: false, isActive: true, logoUrl: "https://placehold.co/200x60/ffb300/333333?text=Accu-Chek&font=montserrat", isHomeFeatured: false, homePosition: null },
   ];
 
   for (const brand of brandData) {
@@ -102,21 +124,54 @@ async function seed() {
     }
   }
 
-  // Add some subcategories
+  // Add comprehensive subcategories
   const subcategoryData = [
+    // OTC Medicines subcategories
     { name: "Pain Relief", parentName: "OTC Medicines" },
     { name: "Cold & Flu", parentName: "OTC Medicines" },
+    { name: "Cough & Sore Throat", parentName: "OTC Medicines" },
     { name: "Digestive Health", parentName: "OTC Medicines" },
+    { name: "Heartburn & Indigestion", parentName: "OTC Medicines" },
     { name: "Allergy Relief", parentName: "OTC Medicines" },
+    { name: "Eye Care", parentName: "OTC Medicines" },
+    { name: "Sleep & Stress", parentName: "OTC Medicines" },
+    // Vitamins & Supplements subcategories
     { name: "Multivitamins", parentName: "Vitamins & Supplements" },
     { name: "Omega 3 & Fish Oils", parentName: "Vitamins & Supplements" },
     { name: "Probiotics", parentName: "Vitamins & Supplements" },
+    { name: "Vitamin D", parentName: "Vitamins & Supplements" },
+    { name: "Vitamin C", parentName: "Vitamins & Supplements" },
+    { name: "Iron Supplements", parentName: "Vitamins & Supplements" },
+    { name: "Energy & Immunity", parentName: "Vitamins & Supplements" },
+    { name: "Women's Health", parentName: "Vitamins & Supplements" },
+    { name: "Men's Health", parentName: "Vitamins & Supplements" },
+    // First Aid subcategories
     { name: "Bandages & Dressings", parentName: "First Aid" },
+    { name: "Plasters", parentName: "First Aid" },
     { name: "Antiseptics", parentName: "First Aid" },
+    { name: "Burns & Scalds", parentName: "First Aid" },
+    // Medical Devices subcategories
     { name: "Blood Pressure Monitors", parentName: "Medical Devices" },
     { name: "Glucose Monitors", parentName: "Medical Devices" },
+    { name: "Thermometers", parentName: "Medical Devices" },
+    { name: "Pulse Oximeters", parentName: "Medical Devices" },
+    // Skincare subcategories
     { name: "Moisturisers", parentName: "Skincare" },
     { name: "Acne Treatment", parentName: "Skincare" },
+    { name: "Dry Skin", parentName: "Skincare" },
+    { name: "Eczema & Psoriasis", parentName: "Skincare" },
+    { name: "Sun Care", parentName: "Skincare" },
+    // Oral Care subcategories
+    { name: "Toothpaste", parentName: "Oral Care" },
+    { name: "Mouthwash", parentName: "Oral Care" },
+    { name: "Mouth Ulcers", parentName: "Oral Care" },
+    { name: "Denture Care", parentName: "Oral Care" },
+    // Baby & Child subcategories
+    { name: "Baby Pain Relief", parentName: "Baby & Child" },
+    { name: "Nappy Rash", parentName: "Baby & Child" },
+    { name: "Teething", parentName: "Baby & Child" },
+    { name: "Colic Relief", parentName: "Baby & Child" },
+    { name: "Baby Vitamins", parentName: "Baby & Child" },
   ];
 
   for (const subcategory of subcategoryData) {
@@ -144,24 +199,117 @@ async function seed() {
     brandMap[brand.name] = brand.id;
   }
 
-  // Create sample products
+  // Create comprehensive real UK pharmaceutical products with images
   const productData = [
-    { sku: "PC-IBU-400", productName: "Ibuprofen 400mg Tablets", brandName: "PharmaCare Plus", categoryName: "Pain Relief", wholesalePrice: "2.50", rrp: "4.99", packSize: "32 tablets", moq: 12, isFeatured: true },
-    { sku: "PC-PAR-500", productName: "Paracetamol 500mg Caplets", brandName: "PharmaCare Plus", categoryName: "Pain Relief", wholesalePrice: "1.80", rrp: "3.49", packSize: "100 tablets", moq: 24, isFeatured: false },
-    { sku: "WF-VITA-MV", productName: "Complete Multivitamin A-Z", brandName: "WellnessFirst", categoryName: "Multivitamins", wholesalePrice: "4.20", rrp: "8.99", packSize: "60 tablets", moq: 12, isFeatured: true },
-    { sku: "WF-OMG3-1K", productName: "Omega 3 Fish Oil 1000mg", brandName: "WellnessFirst", categoryName: "Omega 3 & Fish Oils", wholesalePrice: "5.50", rrp: "12.99", packSize: "90 softgels", moq: 12, isFeatured: true },
-    { sku: "MC-FA-BURN", productName: "Professional Burn Dressing Pad", brandName: "MediCore", categoryName: "Bandages & Dressings", wholesalePrice: "3.20", rrp: "6.99", packSize: "Pack of 5", moq: 10, isFeatured: false },
-    { sku: "HG-BAND-AST", productName: "Assorted Plaster Pack", brandName: "HealthGuard", categoryName: "Bandages & Dressings", wholesalePrice: "1.50", rrp: "3.29", packSize: "40 plasters", moq: 24, isFeatured: false },
-    { sku: "VB-VITD-1K", productName: "Vitamin D3 1000IU Tablets", brandName: "VitaBoost", categoryName: "Multivitamins", wholesalePrice: "2.80", rrp: "5.99", packSize: "180 tablets", moq: 12, isFeatured: true },
-    { sku: "VB-PROB-30", productName: "Daily Probiotic 30 Billion CFU", brandName: "VitaBoost", categoryName: "Probiotics", wholesalePrice: "6.50", rrp: "14.99", packSize: "30 capsules", moq: 12, isFeatured: true },
-    { sku: "DS-MOIST-50", productName: "Intensive Moisturising Cream", brandName: "DermaSkin", categoryName: "Moisturisers", wholesalePrice: "7.80", rrp: "15.99", packSize: "50ml", moq: 6, isFeatured: true },
-    { sku: "DS-ACNE-GEL", productName: "Clear Skin Acne Gel", brandName: "DermaSkin", categoryName: "Acne Treatment", wholesalePrice: "5.20", rrp: "11.99", packSize: "30ml", moq: 12, isFeatured: false },
-    { sku: "OP-TOOTH-T", productName: "Professional Toothpaste", brandName: "OralCare Pro", categoryName: "Oral Care", wholesalePrice: "2.10", rrp: "4.49", packSize: "100ml", moq: 24, isFeatured: false },
-    { sku: "CH-BPM-AUTO", productName: "Automatic Blood Pressure Monitor", brandName: "CardioHealth", categoryName: "Blood Pressure Monitors", wholesalePrice: "18.50", rrp: "39.99", packSize: "1 unit", moq: 4, isFeatured: true },
-    { sku: "CH-GLU-KIT", productName: "Blood Glucose Test Kit", brandName: "CardioHealth", categoryName: "Glucose Monitors", wholesalePrice: "12.00", rrp: "24.99", packSize: "1 unit + 50 strips", moq: 6, isFeatured: false },
-    { sku: "PC-COLD-TAB", productName: "Cold & Flu Relief Tablets", brandName: "PharmaCare Plus", categoryName: "Cold & Flu", wholesalePrice: "3.20", rrp: "6.99", packSize: "24 tablets", moq: 12, isFeatured: false },
-    { sku: "PC-ALLER-TAB", productName: "Antihistamine Allergy Tablets", brandName: "PharmaCare Plus", categoryName: "Allergy Relief", wholesalePrice: "2.80", rrp: "5.99", packSize: "30 tablets", moq: 12, isFeatured: false },
-    { sku: "HG-ANTISEP", productName: "Antiseptic Wound Spray", brandName: "HealthGuard", categoryName: "Antiseptics", wholesalePrice: "3.50", rrp: "7.49", packSize: "100ml", moq: 12, isFeatured: false },
+    // PAIN RELIEF - Nurofen products
+    { sku: "NUR-IBU-200-16", ean: "5000158100169", productName: "Nurofen Ibuprofen 200mg Tablets", brandName: "Nurofen", categoryName: "Pain Relief", wholesalePrice: "2.45", rrp: "4.49", packSize: "16 tablets", moq: 12, isFeatured: true, imageUrl: "/attached_assets/stock_images/medicine_tablets_pil_ba80ee84.jpg", description: "Fast-acting pain relief for headaches, dental pain, period pain and muscular aches." },
+    { sku: "NUR-IBU-400-24", ean: "5000158100244", productName: "Nurofen Ibuprofen 400mg Tablets", brandName: "Nurofen", categoryName: "Pain Relief", wholesalePrice: "3.25", rrp: "5.99", packSize: "24 tablets", moq: 12, isFeatured: true, imageUrl: "/attached_assets/stock_images/medicine_tablets_pil_abb03774.jpg", description: "Maximum strength ibuprofen for effective relief from pain and inflammation." },
+    { sku: "NUR-EXPRESS-16", ean: "5000158105102", productName: "Nurofen Express 256mg Sodium Ibuprofen", brandName: "Nurofen", categoryName: "Pain Relief", wholesalePrice: "3.80", rrp: "6.99", packSize: "16 caplets", moq: 12, isFeatured: true, imageUrl: "/attached_assets/stock_images/medicine_tablets_pil_3180d043.jpg", description: "Absorbed faster than standard ibuprofen tablets for speedy pain relief." },
+    { sku: "NUR-MIGRAINE-12", ean: "5000158105287", productName: "Nurofen Migraine Pain 342mg Caplets", brandName: "Nurofen", categoryName: "Pain Relief", wholesalePrice: "4.20", rrp: "7.99", packSize: "12 caplets", moq: 12, isFeatured: false, imageUrl: "/attached_assets/stock_images/medicine_tablets_pil_429b1afa.jpg", description: "Specifically formulated for the relief of migraine headaches." },
+    // PAIN RELIEF - Panadol products  
+    { sku: "PAN-ORI-16", ean: "5014017600173", productName: "Panadol Original Paracetamol 500mg", brandName: "Panadol", categoryName: "Pain Relief", wholesalePrice: "1.95", rrp: "3.79", packSize: "16 tablets", moq: 24, isFeatured: true, imageUrl: "/attached_assets/stock_images/medicine_tablets_pil_7bfe6df1.jpg", description: "Gentle yet effective pain relief with paracetamol." },
+    { sku: "PAN-EXTRA-16", ean: "5014017600210", productName: "Panadol Extra Advance 500mg/65mg", brandName: "Panadol", categoryName: "Pain Relief", wholesalePrice: "2.50", rrp: "4.79", packSize: "16 tablets", moq: 24, isFeatured: true, imageUrl: "/attached_assets/stock_images/medicine_tablets_pil_daeebc79.jpg", description: "Paracetamol with caffeine for enhanced pain relief." },
+    { sku: "PAN-ACTIFAST-20", ean: "5014017600302", productName: "Panadol Actifast Soluble 500mg", brandName: "Panadol", categoryName: "Pain Relief", wholesalePrice: "3.10", rrp: "5.99", packSize: "20 effervescent", moq: 12, isFeatured: false, imageUrl: "/attached_assets/stock_images/medicine_tablets_pil_cd311152.jpg", description: "Dissolves quickly for fast-acting pain relief." },
+    // COLD & FLU - Lemsip products
+    { sku: "LEM-MAX-10", ean: "5011417560808", productName: "Lemsip Max Cold & Flu Lemon", brandName: "Lemsip", categoryName: "Cold & Flu", wholesalePrice: "3.20", rrp: "5.99", packSize: "10 sachets", moq: 12, isFeatured: true, imageUrl: "/attached_assets/stock_images/cough_syrup_medicine_8a8cf9b3.jpg", description: "Maximum strength hot lemon drink for cold and flu symptoms." },
+    { sku: "LEM-MAX-CAPS-16", ean: "5011417560815", productName: "Lemsip Max All In One Capsules", brandName: "Lemsip", categoryName: "Cold & Flu", wholesalePrice: "3.80", rrp: "6.99", packSize: "16 capsules", moq: 12, isFeatured: true, imageUrl: "/attached_assets/stock_images/medicine_tablets_pil_3ab75966.jpg", description: "All-in-one relief for cold and flu symptoms in capsule form." },
+    { sku: "LEM-FLU-MAX-8", ean: "5011417560822", productName: "Lemsip Flu Max Strength", brandName: "Lemsip", categoryName: "Cold & Flu", wholesalePrice: "4.50", rrp: "8.49", packSize: "8 sachets", moq: 12, isFeatured: false, imageUrl: "/attached_assets/stock_images/cough_syrup_medicine_fb6e77c9.jpg", description: "Extra strength relief for severe flu symptoms." },
+    // COUGH & SORE THROAT - Strepsils products
+    { sku: "STR-ORI-36", ean: "5000158100756", productName: "Strepsils Original Lozenges", brandName: "Strepsils", categoryName: "Cough & Sore Throat", wholesalePrice: "2.40", rrp: "4.29", packSize: "36 lozenges", moq: 12, isFeatured: true, imageUrl: "/attached_assets/stock_images/medicine_tablets_pil_69d00232.jpg", description: "Dual antibacterial action for sore throat relief." },
+    { sku: "STR-HONEY-24", ean: "5000158100763", productName: "Strepsils Honey & Lemon Lozenges", brandName: "Strepsils", categoryName: "Cough & Sore Throat", wholesalePrice: "2.20", rrp: "3.99", packSize: "24 lozenges", moq: 12, isFeatured: true, imageUrl: "/attached_assets/stock_images/medicine_tablets_pil_b1daa8b5.jpg", description: "Soothing honey and lemon flavour with antibacterial action." },
+    { sku: "STR-INTNSE-16", ean: "5000158100770", productName: "Strepsils Intensive Lozenges", brandName: "Strepsils", categoryName: "Cough & Sore Throat", wholesalePrice: "3.50", rrp: "6.49", packSize: "16 lozenges", moq: 12, isFeatured: false, imageUrl: "/attached_assets/stock_images/medicine_tablets_pil_ba80ee84.jpg", description: "Contains flurbiprofen for more intensive sore throat relief." },
+    // COUGH & SORE THROAT - Benylin products
+    { sku: "BEN-DRY-150", ean: "5011417560907", productName: "Benylin Dry Coughs Non-Drowsy 150ml", brandName: "Benylin", categoryName: "Cough & Sore Throat", wholesalePrice: "4.20", rrp: "7.49", packSize: "150ml", moq: 6, isFeatured: true, imageUrl: "/attached_assets/stock_images/cough_syrup_medicine_e1f83e85.jpg", description: "Non-drowsy formula for effective dry cough relief." },
+    { sku: "BEN-CHEST-150", ean: "5011417560914", productName: "Benylin Chesty Coughs Non-Drowsy 150ml", brandName: "Benylin", categoryName: "Cough & Sore Throat", wholesalePrice: "4.20", rrp: "7.49", packSize: "150ml", moq: 6, isFeatured: true, imageUrl: "/attached_assets/stock_images/cough_syrup_medicine_556f0b96.jpg", description: "Helps clear stubborn chesty coughs without drowsiness." },
+    { sku: "BEN-MUCUS-100", ean: "5011417560921", productName: "Benylin Mucus Cough Plus 100ml", brandName: "Benylin", categoryName: "Cough & Sore Throat", wholesalePrice: "3.80", rrp: "6.99", packSize: "100ml", moq: 6, isFeatured: false, imageUrl: "/attached_assets/stock_images/cough_syrup_medicine_461806c0.jpg", description: "Thins and loosens mucus to make coughs more productive." },
+    // HEARTBURN & INDIGESTION - Gaviscon products
+    { sku: "GAV-DOU-300", ean: "5000158100909", productName: "Gaviscon Double Action Liquid 300ml", brandName: "Gaviscon", categoryName: "Heartburn & Indigestion", wholesalePrice: "4.50", rrp: "8.29", packSize: "300ml", moq: 6, isFeatured: true, imageUrl: "/attached_assets/stock_images/cough_syrup_medicine_8a8cf9b3.jpg", description: "Double action relief from heartburn and acid indigestion." },
+    { sku: "GAV-ADV-24", ean: "5000158100916", productName: "Gaviscon Advance Tablets Mint", brandName: "Gaviscon", categoryName: "Heartburn & Indigestion", wholesalePrice: "3.20", rrp: "5.99", packSize: "24 tablets", moq: 12, isFeatured: true, imageUrl: "/attached_assets/stock_images/medicine_tablets_pil_abb03774.jpg", description: "Chewable tablets for on-the-go heartburn relief." },
+    { sku: "GAV-INF-150", ean: "5000158100923", productName: "Gaviscon Infant Oral Powder", brandName: "Gaviscon", categoryName: "Heartburn & Indigestion", wholesalePrice: "5.20", rrp: "9.49", packSize: "30 sachets", moq: 6, isFeatured: false, imageUrl: "/attached_assets/stock_images/baby_child_medicine__b26a7473.jpg", description: "For regurgitation and gastric reflux in infants." },
+    // HEARTBURN & INDIGESTION - Rennie products
+    { sku: "REN-ORIG-48", ean: "5014017600401", productName: "Rennie Peppermint Tablets", brandName: "Rennie", categoryName: "Heartburn & Indigestion", wholesalePrice: "2.80", rrp: "4.99", packSize: "48 tablets", moq: 12, isFeatured: true, imageUrl: "/attached_assets/stock_images/medicine_tablets_pil_3180d043.jpg", description: "Fast-acting antacid for heartburn and indigestion." },
+    { sku: "REN-SPEARMINT-24", ean: "5014017600418", productName: "Rennie Spearmint Tablets", brandName: "Rennie", categoryName: "Heartburn & Indigestion", wholesalePrice: "1.80", rrp: "3.29", packSize: "24 tablets", moq: 12, isFeatured: false, imageUrl: "/attached_assets/stock_images/medicine_tablets_pil_429b1afa.jpg", description: "Refreshing spearmint flavour for quick relief." },
+    // DIGESTIVE HEALTH - Imodium products
+    { sku: "IMO-ORIG-6", ean: "5000158100501", productName: "Imodium Original 2mg Capsules", brandName: "Imodium", categoryName: "Digestive Health", wholesalePrice: "2.80", rrp: "4.99", packSize: "6 capsules", moq: 12, isFeatured: true, imageUrl: "/attached_assets/stock_images/medicine_tablets_pil_7bfe6df1.jpg", description: "Effective relief from acute diarrhoea." },
+    { sku: "IMO-INST-6", ean: "5000158100518", productName: "Imodium Instants 2mg Melts", brandName: "Imodium", categoryName: "Digestive Health", wholesalePrice: "3.50", rrp: "6.29", packSize: "6 melts", moq: 12, isFeatured: true, imageUrl: "/attached_assets/stock_images/medicine_tablets_pil_daeebc79.jpg", description: "Melts on the tongue - no water needed." },
+    { sku: "IMO-PLUS-12", ean: "5000158100525", productName: "Imodium Plus Comfort Tablets", brandName: "Imodium", categoryName: "Digestive Health", wholesalePrice: "4.20", rrp: "7.49", packSize: "12 tablets", moq: 12, isFeatured: false, imageUrl: "/attached_assets/stock_images/medicine_tablets_pil_cd311152.jpg", description: "Relieves diarrhoea plus painful cramps and bloating." },
+    // ALLERGY RELIEF - Piriteze and Piriton
+    { sku: "PIZ-ONE-30", ean: "5000158102307", productName: "Piriteze Allergy Tablets 10mg", brandName: "Piriteze", categoryName: "Allergy Relief", wholesalePrice: "4.50", rrp: "8.49", packSize: "30 tablets", moq: 12, isFeatured: true, imageUrl: "/attached_assets/stock_images/medicine_tablets_pil_3ab75966.jpg", description: "One-a-day non-drowsy antihistamine for hayfever and allergies." },
+    { sku: "PIZ-SYR-70", ean: "5000158102314", productName: "Piriteze Allergy Syrup 70ml", brandName: "Piriteze", categoryName: "Allergy Relief", wholesalePrice: "3.80", rrp: "6.99", packSize: "70ml", moq: 6, isFeatured: false, imageUrl: "/attached_assets/stock_images/cough_syrup_medicine_fb6e77c9.jpg", description: "One-a-day liquid antihistamine for ages 2+." },
+    { sku: "PIR-4MG-30", ean: "5000158102401", productName: "Piriton Allergy Tablets 4mg", brandName: "Piriton", categoryName: "Allergy Relief", wholesalePrice: "3.20", rrp: "5.99", packSize: "30 tablets", moq: 12, isFeatured: true, imageUrl: "/attached_assets/stock_images/medicine_tablets_pil_69d00232.jpg", description: "Fast-acting chlorphenamine for allergy symptoms." },
+    { sku: "PIR-SYR-150", ean: "5000158102418", productName: "Piriton Syrup 150ml", brandName: "Piriton", categoryName: "Allergy Relief", wholesalePrice: "4.20", rrp: "7.49", packSize: "150ml", moq: 6, isFeatured: false, imageUrl: "/attached_assets/stock_images/cough_syrup_medicine_e1f83e85.jpg", description: "Antihistamine syrup suitable for children from 1 year." },
+    // VITAMINS & SUPPLEMENTS - Vitabiotics
+    { sku: "VIT-WELLMAN-30", ean: "5021265217601", productName: "Wellman Original 30 Tablets", brandName: "Vitabiotics", categoryName: "Multivitamins", wholesalePrice: "5.50", rrp: "10.49", packSize: "30 tablets", moq: 6, isFeatured: true, imageUrl: "/attached_assets/stock_images/vitamin_supplement_b_79241704.jpg", description: "Complete vitamin formula for men with 29 nutrients." },
+    { sku: "VIT-WELLWOMAN-30", ean: "5021265217618", productName: "Wellwoman Original 30 Capsules", brandName: "Vitabiotics", categoryName: "Multivitamins", wholesalePrice: "5.50", rrp: "10.49", packSize: "30 capsules", moq: 6, isFeatured: true, imageUrl: "/attached_assets/stock_images/vitamin_supplement_b_00a7d6de.jpg", description: "Complete vitamin formula for women with 25 nutrients." },
+    { sku: "VIT-PREGNA-30", ean: "5021265217625", productName: "Pregnacare Original 30 Tablets", brandName: "Vitabiotics", categoryName: "Women's Health", wholesalePrice: "4.80", rrp: "8.99", packSize: "30 tablets", moq: 6, isFeatured: true, imageUrl: "/attached_assets/stock_images/vitamin_supplement_b_31545ce3.jpg", description: "Essential nutrients for pregnancy including folic acid." },
+    { sku: "VIT-MENOP-30", ean: "5021265217632", productName: "Menopace Original 30 Tablets", brandName: "Vitabiotics", categoryName: "Women's Health", wholesalePrice: "6.20", rrp: "11.49", packSize: "30 tablets", moq: 6, isFeatured: false, imageUrl: "/attached_assets/stock_images/vitamin_supplement_b_156cdfad.jpg", description: "Nutritional support during and after the menopause." },
+    // VITAMINS & SUPPLEMENTS - Seven Seas
+    { sku: "SS-COD-120", ean: "5012335530102", productName: "Seven Seas Cod Liver Oil Capsules", brandName: "Seven Seas", categoryName: "Omega 3 & Fish Oils", wholesalePrice: "6.50", rrp: "11.99", packSize: "120 capsules", moq: 6, isFeatured: true, imageUrl: "/attached_assets/stock_images/vitamin_supplement_b_434336bd.jpg", description: "Pure cod liver oil rich in Omega-3 and vitamins A & D." },
+    { sku: "SS-OMEGA-60", ean: "5012335530119", productName: "Seven Seas Omega-3 Fish Oil 1000mg", brandName: "Seven Seas", categoryName: "Omega 3 & Fish Oils", wholesalePrice: "7.20", rrp: "13.49", packSize: "60 capsules", moq: 6, isFeatured: true, imageUrl: "/attached_assets/stock_images/vitamin_supplement_b_ffeff786.jpg", description: "High strength Omega-3 for heart and brain health." },
+    { sku: "SS-JOINTS-60", ean: "5012335530126", productName: "Seven Seas JointCare Max", brandName: "Seven Seas", categoryName: "Multivitamins", wholesalePrice: "9.50", rrp: "17.99", packSize: "60 tablets", moq: 6, isFeatured: false, imageUrl: "/attached_assets/stock_images/vitamin_supplement_b_51e43e23.jpg", description: "Glucosamine, chondroitin and omega-3 for joint support." },
+    // VITAMINS & SUPPLEMENTS - Berocca
+    { sku: "BER-EFF-30", ean: "5000166100309", productName: "Berocca Energy Orange 30 Effervescent", brandName: "Berocca", categoryName: "Energy & Immunity", wholesalePrice: "5.80", rrp: "10.99", packSize: "30 tablets", moq: 6, isFeatured: true, imageUrl: "/attached_assets/stock_images/vitamin_supplement_b_e114cd35.jpg", description: "Effervescent vitamin tablets for mental and physical energy." },
+    { sku: "BER-BOOST-30", ean: "5000166100316", productName: "Berocca Boost 10mg Caffeine 30 Tablets", brandName: "Berocca", categoryName: "Energy & Immunity", wholesalePrice: "6.50", rrp: "12.49", packSize: "30 tablets", moq: 6, isFeatured: false, imageUrl: "/attached_assets/stock_images/vitamin_supplement_b_c7d60b7f.jpg", description: "Added caffeine and guarana for an extra energy boost." },
+    // VITAMINS & SUPPLEMENTS - Centrum
+    { sku: "CEN-ADV-30", ean: "5054563003010", productName: "Centrum Advance 30 Tablets", brandName: "Centrum", categoryName: "Multivitamins", wholesalePrice: "4.50", rrp: "8.49", packSize: "30 tablets", moq: 6, isFeatured: true, imageUrl: "/attached_assets/stock_images/vitamin_supplement_b_5ec2fa34.jpg", description: "Complete A-Z multivitamin for adults." },
+    { sku: "CEN-ADV-60", ean: "5054563003027", productName: "Centrum Advance 60 Tablets", brandName: "Centrum", categoryName: "Multivitamins", wholesalePrice: "7.80", rrp: "14.49", packSize: "60 tablets", moq: 6, isFeatured: false, imageUrl: "/attached_assets/stock_images/vitamin_supplement_b_79241704.jpg", description: "2-month supply of complete A-Z multivitamin." },
+    { sku: "CEN-50P-30", ean: "5054563003034", productName: "Centrum Advance 50 Plus 30 Tablets", brandName: "Centrum", categoryName: "Multivitamins", wholesalePrice: "5.20", rrp: "9.49", packSize: "30 tablets", moq: 6, isFeatured: false, imageUrl: "/attached_assets/stock_images/vitamin_supplement_b_00a7d6de.jpg", description: "Tailored formula for adults over 50." },
+    // VITAMINS & SUPPLEMENTS - Floradix
+    { sku: "FLO-IRON-250", ean: "4008617001052", productName: "Floradix Liquid Iron 250ml", brandName: "Floradix", categoryName: "Iron Supplements", wholesalePrice: "8.50", rrp: "15.99", packSize: "250ml", moq: 6, isFeatured: true, imageUrl: "/attached_assets/stock_images/cough_syrup_medicine_556f0b96.jpg", description: "Easily absorbed liquid iron formula with vitamins." },
+    { sku: "FLO-IRON-500", ean: "4008617001069", productName: "Floradix Liquid Iron 500ml", brandName: "Floradix", categoryName: "Iron Supplements", wholesalePrice: "14.50", rrp: "27.49", packSize: "500ml", moq: 4, isFeatured: false, imageUrl: "/attached_assets/stock_images/cough_syrup_medicine_461806c0.jpg", description: "Family size easily absorbed liquid iron formula." },
+    // SKINCARE - E45
+    { sku: "E45-CREAM-350", ean: "5010999801002", productName: "E45 Moisturising Cream 350g", brandName: "E45", categoryName: "Dry Skin", wholesalePrice: "5.50", rrp: "9.99", packSize: "350g", moq: 6, isFeatured: true, imageUrl: "/attached_assets/stock_images/skincare_cream_moist_408415d9.jpg", description: "Clinically proven to treat dry, flaky skin." },
+    { sku: "E45-LOTION-500", ean: "5010999801019", productName: "E45 Moisturising Lotion 500ml", brandName: "E45", categoryName: "Dry Skin", wholesalePrice: "6.80", rrp: "12.49", packSize: "500ml", moq: 6, isFeatured: true, imageUrl: "/attached_assets/stock_images/skincare_cream_moist_c08b43c4.jpg", description: "Light, fast-absorbing lotion for everyday dry skin." },
+    { sku: "E45-ITCH-50", ean: "5010999801026", productName: "E45 Itch Relief Cream 50g", brandName: "E45", categoryName: "Eczema & Psoriasis", wholesalePrice: "4.20", rrp: "7.49", packSize: "50g", moq: 6, isFeatured: false, imageUrl: "/attached_assets/stock_images/skincare_cream_moist_3a2f02b2.jpg", description: "Provides relief from dry, itchy skin conditions." },
+    // SKINCARE - CeraVe
+    { sku: "CER-MOIST-177", ean: "3337875597449", productName: "CeraVe Moisturising Cream 177ml", brandName: "CeraVe", categoryName: "Moisturisers", wholesalePrice: "7.50", rrp: "13.99", packSize: "177ml", moq: 6, isFeatured: true, imageUrl: "/attached_assets/stock_images/skincare_cream_moist_f99b292d.jpg", description: "With 3 essential ceramides for normal to dry skin." },
+    { sku: "CER-FOAM-236", ean: "3337875597456", productName: "CeraVe Foaming Cleanser 236ml", brandName: "CeraVe", categoryName: "Moisturisers", wholesalePrice: "6.80", rrp: "12.49", packSize: "236ml", moq: 6, isFeatured: true, imageUrl: "/attached_assets/stock_images/skincare_cream_moist_d27441ee.jpg", description: "Foaming gel cleanser for normal to oily skin." },
+    { sku: "CER-HYDRA-236", ean: "3337875597463", productName: "CeraVe Hydrating Cleanser 236ml", brandName: "CeraVe", categoryName: "Dry Skin", wholesalePrice: "6.80", rrp: "12.49", packSize: "236ml", moq: 6, isFeatured: false, imageUrl: "/attached_assets/stock_images/skincare_cream_moist_408415d9.jpg", description: "Hydrating cleanser for normal to dry skin." },
+    // SKINCARE - Simple
+    { sku: "SIM-MOIS-125", ean: "5011451101357", productName: "Simple Kind to Skin Moisturiser 125ml", brandName: "Simple", categoryName: "Moisturisers", wholesalePrice: "3.50", rrp: "5.99", packSize: "125ml", moq: 12, isFeatured: true, imageUrl: "/attached_assets/stock_images/skincare_cream_moist_c08b43c4.jpg", description: "Light, non-greasy moisturiser for sensitive skin." },
+    { sku: "SIM-WIPES-25", ean: "5011451101364", productName: "Simple Cleansing Wipes 25 Pack", brandName: "Simple", categoryName: "Moisturisers", wholesalePrice: "2.20", rrp: "3.99", packSize: "25 wipes", moq: 12, isFeatured: false, imageUrl: "/attached_assets/stock_images/skincare_cream_moist_3a2f02b2.jpg", description: "Gentle cleansing wipes for sensitive skin." },
+    // ORAL CARE - Sensodyne
+    { sku: "SEN-RAPID-75", ean: "5000347003714", productName: "Sensodyne Rapid Relief Original 75ml", brandName: "Sensodyne", categoryName: "Toothpaste", wholesalePrice: "3.20", rrp: "5.99", packSize: "75ml", moq: 12, isFeatured: true, imageUrl: "/attached_assets/stock_images/medicine_tablets_pil_ba80ee84.jpg", description: "Clinically proven sensitivity relief in 60 seconds." },
+    { sku: "SEN-REPAIR-75", ean: "5000347003721", productName: "Sensodyne Repair & Protect 75ml", brandName: "Sensodyne", categoryName: "Toothpaste", wholesalePrice: "3.50", rrp: "6.49", packSize: "75ml", moq: 12, isFeatured: true, imageUrl: "/attached_assets/stock_images/medicine_tablets_pil_abb03774.jpg", description: "Builds a repairing layer over sensitive areas." },
+    { sku: "SEN-WHITE-75", ean: "5000347003738", productName: "Sensodyne True White 75ml", brandName: "Sensodyne", categoryName: "Toothpaste", wholesalePrice: "3.80", rrp: "6.99", packSize: "75ml", moq: 12, isFeatured: false, imageUrl: "/attached_assets/stock_images/medicine_tablets_pil_3180d043.jpg", description: "Whitening toothpaste for sensitive teeth." },
+    // ORAL CARE - Corsodyl
+    { sku: "COR-MW-300", ean: "5000347040511", productName: "Corsodyl Daily Gum Care Mouthwash 300ml", brandName: "Corsodyl", categoryName: "Mouthwash", wholesalePrice: "3.50", rrp: "6.49", packSize: "300ml", moq: 6, isFeatured: true, imageUrl: "/attached_assets/stock_images/cough_syrup_medicine_8a8cf9b3.jpg", description: "Daily mouthwash for healthier gums." },
+    { sku: "COR-GEL-50", ean: "5000347040528", productName: "Corsodyl Intensive Treatment Gel 50g", brandName: "Corsodyl", categoryName: "Mouthwash", wholesalePrice: "4.20", rrp: "7.49", packSize: "50g", moq: 6, isFeatured: false, imageUrl: "/attached_assets/stock_images/skincare_cream_moist_f99b292d.jpg", description: "Intensive treatment for bleeding gums." },
+    // ORAL CARE - Bonjela
+    { sku: "BON-ADULT-15", ean: "5000386020017", productName: "Bonjela Adult Gel 15g", brandName: "Bonjela", categoryName: "Mouth Ulcers", wholesalePrice: "3.20", rrp: "5.99", packSize: "15g", moq: 12, isFeatured: true, imageUrl: "/attached_assets/stock_images/skincare_cream_moist_d27441ee.jpg", description: "Fast relief from mouth ulcers and denture sores." },
+    { sku: "BON-JNR-15", ean: "5000386020024", productName: "Bonjela Junior Gel 15g", brandName: "Bonjela", categoryName: "Mouth Ulcers", wholesalePrice: "3.50", rrp: "6.49", packSize: "15g", moq: 12, isFeatured: false, imageUrl: "/attached_assets/stock_images/baby_child_medicine__81549c36.jpg", description: "Sugar-free gel for children's mouth ulcers." },
+    // FIRST AID - Elastoplast
+    { sku: "ELA-AST-40", ean: "4005800001017", productName: "Elastoplast Sensitive Plasters 40 Pack", brandName: "Elastoplast", categoryName: "Plasters", wholesalePrice: "2.80", rrp: "4.99", packSize: "40 plasters", moq: 12, isFeatured: true, imageUrl: "/attached_assets/stock_images/first_aid_bandage_me_cce8b7ef.jpg", description: "Extra skin-friendly plasters for sensitive skin." },
+    { sku: "ELA-WATER-20", ean: "4005800001024", productName: "Elastoplast Waterproof Plasters 20 Pack", brandName: "Elastoplast", categoryName: "Plasters", wholesalePrice: "2.50", rrp: "4.49", packSize: "20 plasters", moq: 12, isFeatured: true, imageUrl: "/attached_assets/stock_images/first_aid_bandage_me_96bd72ab.jpg", description: "100% waterproof protection for cuts and grazes." },
+    { sku: "ELA-FABRIC-20", ean: "4005800001031", productName: "Elastoplast Fabric Plasters 20 Pack", brandName: "Elastoplast", categoryName: "Plasters", wholesalePrice: "2.20", rrp: "3.99", packSize: "20 plasters", moq: 12, isFeatured: false, imageUrl: "/attached_assets/stock_images/first_aid_bandage_me_acfa1e82.jpg", description: "Flexible fabric plasters that move with you." },
+    // FIRST AID - Savlon
+    { sku: "SAV-CREAM-60", ean: "5011417560501", productName: "Savlon Antiseptic Cream 60g", brandName: "Savlon", categoryName: "Antiseptics", wholesalePrice: "2.80", rrp: "4.99", packSize: "60g", moq: 12, isFeatured: true, imageUrl: "/attached_assets/stock_images/skincare_cream_moist_408415d9.jpg", description: "Helps prevent infection in minor wounds and burns." },
+    { sku: "SAV-SPRAY-50", ean: "5011417560518", productName: "Savlon Antiseptic Wound Wash 50ml", brandName: "Savlon", categoryName: "Antiseptics", wholesalePrice: "3.20", rrp: "5.99", packSize: "50ml", moq: 12, isFeatured: false, imageUrl: "/attached_assets/stock_images/first_aid_bandage_me_efa1a609.jpg", description: "Gentle spray to clean and help prevent infection." },
+    // FIRST AID - Dettol
+    { sku: "DET-LIQ-500", ean: "5000158100206", productName: "Dettol Antiseptic Liquid 500ml", brandName: "Dettol", categoryName: "Antiseptics", wholesalePrice: "3.50", rrp: "6.49", packSize: "500ml", moq: 6, isFeatured: true, imageUrl: "/attached_assets/stock_images/cough_syrup_medicine_fb6e77c9.jpg", description: "Trusted antiseptic for wounds and household use." },
+    { sku: "DET-WIPES-40", ean: "5000158100213", productName: "Dettol Antibacterial Wipes 40 Pack", brandName: "Dettol", categoryName: "Antiseptics", wholesalePrice: "2.50", rrp: "4.49", packSize: "40 wipes", moq: 12, isFeatured: false, imageUrl: "/attached_assets/stock_images/first_aid_bandage_me_db473e7c.jpg", description: "Antibacterial surface cleaning wipes." },
+    // BABY & CHILD - Calpol
+    { sku: "CAL-INF-100", ean: "5000347001017", productName: "Calpol Infant Suspension Strawberry 100ml", brandName: "Calpol", categoryName: "Baby Pain Relief", wholesalePrice: "3.80", rrp: "6.99", packSize: "100ml", moq: 6, isFeatured: true, imageUrl: "/attached_assets/stock_images/baby_child_medicine__b26a7473.jpg", description: "Paracetamol suspension for babies 2 months+." },
+    { sku: "CAL-6PLU-100", ean: "5000347001024", productName: "Calpol Six Plus Suspension 100ml", brandName: "Calpol", categoryName: "Baby Pain Relief", wholesalePrice: "3.50", rrp: "6.49", packSize: "100ml", moq: 6, isFeatured: true, imageUrl: "/attached_assets/stock_images/baby_child_medicine__81549c36.jpg", description: "Paracetamol suspension for children 6 years+." },
+    { sku: "CAL-SALINE-15", ean: "5000347001031", productName: "Calpol Soothe & Care Saline Drops 15ml", brandName: "Calpol", categoryName: "Baby Pain Relief", wholesalePrice: "3.20", rrp: "5.99", packSize: "15ml", moq: 12, isFeatured: false, imageUrl: "/attached_assets/stock_images/baby_child_medicine__387618a9.jpg", description: "Gentle saline drops to help clear baby's congestion." },
+    // BABY & CHILD - Sudocrem
+    { sku: "SUD-POT-125", ean: "5011451100015", productName: "Sudocrem Antiseptic Healing Cream 125g", brandName: "Sudocrem", categoryName: "Nappy Rash", wholesalePrice: "3.20", rrp: "5.99", packSize: "125g", moq: 12, isFeatured: true, imageUrl: "/attached_assets/stock_images/skincare_cream_moist_c08b43c4.jpg", description: "The original nappy rash cream trusted for generations." },
+    { sku: "SUD-POT-250", ean: "5011451100022", productName: "Sudocrem Antiseptic Healing Cream 250g", brandName: "Sudocrem", categoryName: "Nappy Rash", wholesalePrice: "5.50", rrp: "9.99", packSize: "250g", moq: 6, isFeatured: false, imageUrl: "/attached_assets/stock_images/skincare_cream_moist_3a2f02b2.jpg", description: "Family size nappy rash and skin care cream." },
+    // BABY & CHILD - Bepanthen
+    { sku: "BEP-NAPPY-100", ean: "5054563000019", productName: "Bepanthen Nappy Care Ointment 100g", brandName: "Bepanthen", categoryName: "Nappy Rash", wholesalePrice: "4.50", rrp: "8.49", packSize: "100g", moq: 6, isFeatured: true, imageUrl: "/attached_assets/stock_images/skincare_cream_moist_f99b292d.jpg", description: "Gentle protection with provitamin B5." },
+    { sku: "BEP-SENSE-20", ean: "5054563000026", productName: "Bepanthen Sensiderm Cream 20g", brandName: "Bepanthen", categoryName: "Eczema & Psoriasis", wholesalePrice: "5.80", rrp: "10.99", packSize: "20g", moq: 6, isFeatured: false, imageUrl: "/attached_assets/stock_images/skincare_cream_moist_d27441ee.jpg", description: "For eczema-prone and itchy, irritated skin." },
+    // BABY & CHILD - Infacol
+    { sku: "INF-DROPS-50", ean: "5011451102017", productName: "Infacol Colic Relief Drops 50ml", brandName: "Infacol", categoryName: "Colic Relief", wholesalePrice: "3.50", rrp: "6.49", packSize: "50ml", moq: 12, isFeatured: true, imageUrl: "/attached_assets/stock_images/baby_child_medicine__9fca952e.jpg", description: "Helps relieve colic and griping pain in babies." },
+    { sku: "INF-DROPS-85", ean: "5011451102024", productName: "Infacol Colic Relief Drops 85ml", brandName: "Infacol", categoryName: "Colic Relief", wholesalePrice: "5.20", rrp: "9.49", packSize: "85ml", moq: 6, isFeatured: false, imageUrl: "/attached_assets/stock_images/baby_child_medicine__0d6b80c6.jpg", description: "Large size colic relief drops." },
+    // BABY & CHILD - Dentinox
+    { sku: "DEN-TEETH-15", ean: "5011451103014", productName: "Dentinox Teething Gel 15g", brandName: "Dentinox", categoryName: "Teething", wholesalePrice: "2.80", rrp: "4.99", packSize: "15g", moq: 12, isFeatured: true, imageUrl: "/attached_assets/stock_images/baby_child_medicine__b26a7473.jpg", description: "Sugar-free teething gel for babies from birth." },
+    { sku: "DEN-COLIC-100", ean: "5011451103021", productName: "Dentinox Infant Colic Drops 100ml", brandName: "Dentinox", categoryName: "Colic Relief", wholesalePrice: "3.20", rrp: "5.99", packSize: "100ml", moq: 6, isFeatured: false, imageUrl: "/attached_assets/stock_images/baby_child_medicine__81549c36.jpg", description: "Helps relieve wind, griping pain and colic." },
+    // MEDICAL DEVICES - Omron
+    { sku: "OMR-M2-BPM", ean: "4015672107014", productName: "Omron M2 Basic Blood Pressure Monitor", brandName: "Omron", categoryName: "Blood Pressure Monitors", wholesalePrice: "24.50", rrp: "44.99", packSize: "1 unit", moq: 2, isFeatured: true, imageUrl: "/attached_assets/stock_images/medicine_tablets_pil_7bfe6df1.jpg", description: "Clinically validated automatic blood pressure monitor." },
+    { sku: "OMR-M3-BPM", ean: "4015672107021", productName: "Omron M3 Comfort Blood Pressure Monitor", brandName: "Omron", categoryName: "Blood Pressure Monitors", wholesalePrice: "42.50", rrp: "79.99", packSize: "1 unit", moq: 2, isFeatured: true, imageUrl: "/attached_assets/stock_images/medicine_tablets_pil_daeebc79.jpg", description: "Advanced monitor with irregular heartbeat detection." },
+    // MEDICAL DEVICES - Accu-Chek
+    { sku: "ACC-GUIDE-KIT", ean: "4015630074013", productName: "Accu-Chek Guide Blood Glucose Monitor", brandName: "Accu-Chek", categoryName: "Glucose Monitors", wholesalePrice: "18.50", rrp: "34.99", packSize: "1 kit", moq: 2, isFeatured: true, imageUrl: "/attached_assets/stock_images/medicine_tablets_pil_cd311152.jpg", description: "Easy-to-use blood glucose monitoring system." },
+    { sku: "ACC-STRIPS-50", ean: "4015630074020", productName: "Accu-Chek Guide Test Strips 50 Pack", brandName: "Accu-Chek", categoryName: "Glucose Monitors", wholesalePrice: "14.50", rrp: "27.99", packSize: "50 strips", moq: 4, isFeatured: false, imageUrl: "/attached_assets/stock_images/first_aid_bandage_me_cce8b7ef.jpg", description: "Blood glucose test strips for Accu-Chek Guide." },
   ];
 
   for (const product of productData) {
@@ -173,7 +321,9 @@ async function seed() {
       if (existing.length === 0) {
         await db.insert(products).values({
           sku: product.sku,
+          ean: product.ean,
           productName: product.productName,
+          shortDescription: product.description,
           brandId,
           categoryId,
           wholesalePrice: product.wholesalePrice,
@@ -182,10 +332,23 @@ async function seed() {
           moq: product.moq,
           isFeatured: product.isFeatured,
           isActive: true,
+          imageUrl: product.imageUrl,
           uom: "each",
           vatRate: "0.20",
+          countryOfOrigin: "United Kingdom",
         });
         console.log(`Product created: ${product.productName}`);
+      } else {
+        // Update existing product with new data
+        await db.update(products)
+          .set({
+            ean: product.ean,
+            shortDescription: product.description,
+            imageUrl: product.imageUrl,
+            countryOfOrigin: "United Kingdom",
+          })
+          .where(eq(products.sku, product.sku));
+        console.log(`Product updated: ${product.productName}`);
       }
     }
   }
