@@ -194,7 +194,7 @@ async function seed() {
   const settingsData = [
     { key: "site_name", value: "Pharma Oasis", description: "Website name" },
     { key: "site_tagline", value: "Your Wholesale Healthcare Partner", description: "Website tagline" },
-    { key: "contact_email", value: "info@pharmaoasis.com", description: "Main contact email" },
+    { key: "contact_email", value: "trade@pharmaoasis.com", description: "Main contact email" },
     { key: "contact_phone", value: "+44 (0) 20 1234 5678", description: "Main contact phone" },
     { key: "active_theme", value: "theme_clinical_blue", description: "Active theme (theme_clinical_blue, theme_premium_offwhite, theme_tech_slate)" },
   ];

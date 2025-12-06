@@ -115,8 +115,8 @@ export function Footer() {
                 <li className="flex items-start gap-2">
                   <Mail className="h-4 w-4 mt-0.5 text-sidebar-foreground/70 flex-shrink-0" />
                   <div>
-                    <a href="mailto:info@pharmaoasis.com" className="text-sidebar-primary hover:underline">
-                      info@pharmaoasis.com
+                    <a href="mailto:trade@pharmaoasis.com" className="text-sidebar-primary hover:underline">
+                      trade@pharmaoasis.com
                     </a>
                   </div>
                 </li>

@@ -173,8 +173,8 @@ export default function ContactPage() {
                       <div>
                         <h3 className="font-medium">Email</h3>
                         <p className="mt-1 text-sm text-muted-foreground">General enquiries</p>
-                        <a href="mailto:info@pharmaoasis.com" className="text-sm text-primary hover:underline">
-                          info@pharmaoasis.com
+                        <a href="mailto:trade@pharmaoasis.com" className="text-sm text-primary hover:underline">
+                          trade@pharmaoasis.com
                         </a>
                       </div>
                     </div>

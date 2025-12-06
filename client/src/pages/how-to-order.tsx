@@ -312,7 +312,7 @@ export default function HowToOrderPage() {
               className="w-full sm:w-auto gap-2 bg-transparent text-white border-white/30 hover:bg-white/10"
               asChild
             >
-              <a href="mailto:info@pharmaoasis.com">
+              <a href="mailto:trade@pharmaoasis.com">
                 <Mail className="h-4 w-4" />
                 Email Us
               </a>
