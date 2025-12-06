@@ -329,28 +329,22 @@ async function seed() {
       continue;
     }
 
-    // Handle both old categoryName and new parentCategory/subcategoryName format
+    // Determine parent category and subcategory from categoryName
     let categoryId: number | null = null;
     let subcategoryId: number | null = null;
     
-    if ('parentCategory' in product && 'subcategoryName' in product) {
-      // New format with explicit parent and subcategory
-      categoryId = categoryNameToIdMap[product.parentCategory] || null;
-      subcategoryId = categoryNameToIdMap[product.subcategoryName] || null;
-    } else if ('categoryName' in product) {
-      // Old format - determine if it's a parent or subcategory
-      const catId = categoryNameToIdMap[(product as any).categoryName];
-      if (catId) {
-        const parentId = categoryParentMap[catId];
-        if (parentId) {
-          // This is a subcategory
-          categoryId = parentId;
-          subcategoryId = catId;
-        } else {
-          // This is a top-level category
-          categoryId = catId;
-          subcategoryId = null;
-        }
+    // categoryName refers to the subcategory - find it and its parent
+    const catId = categoryNameToIdMap[product.categoryName];
+    if (catId) {
+      const parentId = categoryParentMap[catId];
+      if (parentId) {
+        // This is a subcategory - use parent as categoryId
+        categoryId = parentId;
+        subcategoryId = catId;
+      } else {
+        // This is a top-level category
+        categoryId = catId;
+        subcategoryId = null;
       }
     }
     
@@ -401,7 +395,7 @@ async function seed() {
     { key: "site_name", value: "Pharma Oasis", description: "Website name" },
     { key: "site_tagline", value: "Your Wholesale Healthcare Partner", description: "Website tagline" },
     { key: "contact_email", value: "trade@pharmaoasis.com", description: "Main contact email" },
-    { key: "contact_phone", value: "+44 (0) 20 1234 5678", description: "Main contact phone" },
+    { key: "contact_phone", value: "+44 7481 640640", description: "Main contact phone" },
     { key: "active_theme", value: "theme_clinical_blue", description: "Active theme (theme_clinical_blue, theme_premium_offwhite, theme_tech_slate)" },
   ];
 

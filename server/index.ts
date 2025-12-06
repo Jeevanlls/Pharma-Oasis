@@ -75,6 +75,10 @@ app.use((req, res, next) => {
   const publicPath = path.resolve(process.cwd(), "public");
   app.use(express.static(publicPath));
 
+  // Serve attached assets (product images, stock images, etc.)
+  const attachedAssetsPath = path.resolve(process.cwd(), "attached_assets");
+  app.use("/attached_assets", express.static(attachedAssetsPath));
+
   // importantly only setup vite in development and after
   // setting up all the other routes so the catch-all route
   // doesn't interfere with the other routes

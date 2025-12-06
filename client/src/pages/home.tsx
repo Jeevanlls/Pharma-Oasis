@@ -41,9 +41,11 @@ import {
 import type { LucideIcon } from "lucide-react";
 
 const stats = [
-  { value: "50+", label: "Premium Brands" },
-  { value: "10K+", label: "Products Available" },
-  { value: "98%", label: "Order Accuracy" },
+  { value: "50+", label: "Premium Brands", type: "stat" as const },
+  { value: "10K+", label: "Products Available", type: "stat" as const },
+  { value: "98%", label: "Order Accuracy", type: "stat" as const },
+  { value: "MHRA", label: "Licensed Distributor", type: "badge" as const },
+  { value: "GDP", label: "Compliant", type: "badge" as const },
 ];
 
 const features = [
@@ -317,13 +319,24 @@ function StatsBar() {
   return (
     <section className="py-12 bg-sidebar" data-testid="stats-bar">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-3 gap-8">
+        <div className="grid grid-cols-3 sm:grid-cols-5 gap-8">
           {stats.map((stat, index) => (
             <div key={stat.label} className="text-center" data-testid={`stat-item-${index}`}>
-              <p className="text-3xl font-bold sm:text-4xl text-sidebar-foreground" style={{ fontFamily: "DM Sans, sans-serif" }} data-testid={`stat-value-${index}`}>
-                {stat.value}
-              </p>
-              <p className="mt-1 text-sm text-sidebar-foreground/70" data-testid={`stat-label-${index}`}>{stat.label}</p>
+              {stat.type === "badge" ? (
+                <>
+                  <Badge variant="outline" className="bg-sidebar-primary/20 text-sidebar-primary border-sidebar-primary/40 px-3 py-1 text-lg font-bold">
+                    {stat.value}
+                  </Badge>
+                  <p className="mt-2 text-sm text-sidebar-foreground/70" data-testid={`stat-label-${index}`}>{stat.label}</p>
+                </>
+              ) : (
+                <>
+                  <p className="text-3xl font-bold sm:text-4xl text-sidebar-foreground" style={{ fontFamily: "DM Sans, sans-serif" }} data-testid={`stat-value-${index}`}>
+                    {stat.value}
+                  </p>
+                  <p className="mt-1 text-sm text-sidebar-foreground/70" data-testid={`stat-label-${index}`}>{stat.label}</p>
+                </>
+              )}
             </div>
           ))}
         </div>
