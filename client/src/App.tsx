@@ -20,6 +20,9 @@ import MyQuotesPage from "@/pages/my-quotes";
 import QuoteDetailPage from "@/pages/quote-detail";
 import SupplierRegistrationPage from "@/pages/supplier-registration";
 import DashboardPage from "@/pages/dashboard";
+import PrivacyPolicyPage from "@/pages/privacy";
+import TermsOfServicePage from "@/pages/terms";
+import CookiePolicyPage from "@/pages/cookies";
 
 import AdminDashboard from "@/pages/admin/index";
 import AdminUsersPage from "@/pages/admin/users";
@@ -75,6 +78,9 @@ function Router() {
       <Route path="/my-quotes/:id" component={QuoteDetailPage} />
       <Route path="/dashboard" component={DashboardPage} />
       <Route path="/supplier-registration" component={SupplierRegistrationPage} />
+      <Route path="/privacy" component={PrivacyPolicyPage} />
+      <Route path="/terms" component={TermsOfServicePage} />
+      <Route path="/cookies" component={CookiePolicyPage} />
       
       <Route path="/admin">{() => <AdminRoute component={AdminDashboard} />}</Route>
       <Route path="/admin/users">{() => <AdminRoute component={AdminUsersPage} />}</Route>
