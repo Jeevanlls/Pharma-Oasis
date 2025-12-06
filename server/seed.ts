@@ -298,6 +298,15 @@ async function seed() {
       position: 8,
       isActive: true,
     },
+    {
+      title: "Global Distribution Network",
+      subtitle: "From our UK headquarters to pharmacies worldwide. We export to Europe, Asia, Africa and beyond with reliable international logistics.",
+      ctaLabel: "Partner With Us",
+      ctaHref: "/supplier-registration",
+      imageUrl: "/assets/global-distribution-map.png",
+      position: 9,
+      isActive: true,
+    },
   ];
 
   // Delete existing hero slides and insert new ones

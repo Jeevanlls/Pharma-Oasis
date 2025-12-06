@@ -1,15 +1,53 @@
 import { Link } from "wouter";
-import { Mail, Phone, MapPin, Shield, Award, Truck, Building2, Globe } from "lucide-react";
+import { Mail, Truck, Building2, Globe, Shield, Award } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import logoImage from "@assets/01_1764977214745.png";
 import type { CompanyLocation } from "@shared/schema";
+
+function MHRALogo() {
+  return (
+    <div className="flex items-center gap-2 p-2 rounded-md bg-sidebar-foreground/10">
+      <div className="flex flex-col items-center">
+        <svg viewBox="0 0 60 40" className="h-8 w-12">
+          <rect x="2" y="2" width="56" height="36" rx="4" fill="none" stroke="currentColor" strokeWidth="2" className="text-sidebar-foreground/80"/>
+          <text x="30" y="18" textAnchor="middle" fill="currentColor" className="text-sidebar-foreground" fontSize="10" fontWeight="bold" fontFamily="Arial, sans-serif">MHRA</text>
+          <text x="30" y="30" textAnchor="middle" fill="currentColor" className="text-sidebar-foreground/70" fontSize="6" fontFamily="Arial, sans-serif">WDA(H) Licensed</text>
+        </svg>
+      </div>
+      <div className="text-left">
+        <p className="text-[10px] font-semibold text-sidebar-foreground leading-tight">Medicines & Healthcare</p>
+        <p className="text-[10px] font-semibold text-sidebar-foreground leading-tight">Regulatory Agency</p>
+        <p className="text-[9px] text-sidebar-foreground/60">Licence: 53820</p>
+      </div>
+    </div>
+  );
+}
+
+function GDPLogo() {
+  return (
+    <div className="flex items-center gap-2 p-2 rounded-md bg-sidebar-foreground/10">
+      <div className="flex flex-col items-center">
+        <svg viewBox="0 0 50 40" className="h-8 w-10">
+          <circle cx="25" cy="20" r="16" fill="none" stroke="currentColor" strokeWidth="2" className="text-sidebar-foreground/80"/>
+          <text x="25" y="18" textAnchor="middle" fill="currentColor" className="text-sidebar-foreground" fontSize="9" fontWeight="bold" fontFamily="Arial, sans-serif">GDP</text>
+          <text x="25" y="28" textAnchor="middle" fill="currentColor" className="text-sidebar-foreground/70" fontSize="5" fontFamily="Arial, sans-serif">CERTIFIED</text>
+          <path d="M17 20 L22 25 L33 14" fill="none" stroke="currentColor" strokeWidth="2" className="text-green-400" opacity="0.8" transform="translate(0, 5)"/>
+        </svg>
+      </div>
+      <div className="text-left">
+        <p className="text-[10px] font-semibold text-sidebar-foreground leading-tight">Good Distribution</p>
+        <p className="text-[10px] font-semibold text-sidebar-foreground leading-tight">Practice Compliant</p>
+        <p className="text-[9px] text-sidebar-foreground/60">Supply Chain Certified</p>
+      </div>
+    </div>
+  );
+}
 
 export function Footer() {
   const { data: locations = [] } = useQuery<CompanyLocation[]>({
     queryKey: ["/api/company-locations"],
   });
 
-  // Get headquarters for main display
   const headquarters = locations.find(l => l.locationType === "headquarters");
   const otherLocations = locations.filter(l => l.locationType !== "headquarters");
 
@@ -30,15 +68,9 @@ export function Footer() {
                 Trusted wholesale partner to 3,000+ UK pharmacies. Licensed healthcare,
                 wellness and beauty distributor.
               </p>
-              <div className="flex items-center gap-4 pt-2">
-                <div className="flex items-center gap-1.5 text-xs text-sidebar-foreground/70">
-                  <Shield className="h-4 w-4" />
-                  <span>MHRA Licensed</span>
-                </div>
-                <div className="flex items-center gap-1.5 text-xs text-sidebar-foreground/70">
-                  <Award className="h-4 w-4" />
-                  <span>GDP Compliant</span>
-                </div>
+              <div className="flex flex-col gap-2 pt-2">
+                <MHRALogo />
+                <GDPLogo />
               </div>
             </div>
 

@@ -30,10 +30,7 @@ export default function ContactPage() {
   const onSubmit = async (data: ContactFormData) => {
     setIsLoading(true);
     try {
-      await apiRequest("/api/contact", {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
+      await apiRequest("POST", "/api/contact", data);
       setIsSuccess(true);
       form.reset();
     } catch (error: any) {
