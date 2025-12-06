@@ -528,11 +528,11 @@ export async function seed() {
     console.log(`Hero slide created: ${slide.title}`);
   }
 
-  // Create company locations - Single UK warehouse only
+  // Create company locations - UK headquarters and global presence
   const locationData = [
     {
       locationType: "headquarters",
-      locationName: "UK Warehouse",
+      locationName: "UK Headquarters & Warehouse",
       companyName: "Pharma Oasis Limited",
       addressLine1: "Unit - J, Doddington Park Farmhouse",
       addressLine2: "Bridgemere",
@@ -543,6 +543,37 @@ export async function seed() {
       companyRegNumber: "11369972",
       wdaLicenceNumber: "53820",
       position: 1,
+      isActive: true,
+    },
+    {
+      locationType: "distribution",
+      locationName: "European Distribution Centre",
+      companyName: "Pharma Oasis Europe B.V.",
+      addressLine1: "Havenweg 35",
+      city: "Rotterdam",
+      postcode: "3089 JH",
+      country: "Netherlands",
+      position: 2,
+      isActive: true,
+    },
+    {
+      locationType: "office",
+      locationName: "Middle East Office",
+      companyName: "Pharma Oasis MENA",
+      addressLine1: "Dubai Healthcare City",
+      city: "Dubai",
+      country: "United Arab Emirates",
+      position: 3,
+      isActive: true,
+    },
+    {
+      locationType: "sourcing",
+      locationName: "Asia Sourcing Hub",
+      companyName: "Pharma Oasis Asia",
+      addressLine1: "Bandra Kurla Complex",
+      city: "Mumbai",
+      country: "India",
+      position: 4,
       isActive: true,
     },
   ];
