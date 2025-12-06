@@ -1,6 +1,6 @@
 import { 
   users, brands, categories, products, quotes, quoteItems, 
-  supplierLeads, cmsBlocks, siteSettings, contactMessages, heroSlides,
+  supplierLeads, cmsBlocks, siteSettings, contactMessages, heroSlides, companyLocations,
   type User, type InsertUser,
   type Brand, type InsertBrand,
   type Category, type InsertCategory,
@@ -12,6 +12,7 @@ import {
   type SiteSetting, type InsertSiteSetting,
   type ContactMessage, type InsertContactMessage,
   type HeroSlide, type InsertHeroSlide,
+  type CompanyLocation, type InsertCompanyLocation,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, ilike, desc, asc, sql, isNull, inArray } from "drizzle-orm";
@@ -111,6 +112,14 @@ export interface IStorage {
   // Featured Brands (for homepage)
   getFeaturedBrands(): Promise<Brand[]>;
   updateBrandHomeFeatured(id: number, isHomeFeatured: boolean, homePosition?: number): Promise<Brand | undefined>;
+
+  // Company Locations
+  getCompanyLocation(id: number): Promise<CompanyLocation | undefined>;
+  createCompanyLocation(location: InsertCompanyLocation): Promise<CompanyLocation>;
+  updateCompanyLocation(id: number, updates: Partial<InsertCompanyLocation>): Promise<CompanyLocation | undefined>;
+  deleteCompanyLocation(id: number): Promise<void>;
+  getAllCompanyLocations(): Promise<CompanyLocation[]>;
+  getActiveCompanyLocations(): Promise<CompanyLocation[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -666,6 +675,39 @@ export class DatabaseStorage implements IStorage {
       .where(eq(brands.id, id))
       .returning();
     return updated;
+  }
+
+  // ==================== COMPANY LOCATIONS ====================
+  async getCompanyLocation(id: number): Promise<CompanyLocation | undefined> {
+    const [location] = await db.select().from(companyLocations).where(eq(companyLocations.id, id));
+    return location;
+  }
+
+  async createCompanyLocation(location: InsertCompanyLocation): Promise<CompanyLocation> {
+    const [created] = await db.insert(companyLocations).values(location).returning();
+    return created;
+  }
+
+  async updateCompanyLocation(id: number, updates: Partial<InsertCompanyLocation>): Promise<CompanyLocation | undefined> {
+    const [updated] = await db.update(companyLocations)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(companyLocations.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteCompanyLocation(id: number): Promise<void> {
+    await db.delete(companyLocations).where(eq(companyLocations.id, id));
+  }
+
+  async getAllCompanyLocations(): Promise<CompanyLocation[]> {
+    return db.select().from(companyLocations).orderBy(asc(companyLocations.position));
+  }
+
+  async getActiveCompanyLocations(): Promise<CompanyLocation[]> {
+    return db.select().from(companyLocations)
+      .where(eq(companyLocations.isActive, true))
+      .orderBy(asc(companyLocations.position));
   }
 }
 

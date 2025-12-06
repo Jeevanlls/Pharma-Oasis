@@ -236,6 +236,30 @@ export const heroSlides = pgTable("hero_slides", {
 });
 
 // ============================================
+// COMPANY LOCATIONS TABLE
+// ============================================
+export const companyLocations = pgTable("company_locations", {
+  id: serial("id").primaryKey(),
+  locationType: varchar("location_type", { length: 50 }).notNull(), // "headquarters", "warehouse", "branch"
+  locationName: varchar("location_name", { length: 255 }).notNull(),
+  companyName: varchar("company_name", { length: 255 }).notNull(),
+  addressLine1: varchar("address_line_1", { length: 255 }).notNull(),
+  addressLine2: varchar("address_line_2", { length: 255 }),
+  city: varchar("city", { length: 100 }),
+  postcode: varchar("postcode", { length: 50 }),
+  country: varchar("country", { length: 100 }).notNull(),
+  vatNumber: varchar("vat_number", { length: 100 }),
+  companyRegNumber: varchar("company_reg_number", { length: 100 }),
+  wdaLicenceNumber: varchar("wda_licence_number", { length: 100 }),
+  phoneNumber: varchar("phone_number", { length: 50 }),
+  email: varchar("email", { length: 255 }),
+  position: integer("position").notNull().default(0),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ============================================
 // RELATIONS
 // ============================================
 export const usersRelations = relations(users, ({ many }) => ({
@@ -427,6 +451,16 @@ export const insertHeroSlideSchema = createInsertSchema(heroSlides).omit({
 export const selectHeroSlideSchema = createSelectSchema(heroSlides);
 export type InsertHeroSlide = z.infer<typeof insertHeroSlideSchema>;
 export type HeroSlide = typeof heroSlides.$inferSelect;
+
+// Company locations schemas
+export const insertCompanyLocationSchema = createInsertSchema(companyLocations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const selectCompanyLocationSchema = createSelectSchema(companyLocations);
+export type InsertCompanyLocation = z.infer<typeof insertCompanyLocationSchema>;
+export type CompanyLocation = typeof companyLocations.$inferSelect;
 
 // ============================================
 // FORM VALIDATION SCHEMAS

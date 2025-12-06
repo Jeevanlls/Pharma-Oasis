@@ -1087,6 +1087,16 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     }
   });
 
+  // Company locations (public - for footer/contact page)
+  app.get("/api/company-locations", async (req, res) => {
+    try {
+      const locations = await storage.getActiveCompanyLocations();
+      res.json(locations);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch company locations" });
+    }
+  });
+
   // ==================== ADMIN - HERO SLIDES ====================
   app.get("/api/admin/hero-slides", requireAdmin, async (req, res) => {
     try {
@@ -1155,6 +1165,46 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
       res.json(brand);
     } catch (error) {
       res.status(500).json({ message: "Failed to update brand homepage status" });
+    }
+  });
+
+  // ==================== ADMIN - COMPANY LOCATIONS ====================
+  app.get("/api/admin/company-locations", requireAdmin, async (req, res) => {
+    try {
+      const locations = await storage.getAllCompanyLocations();
+      res.json(locations);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch company locations" });
+    }
+  });
+
+  app.post("/api/admin/company-locations", requireAdmin, async (req, res) => {
+    try {
+      const location = await storage.createCompanyLocation(req.body);
+      res.status(201).json(location);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create company location" });
+    }
+  });
+
+  app.patch("/api/admin/company-locations/:id", requireAdmin, async (req, res) => {
+    try {
+      const location = await storage.updateCompanyLocation(Number(req.params.id), req.body);
+      if (!location) {
+        return res.status(404).json({ message: "Location not found" });
+      }
+      res.json(location);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update company location" });
+    }
+  });
+
+  app.delete("/api/admin/company-locations/:id", requireAdmin, async (req, res) => {
+    try {
+      await storage.deleteCompanyLocation(Number(req.params.id));
+      res.json({ message: "Location deleted" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete location" });
     }
   });
 }

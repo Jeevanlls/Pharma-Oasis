@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { users, brands, categories, products, siteSettings, cmsBlocks, heroSlides } from "@shared/schema";
+import { users, brands, categories, products, siteSettings, cmsBlocks, heroSlides, companyLocations } from "@shared/schema";
 import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 
@@ -222,8 +222,9 @@ async function seed() {
     }
   }
 
-  // Create hero slides - clear existing and add new ones
+  // Create hero slides - all 8 banners (user uploads + additional slides)
   const heroSlidesData = [
+    // User's 4 uploaded banners
     {
       title: "Keeping UK Pharmacies Stocked & Ready",
       subtitle: "Reliable, fast distribution to ensure you have the right products when your patients need them most.",
@@ -260,6 +261,43 @@ async function seed() {
       position: 4,
       isActive: true,
     },
+    // Additional 4 banners with gradient backgrounds
+    {
+      title: "Direct from Manufacturers",
+      subtitle: "We work directly with leading pharmaceutical brands to bring you authentic products at the best wholesale prices.",
+      ctaLabel: "View Our Brands",
+      ctaHref: "/brands",
+      imageUrl: "https://images.unsplash.com/photo-1587854692152-cbe660dbde88?w=1920&h=600&fit=crop&auto=format",
+      position: 5,
+      isActive: true,
+    },
+    {
+      title: "Temperature-Controlled Supply Chain",
+      subtitle: "GDP-compliant cold chain logistics ensuring product integrity from our warehouse to your pharmacy.",
+      ctaLabel: "Learn More",
+      ctaHref: "/about",
+      imageUrl: "https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=1920&h=600&fit=crop&auto=format",
+      position: 6,
+      isActive: true,
+    },
+    {
+      title: "Trusted by 3,000+ UK Pharmacies",
+      subtitle: "Join thousands of healthcare professionals who rely on Pharma Oasis for their wholesale needs.",
+      ctaLabel: "Register Today",
+      ctaHref: "/register",
+      imageUrl: "https://images.unsplash.com/photo-1631549916768-4119b2e5f926?w=1920&h=600&fit=crop&auto=format",
+      position: 7,
+      isActive: true,
+    },
+    {
+      title: "Next-Day Delivery Nationwide",
+      subtitle: "Fast, reliable delivery across the UK. Order by 5pm for next-day dispatch on in-stock items.",
+      ctaLabel: "Start Ordering",
+      ctaHref: "/products",
+      imageUrl: "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=1920&h=600&fit=crop&auto=format",
+      position: 8,
+      isActive: true,
+    },
   ];
 
   // Delete existing hero slides and insert new ones
@@ -269,6 +307,70 @@ async function seed() {
   for (const slide of heroSlidesData) {
     await db.insert(heroSlides).values(slide);
     console.log(`Hero slide created: ${slide.title}`);
+  }
+
+  // Create company locations
+  const locationData = [
+    {
+      locationType: "headquarters",
+      locationName: "UK Head Office & Warehouse",
+      companyName: "Pharma Oasis Limited",
+      addressLine1: "Unit - J, Doddington Park Farmhouse",
+      addressLine2: "Bridgemere",
+      city: "Nantwich",
+      postcode: "CW5 7PU",
+      country: "United Kingdom",
+      vatNumber: "364 4962 68",
+      companyRegNumber: "11369972",
+      wdaLicenceNumber: "53820",
+      position: 1,
+      isActive: true,
+    },
+    {
+      locationType: "warehouse",
+      locationName: "UK Warehouse - Sutton",
+      companyName: "Pharma Oasis Ltd",
+      addressLine1: "Unit B004 (Big Yellow)",
+      addressLine2: "12 Kimpton Park Way, Off Old Fields Road",
+      city: "Sutton",
+      postcode: "SM3 9QS",
+      country: "United Kingdom",
+      position: 2,
+      isActive: true,
+    },
+    {
+      locationType: "branch",
+      locationName: "Netherlands Branch",
+      companyName: "Pharma Oasis B.V",
+      addressLine1: "Chain Logistics",
+      addressLine2: "Jagersveld 6a",
+      city: "Uden",
+      postcode: "5405 BW",
+      country: "The Netherlands",
+      position: 3,
+      isActive: true,
+    },
+    {
+      locationType: "branch",
+      locationName: "India Office",
+      companyName: "Pharma Oasis",
+      addressLine1: "Office No. 24, 2nd Floor",
+      addressLine2: "Jaipur Electronic Market, Durgapura",
+      city: "Jaipur, Rajasthan",
+      postcode: "302018",
+      country: "India",
+      position: 4,
+      isActive: true,
+    },
+  ];
+
+  // Clear and insert company locations
+  await db.delete(companyLocations);
+  console.log("Cleared existing company locations");
+
+  for (const location of locationData) {
+    await db.insert(companyLocations).values(location);
+    console.log(`Location created: ${location.locationName}`);
   }
 
   console.log("Database seed completed!");
