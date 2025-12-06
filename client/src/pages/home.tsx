@@ -11,7 +11,7 @@ import {
   CarouselItem,
   type CarouselApi,
 } from "@/components/ui/carousel";
-import type { HeroSlide, Brand } from "@shared/schema";
+import type { HeroSlide, Brand, HomeStat, HomeFeature, HomeCategory, HomeProcessStep, HomeSection } from "@shared/schema";
 import {
   Package,
   Shield,
@@ -40,52 +40,37 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
-const stats = [
-  { value: "50+", label: "Premium Brands", type: "stat" as const },
-  { value: "10K+", label: "Products Available", type: "stat" as const },
-  { value: "98%", label: "Order Accuracy", type: "stat" as const },
-  { value: "MHRA", label: "Licensed Distributor", type: "badge" as const },
-  { value: "GDP", label: "Compliant", type: "badge" as const },
-];
+const iconMap: Record<string, LucideIcon> = {
+  Package,
+  Shield,
+  Truck,
+  Award,
+  Users,
+  ArrowRight,
+  CheckCircle2,
+  Zap,
+  Clock,
+  Building2,
+  ChevronLeft,
+  ChevronRight,
+  Globe,
+  Handshake,
+  Ship,
+  FileCheck,
+  Boxes,
+  BadgeCheck,
+  Pill,
+  Stethoscope,
+  Heart,
+  Sparkles,
+  Activity,
+  Cross,
+};
 
-const features = [
-  {
-    icon: Shield,
-    title: "MHRA Licensed",
-    description: "Fully licensed WDA(H) holder ensuring regulatory compliance for all pharmaceutical products.",
-  },
-  {
-    icon: Award,
-    title: "GDP Compliant",
-    description: "Good Distribution Practice certified supply chain from warehouse to delivery.",
-  },
-  {
-    icon: Truck,
-    title: "UK-Wide Delivery",
-    description: "Fast, reliable next-day delivery across the United Kingdom with temperature control.",
-  },
-  {
-    icon: Users,
-    title: "Dedicated Support",
-    description: "Expert account managers providing personalized service and competitive pricing.",
-  },
-];
-
-const categories: { name: string; count: string; icon: LucideIcon }[] = [
-  { name: "Pharmaceuticals", count: "5,000+ products", icon: Pill },
-  { name: "OTC Medicines", count: "3,500+ products", icon: Stethoscope },
-  { name: "Health & Wellness", count: "4,000+ products", icon: Heart },
-  { name: "Beauty & Skincare", count: "3,000+ products", icon: Sparkles },
-  { name: "Medical Devices", count: "2,500+ products", icon: Activity },
-  { name: "First Aid", count: "1,500+ products", icon: Cross },
-];
-
-const processSteps = [
-  { step: 1, title: "Register & Get Approved", description: "Complete our simple registration form. Our team reviews and approves qualified healthcare businesses." },
-  { step: 2, title: "Browse Products", description: "Access our full catalogue with wholesale pricing on 20,000+ healthcare products." },
-  { step: 3, title: "Request a Quote", description: "Add products to your basket and submit a quote request for competitive pricing." },
-  { step: 4, title: "Receive & Order", description: "Our team reviews your request and provides a formal quote. Accept and place your order." },
-];
+function getIcon(iconName: string | null): LucideIcon {
+  if (!iconName) return Package;
+  return iconMap[iconName] || Package;
+}
 
 function HeroCarousel() {
   const { data: slides = [], isLoading } = useQuery<HeroSlide[]>({
@@ -316,12 +301,20 @@ function BrandStrip() {
 }
 
 function StatsBar() {
+  const { data: stats = [], isLoading } = useQuery<HomeStat[]>({
+    queryKey: ["/api/home/stats"],
+  });
+
+  if (isLoading || stats.length === 0) {
+    return null;
+  }
+
   return (
     <section className="py-12 bg-sidebar" data-testid="stats-bar">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-3 sm:grid-cols-5 gap-8">
           {stats.map((stat, index) => (
-            <div key={stat.label} className="text-center" data-testid={`stat-item-${index}`}>
+            <div key={stat.id} className="text-center" data-testid={`stat-item-${index}`}>
               {stat.type === "badge" ? (
                 <>
                   <Badge variant="outline" className="bg-sidebar-primary/20 text-sidebar-primary border-sidebar-primary/40 px-3 py-1 text-lg font-bold">
@@ -345,86 +338,420 @@ function StatsBar() {
   );
 }
 
-function BrandPartnershipSection() {
-  const partnerBenefits = [
-    "Food Supplements & Nutraceuticals",
-    "Cosmetics & Skincare Products",
-    "Health Foods & Wellness Products",
-    "Generic Medicines & Pharmaceuticals",
-    "Medical Devices & Health Equipment",
-  ];
+function DynamicPartnerSection({ section }: { section: HomeSection }) {
+  const bulletPoints = section.bulletPoints ? JSON.parse(section.bulletPoints) : [];
+  const cardItems = section.cardItems ? JSON.parse(section.cardItems) : [];
+  const BadgeIconComponent = getIcon(section.badgeIcon);
+  const PrimaryCtaIcon = getIcon(section.primaryCtaIcon);
+  const CardIconComponent = getIcon(section.cardIcon);
 
   return (
-    <section className="py-16 sm:py-20 bg-gradient-to-br from-primary/5 via-background to-accent/5" data-testid="brand-partnership-section">
+    <section className="py-16 sm:py-20 bg-gradient-to-br from-primary/5 via-background to-accent/5" data-testid={`section-${section.sectionKey}`}>
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 gap-12 lg:grid-cols-2 items-center">
           <div>
             <Badge className="mb-4 bg-primary/10 text-primary border-primary/20">
-              <Globe className="mr-1.5 h-3 w-3" />
-              Global Brands Welcome
+              <BadgeIconComponent className="mr-1.5 h-3 w-3" />
+              {section.badgeText}
             </Badge>
             <h2 className="text-3xl font-bold tracking-tight sm:text-4xl mb-4" style={{ fontFamily: "DM Sans, sans-serif" }}>
-              Expand Your Brand into the UK Market
+              {section.title}
             </h2>
             <p className="text-lg text-muted-foreground mb-6">
-              Are you a brand from anywhere in the world looking to enter the UK healthcare and wellness market? 
-              Pharma Oasis is your trusted gateway to reaching pharmacies, retailers, and wholesalers across the United Kingdom.
+              {section.subtitle}
             </p>
-            <p className="text-muted-foreground mb-6">
-              We welcome partnerships with international manufacturers and brands in these sectors:
-            </p>
-            <ul className="space-y-3 mb-8">
-              {partnerBenefits.map((item) => (
-                <li key={item} className="flex items-center gap-3">
-                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                  </div>
-                  <span className="text-foreground font-medium">{item}</span>
-                </li>
-              ))}
-            </ul>
+            {section.description && (
+              <p className="text-muted-foreground mb-6">
+                {section.description}
+              </p>
+            )}
+            {bulletPoints.length > 0 && (
+              <ul className="space-y-3 mb-8">
+                {bulletPoints.map((item: string) => (
+                  <li key={item} className="flex items-center gap-3">
+                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10">
+                      <CheckCircle2 className="h-4 w-4 text-primary" />
+                    </div>
+                    <span className="text-foreground font-medium">{item}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
             <div className="flex flex-col sm:flex-row gap-4">
-              <Link href="/contact">
-                <Button size="lg" className="w-full sm:w-auto gap-2" data-testid="button-brand-partner">
-                  <Handshake className="h-4 w-4" />
-                  Discuss Partnership
-                </Button>
-              </Link>
-              <Link href="/supplier-registration">
-                <Button size="lg" variant="outline" className="w-full sm:w-auto gap-2" data-testid="button-supplier-apply">
-                  Apply as Supplier
-                </Button>
-              </Link>
+              {section.primaryCtaLabel && section.primaryCtaHref && (
+                <Link href={section.primaryCtaHref}>
+                  <Button size="lg" className="w-full sm:w-auto gap-2" data-testid={`button-${section.sectionKey}-primary`}>
+                    <PrimaryCtaIcon className="h-4 w-4" />
+                    {section.primaryCtaLabel}
+                  </Button>
+                </Link>
+              )}
+              {section.secondaryCtaLabel && section.secondaryCtaHref && (
+                <Link href={section.secondaryCtaHref}>
+                  <Button size="lg" variant="outline" className="w-full sm:w-auto gap-2" data-testid={`button-${section.sectionKey}-secondary`}>
+                    {section.secondaryCtaLabel}
+                  </Button>
+                </Link>
+              )}
             </div>
           </div>
           <div className="relative">
             <Card className="p-8 bg-card border shadow-lg">
               <div className="text-center mb-6">
-                <Globe className="h-12 w-12 mx-auto text-primary mb-4" />
-                <h3 className="text-xl font-semibold mb-2">Why Partner With Us?</h3>
-                <p className="text-sm text-muted-foreground">Unlock the UK healthcare market</p>
+                <CardIconComponent className="h-12 w-12 mx-auto text-primary mb-4" />
+                <h3 className="text-xl font-semibold mb-2">{section.cardTitle}</h3>
+                <p className="text-sm text-muted-foreground">{section.cardSubtitle}</p>
               </div>
               <div className="space-y-4">
-                <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
-                  <BadgeCheck className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="font-medium text-sm">MHRA Compliance Support</p>
-                    <p className="text-xs text-muted-foreground">Navigate UK regulations with expert guidance</p>
+                {cardItems.map((item: { icon: string; title?: string; description?: string; value?: string; label?: string }, idx: number) => {
+                  const ItemIcon = getIcon(item.icon);
+                  if (item.title && item.description) {
+                    return (
+                      <div key={idx} className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
+                        <ItemIcon className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="font-medium text-sm">{item.title}</p>
+                          <p className="text-xs text-muted-foreground">{item.description}</p>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return null;
+                })}
+              </div>
+            </Card>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function DynamicExportSection({ section }: { section: HomeSection }) {
+  const bulletPoints = section.bulletPoints ? JSON.parse(section.bulletPoints) : [];
+  const cardItems = section.cardItems ? JSON.parse(section.cardItems) : [];
+  const BadgeIconComponent = getIcon(section.badgeIcon);
+  const PrimaryCtaIcon = getIcon(section.primaryCtaIcon);
+  const CardIconComponent = getIcon(section.cardIcon);
+
+  return (
+    <section className="py-16 sm:py-20 bg-muted/30" data-testid={`section-${section.sectionKey}`}>
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 gap-12 lg:grid-cols-2 items-center">
+          <div className="order-2 lg:order-1">
+            <Card className="p-8 bg-card border shadow-lg">
+              <div className="text-center mb-6">
+                <CardIconComponent className="h-12 w-12 mx-auto text-primary mb-4" />
+                <h3 className="text-xl font-semibold mb-2">{section.cardTitle}</h3>
+                <p className="text-sm text-muted-foreground">{section.cardSubtitle}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                {cardItems.map((item: { icon: string; value?: string; label?: string }, idx: number) => {
+                  const ItemIcon = getIcon(item.icon);
+                  if (item.value && item.label) {
+                    return (
+                      <div key={idx} className="text-center p-4 rounded-lg bg-muted/50">
+                        <ItemIcon className="h-8 w-8 mx-auto mb-2 text-primary" />
+                        <p className="font-semibold">{item.value}</p>
+                        <p className="text-xs text-muted-foreground">{item.label}</p>
+                      </div>
+                    );
+                  }
+                  return null;
+                })}
+              </div>
+            </Card>
+          </div>
+          <div className="order-1 lg:order-2">
+            <Badge className="mb-4 bg-primary/10 text-primary border-primary/20">
+              <BadgeIconComponent className="mr-1.5 h-3 w-3" />
+              {section.badgeText}
+            </Badge>
+            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl mb-4" style={{ fontFamily: "DM Sans, sans-serif" }}>
+              {section.title}
+            </h2>
+            <p className="text-lg text-muted-foreground mb-6">
+              {section.subtitle}
+            </p>
+            {section.description && (
+              <p className="text-muted-foreground mb-6">
+                {section.description}
+              </p>
+            )}
+            {bulletPoints.length > 0 && (
+              <ul className="space-y-3 mb-8">
+                {bulletPoints.map((item: string) => (
+                  <li key={item} className="flex items-center gap-3">
+                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10">
+                      <CheckCircle2 className="h-4 w-4 text-primary" />
+                    </div>
+                    <span className="text-foreground font-medium">{item}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="flex flex-col sm:flex-row gap-4">
+              {section.primaryCtaLabel && section.primaryCtaHref && (
+                <Link href={section.primaryCtaHref}>
+                  <Button size="lg" className="w-full sm:w-auto gap-2" data-testid={`button-${section.sectionKey}-primary`}>
+                    <PrimaryCtaIcon className="h-4 w-4" />
+                    {section.primaryCtaLabel}
+                  </Button>
+                </Link>
+              )}
+              {section.secondaryCtaLabel && section.secondaryCtaHref && (
+                <Link href={section.secondaryCtaHref}>
+                  <Button size="lg" variant="outline" className="w-full sm:w-auto gap-2" data-testid={`button-${section.sectionKey}-secondary`}>
+                    {section.secondaryCtaLabel}
+                  </Button>
+                </Link>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function HomeSectionsRenderer() {
+  const { data: sections = [], isLoading } = useQuery<HomeSection[]>({
+    queryKey: ["/api/home/sections"],
+  });
+
+  if (isLoading || sections.length === 0) {
+    return null;
+  }
+
+  return (
+    <>
+      {sections.map((section) => {
+        if (section.sectionKey === "partner_with_us") {
+          return <DynamicPartnerSection key={section.id} section={section} />;
+        }
+        if (section.sectionKey === "export_services") {
+          return <DynamicExportSection key={section.id} section={section} />;
+        }
+        return null;
+      })}
+    </>
+  );
+}
+
+function FeaturesSection() {
+  const { data: features = [], isLoading } = useQuery<HomeFeature[]>({
+    queryKey: ["/api/home/features"],
+  });
+
+  if (isLoading || features.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className="py-16 sm:py-24 bg-muted/30" data-testid="features-section">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-12">
+          <Badge variant="secondary" className="mb-4">Why Choose Us</Badge>
+          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl" style={{ fontFamily: "DM Sans, sans-serif" }}>
+            A Partner You Can Trust
+          </h2>
+          <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
+            We combine regulatory excellence with exceptional service to support your pharmacy's success.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          {features.map((feature) => {
+            const IconComponent = getIcon(feature.iconName);
+            return (
+              <Card key={feature.id} className="group relative overflow-visible">
+                <CardContent className="pt-6">
+                  <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <IconComponent className="h-6 w-6" />
                   </div>
+                  <h3 className="font-semibold text-lg mb-2">{feature.title}</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    {feature.description}
+                  </p>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function CategoriesSection() {
+  const { data: categories = [], isLoading } = useQuery<HomeCategory[]>({
+    queryKey: ["/api/home/categories"],
+  });
+
+  if (isLoading || categories.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className="py-16 sm:py-24" data-testid="categories-section">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-12">
+          <Badge variant="secondary" className="mb-4">Product Categories</Badge>
+          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl" style={{ fontFamily: "DM Sans, sans-serif" }}>
+            Comprehensive Healthcare Range
+          </h2>
+          <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
+            From pharmaceuticals to wellness products, we've got your pharmacy covered.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {categories.map((category) => {
+            const IconComponent = getIcon(category.iconName);
+            return (
+              <Link key={category.id} href={category.linkHref || "/products"}>
+                <Card className="group cursor-pointer hover-elevate">
+                  <CardContent className="flex items-center justify-between p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                        <IconComponent className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <h3 className="font-medium">{category.name}</h3>
+                        <p className="text-sm text-muted-foreground">{category.productCount}</p>
+                      </div>
+                    </div>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                  </CardContent>
+                </Card>
+              </Link>
+            );
+          })}
+        </div>
+
+        <div className="mt-8 text-center">
+          <Link href="/products">
+            <Button variant="outline" size="lg" className="gap-2">
+              View Full Catalogue
+              <ArrowRight className="h-4 w-4" />
+            </Button>
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ProcessSection() {
+  const { data: steps = [], isLoading } = useQuery<HomeProcessStep[]>({
+    queryKey: ["/api/home/process-steps"],
+  });
+
+  if (isLoading || steps.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className="py-16 sm:py-24 bg-muted/30" data-testid="process-section">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-12">
+          <Badge variant="secondary" className="mb-4">How It Works</Badge>
+          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl" style={{ fontFamily: "DM Sans, sans-serif" }}>
+            Simple Quote-Based Ordering
+          </h2>
+          <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
+            Our streamlined process makes ordering healthcare products easy and transparent.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+          {steps.map((item, index) => (
+            <div key={item.id} className="relative">
+              <div className="flex flex-col items-center text-center">
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground font-bold text-lg">
+                  {item.stepNumber}
                 </div>
-                <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
-                  <Users className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="font-medium text-sm">3,000+ Pharmacy Network</p>
-                    <p className="text-xs text-muted-foreground">Direct access to UK retail pharmacies</p>
-                  </div>
+                <h3 className="font-semibold text-lg mb-2">{item.title}</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {item.description}
+                </p>
+              </div>
+              {index < steps.length - 1 && (
+                <div className="hidden lg:block absolute top-6 left-[60%] w-[80%] border-t-2 border-dashed border-muted-foreground/30" />
+              )}
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-12 text-center">
+          <Link href="/how-to-order">
+            <Button variant="outline" size="lg" className="gap-2">
+              Learn More
+              <ArrowRight className="h-4 w-4" />
+            </Button>
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function SupplierSection() {
+  return (
+    <section className="py-16 sm:py-24" data-testid="supplier-section">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 gap-12 lg:grid-cols-2 items-center">
+          <div>
+            <Badge variant="secondary" className="mb-4">For Suppliers</Badge>
+            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl mb-6" style={{ fontFamily: "DM Sans, sans-serif" }}>
+              Partner With Us
+            </h2>
+            <p className="text-lg text-muted-foreground mb-6">
+              Are you a manufacturer or supplier looking to expand your distribution in the UK healthcare market? 
+              Partner with Pharma Oasis and reach thousands of pharmacies nationwide.
+            </p>
+            <ul className="space-y-3 mb-8">
+              {[
+                "Access to 3,000+ UK pharmacies",
+                "Established distribution network",
+                "Marketing support and brand visibility",
+                "Dedicated partnership management",
+              ].map((item) => (
+                <li key={item} className="flex items-center gap-2 text-muted-foreground">
+                  <CheckCircle2 className="h-5 w-5 text-primary flex-shrink-0" />
+                  {item}
+                </li>
+              ))}
+            </ul>
+            <Link href="/supplier-registration">
+              <Button size="lg" className="gap-2" data-testid="button-supplier-register">
+                <Building2 className="h-4 w-4" />
+                Register as Supplier
+              </Button>
+            </Link>
+          </div>
+          <div className="relative">
+            <Card className="p-8 bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
+              <div className="grid grid-cols-2 gap-6">
+                <div className="text-center p-4">
+                  <Clock className="h-8 w-8 mx-auto mb-2 text-primary" />
+                  <p className="font-semibold text-2xl">24-48h</p>
+                  <p className="text-sm text-muted-foreground">Application Review</p>
                 </div>
-                <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
-                  <Truck className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="font-medium text-sm">Nationwide Distribution</p>
-                    <p className="text-xs text-muted-foreground">GDP-compliant logistics across the UK</p>
-                  </div>
+                <div className="text-center p-4">
+                  <Users className="h-8 w-8 mx-auto mb-2 text-primary" />
+                  <p className="font-semibold text-2xl">500+</p>
+                  <p className="text-sm text-muted-foreground">Brand Partners</p>
+                </div>
+                <div className="text-center p-4">
+                  <Truck className="h-8 w-8 mx-auto mb-2 text-primary" />
+                  <p className="font-semibold text-2xl">UK-Wide</p>
+                  <p className="text-sm text-muted-foreground">Distribution</p>
+                </div>
+                <div className="text-center p-4">
+                  <Award className="h-8 w-8 mx-auto mb-2 text-primary" />
+                  <p className="font-semibold text-2xl">GDP</p>
+                  <p className="text-sm text-muted-foreground">Certified</p>
                 </div>
               </div>
             </Card>
@@ -435,90 +762,37 @@ function BrandPartnershipSection() {
   );
 }
 
-function ExportServicesSection() {
-  const exportBenefits = [
-    "Genuine UK-sourced healthcare products",
-    "MHRA & GDP certified supply chain",
-    "Competitive wholesale export pricing",
-    "Temperature-controlled shipping options",
-    "Documentation for customs clearance",
-  ];
-
+function CTASection() {
   return (
-    <section className="py-16 sm:py-20 bg-muted/30" data-testid="export-services-section">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 gap-12 lg:grid-cols-2 items-center">
-          <div className="order-2 lg:order-1">
-            <Card className="p-8 bg-card border shadow-lg">
-              <div className="text-center mb-6">
-                <Ship className="h-12 w-12 mx-auto text-primary mb-4" />
-                <h3 className="text-xl font-semibold mb-2">Export Ready</h3>
-                <p className="text-sm text-muted-foreground">Serving international buyers worldwide</p>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="text-center p-4 rounded-lg bg-muted/50">
-                  <Boxes className="h-8 w-8 mx-auto mb-2 text-primary" />
-                  <p className="font-semibold">20,000+</p>
-                  <p className="text-xs text-muted-foreground">Products</p>
-                </div>
-                <div className="text-center p-4 rounded-lg bg-muted/50">
-                  <Globe className="h-8 w-8 mx-auto mb-2 text-primary" />
-                  <p className="font-semibold">Worldwide</p>
-                  <p className="text-xs text-muted-foreground">Shipping</p>
-                </div>
-                <div className="text-center p-4 rounded-lg bg-muted/50">
-                  <FileCheck className="h-8 w-8 mx-auto mb-2 text-primary" />
-                  <p className="font-semibold">Full</p>
-                  <p className="text-xs text-muted-foreground">Documentation</p>
-                </div>
-                <div className="text-center p-4 rounded-lg bg-muted/50">
-                  <Shield className="h-8 w-8 mx-auto mb-2 text-primary" />
-                  <p className="font-semibold">Genuine</p>
-                  <p className="text-xs text-muted-foreground">UK Products</p>
-                </div>
-              </div>
-            </Card>
-          </div>
-          <div className="order-1 lg:order-2">
-            <Badge className="mb-4 bg-primary/10 text-primary border-primary/20">
-              <Ship className="mr-1.5 h-3 w-3" />
-              International Export
-            </Badge>
-            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl mb-4" style={{ fontFamily: "DM Sans, sans-serif" }}>
-              Import Genuine UK Products
-            </h2>
-            <p className="text-lg text-muted-foreground mb-6">
-              Are you a wholesaler, pharmacy distributor, or importer looking for genuine UK healthcare products? 
-              Pharma Oasis supplies authentic British brands to customers worldwide.
-            </p>
-            <p className="text-muted-foreground mb-6">
-              Whether you're sourcing vitamins, cosmetics, health foods, or pharmaceuticals, 
-              we provide the documentation and logistics support you need for seamless international import.
-            </p>
-            <ul className="space-y-3 mb-8">
-              {exportBenefits.map((item) => (
-                <li key={item} className="flex items-center gap-3">
-                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                  </div>
-                  <span className="text-foreground font-medium">{item}</span>
-                </li>
-              ))}
-            </ul>
-            <div className="flex flex-col sm:flex-row gap-4">
-              <Link href="/contact">
-                <Button size="lg" className="w-full sm:w-auto gap-2" data-testid="button-export-inquiry">
-                  <Ship className="h-4 w-4" />
-                  Request Export Quote
-                </Button>
-              </Link>
-              <Link href="/register">
-                <Button size="lg" variant="outline" className="w-full sm:w-auto gap-2" data-testid="button-register-importer">
-                  Register as Importer
-                </Button>
-              </Link>
-            </div>
-          </div>
+    <section className="py-16 sm:py-24 bg-muted" data-testid="cta-section">
+      <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 text-center">
+        <h2 className="text-3xl font-bold tracking-tight sm:text-4xl mb-6 text-foreground" style={{ fontFamily: "DM Sans, sans-serif" }}>
+          Ready to Get Started?
+        </h2>
+        <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
+          Join thousands of UK pharmacies who trust Pharma Oasis for their wholesale healthcare needs.
+          Register today and get access to competitive pricing.
+        </p>
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+          <Link href="/register">
+            <Button 
+              size="lg" 
+              className="w-full sm:w-auto gap-2"
+              data-testid="button-cta-register"
+            >
+              Register Now
+              <ArrowRight className="h-4 w-4" />
+            </Button>
+          </Link>
+          <Link href="/contact">
+            <Button 
+              size="lg" 
+              variant="outline" 
+              className="w-full sm:w-auto"
+            >
+              Contact Sales
+            </Button>
+          </Link>
         </div>
       </div>
     </section>
@@ -541,222 +815,12 @@ export default function HomePage() {
       <HeroCarousel />
       <BrandStrip />
       <StatsBar />
-      <BrandPartnershipSection />
-      <ExportServicesSection />
-
-      <section className="py-16 sm:py-24 bg-muted/30">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <Badge variant="secondary" className="mb-4">Why Choose Us</Badge>
-            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl" style={{ fontFamily: "DM Sans, sans-serif" }}>
-              A Partner You Can Trust
-            </h2>
-            <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
-              We combine regulatory excellence with exceptional service to support your pharmacy's success.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {features.map((feature) => (
-              <Card key={feature.title} className="group relative overflow-visible">
-                <CardContent className="pt-6">
-                  <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                    <feature.icon className="h-6 w-6" />
-                  </div>
-                  <h3 className="font-semibold text-lg mb-2">{feature.title}</h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    {feature.description}
-                  </p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="py-16 sm:py-24">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <Badge variant="secondary" className="mb-4">Product Categories</Badge>
-            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl" style={{ fontFamily: "DM Sans, sans-serif" }}>
-              Comprehensive Healthcare Range
-            </h2>
-            <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
-              From pharmaceuticals to wellness products, we've got your pharmacy covered.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {categories.map((category) => {
-              const IconComponent = category.icon;
-              return (
-                <Link key={category.name} href="/products">
-                  <Card className="group cursor-pointer hover-elevate">
-                    <CardContent className="flex items-center justify-between p-4">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                          <IconComponent className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <h3 className="font-medium">{category.name}</h3>
-                          <p className="text-sm text-muted-foreground">{category.count}</p>
-                        </div>
-                      </div>
-                      <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-                    </CardContent>
-                  </Card>
-                </Link>
-              );
-            })}
-          </div>
-
-          <div className="mt-8 text-center">
-            <Link href="/products">
-              <Button variant="outline" size="lg" className="gap-2">
-                View Full Catalogue
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      <section className="py-16 sm:py-24 bg-muted/30">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <Badge variant="secondary" className="mb-4">How It Works</Badge>
-            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl" style={{ fontFamily: "DM Sans, sans-serif" }}>
-              Simple Quote-Based Ordering
-            </h2>
-            <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
-              Our streamlined process makes ordering healthcare products easy and transparent.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-            {processSteps.map((item) => (
-              <div key={item.step} className="relative">
-                <div className="flex flex-col items-center text-center">
-                  <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground font-bold text-lg">
-                    {item.step}
-                  </div>
-                  <h3 className="font-semibold text-lg mb-2">{item.title}</h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    {item.description}
-                  </p>
-                </div>
-                {item.step < 4 && (
-                  <div className="hidden lg:block absolute top-6 left-[60%] w-[80%] border-t-2 border-dashed border-muted-foreground/30" />
-                )}
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-12 text-center">
-            <Link href="/how-to-order">
-              <Button variant="outline" size="lg" className="gap-2">
-                Learn More
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      <section className="py-16 sm:py-24">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 gap-12 lg:grid-cols-2 items-center">
-            <div>
-              <Badge variant="secondary" className="mb-4">For Suppliers</Badge>
-              <h2 className="text-3xl font-bold tracking-tight sm:text-4xl mb-6" style={{ fontFamily: "DM Sans, sans-serif" }}>
-                Partner With Us
-              </h2>
-              <p className="text-lg text-muted-foreground mb-6">
-                Are you a manufacturer or supplier looking to expand your distribution in the UK healthcare market? 
-                Partner with Pharma Oasis and reach thousands of pharmacies nationwide.
-              </p>
-              <ul className="space-y-3 mb-8">
-                {[
-                  "Access to 3,000+ UK pharmacies",
-                  "Established distribution network",
-                  "Marketing support and brand visibility",
-                  "Dedicated partnership management",
-                ].map((item) => (
-                  <li key={item} className="flex items-center gap-2 text-muted-foreground">
-                    <CheckCircle2 className="h-5 w-5 text-primary flex-shrink-0" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-              <Link href="/supplier-registration">
-                <Button size="lg" className="gap-2" data-testid="button-supplier-register">
-                  <Building2 className="h-4 w-4" />
-                  Register as Supplier
-                </Button>
-              </Link>
-            </div>
-            <div className="relative">
-              <Card className="p-8 bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="text-center p-4">
-                    <Clock className="h-8 w-8 mx-auto mb-2 text-primary" />
-                    <p className="font-semibold text-2xl">24-48h</p>
-                    <p className="text-sm text-muted-foreground">Application Review</p>
-                  </div>
-                  <div className="text-center p-4">
-                    <Users className="h-8 w-8 mx-auto mb-2 text-primary" />
-                    <p className="font-semibold text-2xl">500+</p>
-                    <p className="text-sm text-muted-foreground">Brand Partners</p>
-                  </div>
-                  <div className="text-center p-4">
-                    <Truck className="h-8 w-8 mx-auto mb-2 text-primary" />
-                    <p className="font-semibold text-2xl">UK-Wide</p>
-                    <p className="text-sm text-muted-foreground">Distribution</p>
-                  </div>
-                  <div className="text-center p-4">
-                    <Award className="h-8 w-8 mx-auto mb-2 text-primary" />
-                    <p className="font-semibold text-2xl">GDP</p>
-                    <p className="text-sm text-muted-foreground">Certified</p>
-                  </div>
-                </div>
-              </Card>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="py-16 sm:py-24 bg-muted">
-        <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl mb-6 text-foreground" style={{ fontFamily: "DM Sans, sans-serif" }}>
-            Ready to Get Started?
-          </h2>
-          <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
-            Join thousands of UK pharmacies who trust Pharma Oasis for their wholesale healthcare needs.
-            Register today and get access to competitive pricing.
-          </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link href="/register">
-              <Button 
-                size="lg" 
-                className="w-full sm:w-auto gap-2"
-                data-testid="button-cta-register"
-              >
-                Register Now
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-            </Link>
-            <Link href="/contact">
-              <Button 
-                size="lg" 
-                variant="outline" 
-                className="w-full sm:w-auto"
-              >
-                Contact Sales
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </section>
+      <HomeSectionsRenderer />
+      <FeaturesSection />
+      <CategoriesSection />
+      <ProcessSection />
+      <SupplierSection />
+      <CTASection />
     </PublicLayout>
   );
 }
