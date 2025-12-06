@@ -1107,6 +1107,56 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     }
   });
 
+  // Homepage stats (public)
+  app.get("/api/home/stats", async (req, res) => {
+    try {
+      const stats = await storage.getActiveHomeStats();
+      res.json(stats);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch home stats" });
+    }
+  });
+
+  // Homepage features (public)
+  app.get("/api/home/features", async (req, res) => {
+    try {
+      const features = await storage.getActiveHomeFeatures();
+      res.json(features);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch home features" });
+    }
+  });
+
+  // Homepage categories (public)
+  app.get("/api/home/categories", async (req, res) => {
+    try {
+      const categories = await storage.getActiveHomeCategories();
+      res.json(categories);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch home categories" });
+    }
+  });
+
+  // Homepage process steps (public)
+  app.get("/api/home/process-steps", async (req, res) => {
+    try {
+      const steps = await storage.getActiveHomeProcessSteps();
+      res.json(steps);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch process steps" });
+    }
+  });
+
+  // Homepage sections (public)
+  app.get("/api/home/sections", async (req, res) => {
+    try {
+      const sections = await storage.getActiveHomeSections();
+      res.json(sections);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch home sections" });
+    }
+  });
+
   // ==================== ADMIN - HERO SLIDES ====================
   app.get("/api/admin/hero-slides", requireAdmin, async (req, res) => {
     try {
@@ -1215,6 +1265,206 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
       res.json({ message: "Location deleted" });
     } catch (error) {
       res.status(500).json({ message: "Failed to delete location" });
+    }
+  });
+
+  // ==================== ADMIN - HOME STATS ====================
+  app.get("/api/admin/home-stats", requireAdmin, async (req, res) => {
+    try {
+      const stats = await storage.getAllHomeStats();
+      res.json(stats);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch home stats" });
+    }
+  });
+
+  app.post("/api/admin/home-stats", requireAdmin, async (req, res) => {
+    try {
+      const stat = await storage.createHomeStat(req.body);
+      res.status(201).json(stat);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create home stat" });
+    }
+  });
+
+  app.patch("/api/admin/home-stats/:id", requireAdmin, async (req, res) => {
+    try {
+      const stat = await storage.updateHomeStat(Number(req.params.id), req.body);
+      if (!stat) {
+        return res.status(404).json({ message: "Stat not found" });
+      }
+      res.json(stat);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update home stat" });
+    }
+  });
+
+  app.delete("/api/admin/home-stats/:id", requireAdmin, async (req, res) => {
+    try {
+      await storage.deleteHomeStat(Number(req.params.id));
+      res.json({ message: "Stat deleted" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete stat" });
+    }
+  });
+
+  // ==================== ADMIN - HOME FEATURES ====================
+  app.get("/api/admin/home-features", requireAdmin, async (req, res) => {
+    try {
+      const features = await storage.getAllHomeFeatures();
+      res.json(features);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch home features" });
+    }
+  });
+
+  app.post("/api/admin/home-features", requireAdmin, async (req, res) => {
+    try {
+      const feature = await storage.createHomeFeature(req.body);
+      res.status(201).json(feature);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create home feature" });
+    }
+  });
+
+  app.patch("/api/admin/home-features/:id", requireAdmin, async (req, res) => {
+    try {
+      const feature = await storage.updateHomeFeature(Number(req.params.id), req.body);
+      if (!feature) {
+        return res.status(404).json({ message: "Feature not found" });
+      }
+      res.json(feature);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update home feature" });
+    }
+  });
+
+  app.delete("/api/admin/home-features/:id", requireAdmin, async (req, res) => {
+    try {
+      await storage.deleteHomeFeature(Number(req.params.id));
+      res.json({ message: "Feature deleted" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete feature" });
+    }
+  });
+
+  // ==================== ADMIN - HOME CATEGORIES ====================
+  app.get("/api/admin/home-categories", requireAdmin, async (req, res) => {
+    try {
+      const categories = await storage.getAllHomeCategories();
+      res.json(categories);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch home categories" });
+    }
+  });
+
+  app.post("/api/admin/home-categories", requireAdmin, async (req, res) => {
+    try {
+      const category = await storage.createHomeCategory(req.body);
+      res.status(201).json(category);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create home category" });
+    }
+  });
+
+  app.patch("/api/admin/home-categories/:id", requireAdmin, async (req, res) => {
+    try {
+      const category = await storage.updateHomeCategory(Number(req.params.id), req.body);
+      if (!category) {
+        return res.status(404).json({ message: "Category not found" });
+      }
+      res.json(category);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update home category" });
+    }
+  });
+
+  app.delete("/api/admin/home-categories/:id", requireAdmin, async (req, res) => {
+    try {
+      await storage.deleteHomeCategory(Number(req.params.id));
+      res.json({ message: "Category deleted" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete category" });
+    }
+  });
+
+  // ==================== ADMIN - HOME PROCESS STEPS ====================
+  app.get("/api/admin/home-process-steps", requireAdmin, async (req, res) => {
+    try {
+      const steps = await storage.getAllHomeProcessSteps();
+      res.json(steps);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch process steps" });
+    }
+  });
+
+  app.post("/api/admin/home-process-steps", requireAdmin, async (req, res) => {
+    try {
+      const step = await storage.createHomeProcessStep(req.body);
+      res.status(201).json(step);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create process step" });
+    }
+  });
+
+  app.patch("/api/admin/home-process-steps/:id", requireAdmin, async (req, res) => {
+    try {
+      const step = await storage.updateHomeProcessStep(Number(req.params.id), req.body);
+      if (!step) {
+        return res.status(404).json({ message: "Step not found" });
+      }
+      res.json(step);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update process step" });
+    }
+  });
+
+  app.delete("/api/admin/home-process-steps/:id", requireAdmin, async (req, res) => {
+    try {
+      await storage.deleteHomeProcessStep(Number(req.params.id));
+      res.json({ message: "Step deleted" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete step" });
+    }
+  });
+
+  // ==================== ADMIN - HOME SECTIONS ====================
+  app.get("/api/admin/home-sections", requireAdmin, async (req, res) => {
+    try {
+      const sections = await storage.getAllHomeSections();
+      res.json(sections);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch home sections" });
+    }
+  });
+
+  app.post("/api/admin/home-sections", requireAdmin, async (req, res) => {
+    try {
+      const section = await storage.createHomeSection(req.body);
+      res.status(201).json(section);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create home section" });
+    }
+  });
+
+  app.patch("/api/admin/home-sections/:id", requireAdmin, async (req, res) => {
+    try {
+      const section = await storage.updateHomeSection(Number(req.params.id), req.body);
+      if (!section) {
+        return res.status(404).json({ message: "Section not found" });
+      }
+      res.json(section);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update home section" });
+    }
+  });
+
+  app.delete("/api/admin/home-sections/:id", requireAdmin, async (req, res) => {
+    try {
+      await storage.deleteHomeSection(Number(req.params.id));
+      res.json({ message: "Section deleted" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete section" });
     }
   });
 }

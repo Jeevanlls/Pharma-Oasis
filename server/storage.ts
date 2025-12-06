@@ -1,6 +1,7 @@
 import { 
   users, brands, categories, products, quotes, quoteItems, 
   supplierLeads, cmsBlocks, siteSettings, contactMessages, heroSlides, companyLocations,
+  homeStats, homeFeatures, homeCategories, homeProcessSteps, homeSections,
   type User, type InsertUser,
   type Brand, type InsertBrand,
   type Category, type InsertCategory,
@@ -13,6 +14,11 @@ import {
   type ContactMessage, type InsertContactMessage,
   type HeroSlide, type InsertHeroSlide,
   type CompanyLocation, type InsertCompanyLocation,
+  type HomeStat, type InsertHomeStat,
+  type HomeFeature, type InsertHomeFeature,
+  type HomeCategory, type InsertHomeCategory,
+  type HomeProcessStep, type InsertHomeProcessStep,
+  type HomeSection, type InsertHomeSection,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, ilike, desc, asc, sql, isNull, inArray } from "drizzle-orm";
@@ -708,6 +714,176 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(companyLocations)
       .where(eq(companyLocations.isActive, true))
       .orderBy(asc(companyLocations.position));
+  }
+
+  // ==================== HOMEPAGE STATS ====================
+  async getHomeStat(id: number): Promise<HomeStat | undefined> {
+    const [stat] = await db.select().from(homeStats).where(eq(homeStats.id, id));
+    return stat;
+  }
+
+  async createHomeStat(stat: InsertHomeStat): Promise<HomeStat> {
+    const [created] = await db.insert(homeStats).values(stat).returning();
+    return created;
+  }
+
+  async updateHomeStat(id: number, updates: Partial<InsertHomeStat>): Promise<HomeStat | undefined> {
+    const [updated] = await db.update(homeStats)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(homeStats.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteHomeStat(id: number): Promise<void> {
+    await db.delete(homeStats).where(eq(homeStats.id, id));
+  }
+
+  async getAllHomeStats(): Promise<HomeStat[]> {
+    return db.select().from(homeStats).orderBy(asc(homeStats.position));
+  }
+
+  async getActiveHomeStats(): Promise<HomeStat[]> {
+    return db.select().from(homeStats)
+      .where(eq(homeStats.isActive, true))
+      .orderBy(asc(homeStats.position));
+  }
+
+  // ==================== HOMEPAGE FEATURES ====================
+  async getHomeFeature(id: number): Promise<HomeFeature | undefined> {
+    const [feature] = await db.select().from(homeFeatures).where(eq(homeFeatures.id, id));
+    return feature;
+  }
+
+  async createHomeFeature(feature: InsertHomeFeature): Promise<HomeFeature> {
+    const [created] = await db.insert(homeFeatures).values(feature).returning();
+    return created;
+  }
+
+  async updateHomeFeature(id: number, updates: Partial<InsertHomeFeature>): Promise<HomeFeature | undefined> {
+    const [updated] = await db.update(homeFeatures)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(homeFeatures.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteHomeFeature(id: number): Promise<void> {
+    await db.delete(homeFeatures).where(eq(homeFeatures.id, id));
+  }
+
+  async getAllHomeFeatures(): Promise<HomeFeature[]> {
+    return db.select().from(homeFeatures).orderBy(asc(homeFeatures.position));
+  }
+
+  async getActiveHomeFeatures(): Promise<HomeFeature[]> {
+    return db.select().from(homeFeatures)
+      .where(eq(homeFeatures.isActive, true))
+      .orderBy(asc(homeFeatures.position));
+  }
+
+  // ==================== HOMEPAGE CATEGORIES ====================
+  async getHomeCategory(id: number): Promise<HomeCategory | undefined> {
+    const [category] = await db.select().from(homeCategories).where(eq(homeCategories.id, id));
+    return category;
+  }
+
+  async createHomeCategory(category: InsertHomeCategory): Promise<HomeCategory> {
+    const [created] = await db.insert(homeCategories).values(category).returning();
+    return created;
+  }
+
+  async updateHomeCategory(id: number, updates: Partial<InsertHomeCategory>): Promise<HomeCategory | undefined> {
+    const [updated] = await db.update(homeCategories)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(homeCategories.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteHomeCategory(id: number): Promise<void> {
+    await db.delete(homeCategories).where(eq(homeCategories.id, id));
+  }
+
+  async getAllHomeCategories(): Promise<HomeCategory[]> {
+    return db.select().from(homeCategories).orderBy(asc(homeCategories.position));
+  }
+
+  async getActiveHomeCategories(): Promise<HomeCategory[]> {
+    return db.select().from(homeCategories)
+      .where(eq(homeCategories.isActive, true))
+      .orderBy(asc(homeCategories.position));
+  }
+
+  // ==================== HOMEPAGE PROCESS STEPS ====================
+  async getHomeProcessStep(id: number): Promise<HomeProcessStep | undefined> {
+    const [step] = await db.select().from(homeProcessSteps).where(eq(homeProcessSteps.id, id));
+    return step;
+  }
+
+  async createHomeProcessStep(step: InsertHomeProcessStep): Promise<HomeProcessStep> {
+    const [created] = await db.insert(homeProcessSteps).values(step).returning();
+    return created;
+  }
+
+  async updateHomeProcessStep(id: number, updates: Partial<InsertHomeProcessStep>): Promise<HomeProcessStep | undefined> {
+    const [updated] = await db.update(homeProcessSteps)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(homeProcessSteps.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteHomeProcessStep(id: number): Promise<void> {
+    await db.delete(homeProcessSteps).where(eq(homeProcessSteps.id, id));
+  }
+
+  async getAllHomeProcessSteps(): Promise<HomeProcessStep[]> {
+    return db.select().from(homeProcessSteps).orderBy(asc(homeProcessSteps.position));
+  }
+
+  async getActiveHomeProcessSteps(): Promise<HomeProcessStep[]> {
+    return db.select().from(homeProcessSteps)
+      .where(eq(homeProcessSteps.isActive, true))
+      .orderBy(asc(homeProcessSteps.position));
+  }
+
+  // ==================== HOMEPAGE SECTIONS ====================
+  async getHomeSection(id: number): Promise<HomeSection | undefined> {
+    const [section] = await db.select().from(homeSections).where(eq(homeSections.id, id));
+    return section;
+  }
+
+  async getHomeSectionByKey(sectionKey: string): Promise<HomeSection | undefined> {
+    const [section] = await db.select().from(homeSections).where(eq(homeSections.sectionKey, sectionKey));
+    return section;
+  }
+
+  async createHomeSection(section: InsertHomeSection): Promise<HomeSection> {
+    const [created] = await db.insert(homeSections).values(section).returning();
+    return created;
+  }
+
+  async updateHomeSection(id: number, updates: Partial<InsertHomeSection>): Promise<HomeSection | undefined> {
+    const [updated] = await db.update(homeSections)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(homeSections.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteHomeSection(id: number): Promise<void> {
+    await db.delete(homeSections).where(eq(homeSections.id, id));
+  }
+
+  async getAllHomeSections(): Promise<HomeSection[]> {
+    return db.select().from(homeSections).orderBy(asc(homeSections.position));
+  }
+
+  async getActiveHomeSections(): Promise<HomeSection[]> {
+    return db.select().from(homeSections)
+      .where(eq(homeSections.isActive, true))
+      .orderBy(asc(homeSections.position));
   }
 }
 

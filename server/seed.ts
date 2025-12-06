@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { users, brands, categories, products, siteSettings, cmsBlocks, heroSlides, companyLocations } from "@shared/schema";
+import { users, brands, categories, products, siteSettings, cmsBlocks, heroSlides, companyLocations, homeStats, homeFeatures, homeCategories, homeProcessSteps, homeSections } from "@shared/schema";
 import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 
@@ -580,6 +580,156 @@ async function seed() {
   for (const location of locationData) {
     await db.insert(companyLocations).values(location);
     console.log(`Location created: ${location.locationName}`);
+  }
+
+  // ============================================
+  // HOMEPAGE STATS
+  // ============================================
+  const homeStatsData = [
+    { value: "50+", label: "Premium Brands", type: "stat", position: 1, isActive: true },
+    { value: "20K+", label: "Products Available", type: "stat", position: 2, isActive: true },
+    { value: "98%", label: "Order Accuracy", type: "stat", position: 3, isActive: true },
+    { value: "MHRA", label: "Licensed Distributor", type: "badge", position: 4, isActive: true },
+    { value: "GDP", label: "Compliant", type: "badge", position: 5, isActive: true },
+  ];
+
+  await db.delete(homeStats);
+  console.log("Cleared existing home stats");
+
+  for (const stat of homeStatsData) {
+    await db.insert(homeStats).values(stat);
+    console.log(`Home stat created: ${stat.value} - ${stat.label}`);
+  }
+
+  // ============================================
+  // HOMEPAGE FEATURES
+  // ============================================
+  const homeFeaturesData = [
+    { iconName: "Shield", title: "MHRA Licensed", description: "Fully licensed WDA(H) holder ensuring regulatory compliance for all pharmaceutical products.", position: 1, isActive: true },
+    { iconName: "Award", title: "GDP Compliant", description: "Good Distribution Practice certified supply chain from warehouse to delivery.", position: 2, isActive: true },
+    { iconName: "Truck", title: "UK-Wide Delivery", description: "Fast, reliable next-day delivery across the United Kingdom with temperature control.", position: 3, isActive: true },
+    { iconName: "Users", title: "Dedicated Support", description: "Expert account managers providing personalized service and competitive pricing.", position: 4, isActive: true },
+  ];
+
+  await db.delete(homeFeatures);
+  console.log("Cleared existing home features");
+
+  for (const feature of homeFeaturesData) {
+    await db.insert(homeFeatures).values(feature);
+    console.log(`Home feature created: ${feature.title}`);
+  }
+
+  // ============================================
+  // HOMEPAGE CATEGORIES
+  // ============================================
+  const homeCategoriesData = [
+    { name: "Pharmaceuticals", productCount: "5,000+ products", iconName: "Pill", linkHref: "/products?category=pharmaceuticals", position: 1, isActive: true },
+    { name: "OTC Medicines", productCount: "3,500+ products", iconName: "Stethoscope", linkHref: "/products?category=otc", position: 2, isActive: true },
+    { name: "Health & Wellness", productCount: "4,000+ products", iconName: "Heart", linkHref: "/products?category=health", position: 3, isActive: true },
+    { name: "Beauty & Skincare", productCount: "3,000+ products", iconName: "Sparkles", linkHref: "/products?category=beauty", position: 4, isActive: true },
+    { name: "Medical Devices", productCount: "2,500+ products", iconName: "Activity", linkHref: "/products?category=devices", position: 5, isActive: true },
+    { name: "First Aid", productCount: "1,500+ products", iconName: "Cross", linkHref: "/products?category=firstaid", position: 6, isActive: true },
+  ];
+
+  await db.delete(homeCategories);
+  console.log("Cleared existing home categories");
+
+  for (const category of homeCategoriesData) {
+    await db.insert(homeCategories).values(category);
+    console.log(`Home category created: ${category.name}`);
+  }
+
+  // ============================================
+  // HOMEPAGE PROCESS STEPS
+  // ============================================
+  const homeProcessStepsData = [
+    { stepNumber: 1, title: "Register & Get Approved", description: "Complete our simple registration form. Our team reviews and approves qualified healthcare businesses.", position: 1, isActive: true },
+    { stepNumber: 2, title: "Browse Products", description: "Access our full catalogue with wholesale pricing on 20,000+ healthcare products.", position: 2, isActive: true },
+    { stepNumber: 3, title: "Request a Quote", description: "Add products to your basket and submit a quote request for competitive pricing.", position: 3, isActive: true },
+    { stepNumber: 4, title: "Receive & Order", description: "Our team reviews your request and provides a formal quote. Accept and place your order.", position: 4, isActive: true },
+  ];
+
+  await db.delete(homeProcessSteps);
+  console.log("Cleared existing home process steps");
+
+  for (const step of homeProcessStepsData) {
+    await db.insert(homeProcessSteps).values(step);
+    console.log(`Home process step created: Step ${step.stepNumber} - ${step.title}`);
+  }
+
+  // ============================================
+  // HOMEPAGE SECTIONS (Partner With Us, Export Services)
+  // ============================================
+  const homeSectionsData = [
+    {
+      sectionKey: "partner_with_us",
+      badgeText: "Global Brands Welcome",
+      badgeIcon: "Globe",
+      title: "Expand Your Brand into the UK Market",
+      subtitle: "Are you a brand from anywhere in the world looking to enter the UK healthcare and wellness market? Pharma Oasis is your trusted gateway to reaching pharmacies, retailers, and wholesalers across the United Kingdom.",
+      description: "We welcome partnerships with international manufacturers and brands in these sectors:",
+      bulletPoints: JSON.stringify([
+        "Food Supplements & Nutraceuticals",
+        "Cosmetics & Skincare Products",
+        "Health Foods & Wellness Products",
+        "Generic Medicines & Pharmaceuticals",
+        "Medical Devices & Health Equipment"
+      ]),
+      primaryCtaLabel: "Discuss Partnership",
+      primaryCtaHref: "/contact",
+      primaryCtaIcon: "Handshake",
+      secondaryCtaLabel: "Apply as Supplier",
+      secondaryCtaHref: "/supplier-registration",
+      cardTitle: "Why Partner With Us?",
+      cardSubtitle: "Unlock the UK healthcare market",
+      cardIcon: "Globe",
+      cardItems: JSON.stringify([
+        { icon: "BadgeCheck", title: "MHRA Compliance Support", description: "Navigate UK regulations with expert guidance" },
+        { icon: "Users", title: "3,000+ Pharmacy Network", description: "Direct access to UK retail pharmacies" },
+        { icon: "Truck", title: "Nationwide Distribution", description: "GDP-compliant logistics across the UK" }
+      ]),
+      position: 1,
+      isActive: true,
+    },
+    {
+      sectionKey: "export_services",
+      badgeText: "International Export",
+      badgeIcon: "Ship",
+      title: "Import Genuine UK Products",
+      subtitle: "Are you a wholesaler, pharmacy distributor, or importer looking for genuine UK healthcare products? Pharma Oasis supplies authentic British brands to customers worldwide.",
+      description: "Whether you're sourcing vitamins, cosmetics, health foods, or pharmaceuticals, we provide the documentation and logistics support you need for seamless international import.",
+      bulletPoints: JSON.stringify([
+        "Genuine UK-sourced healthcare products",
+        "MHRA & GDP certified supply chain",
+        "Competitive wholesale export pricing",
+        "Temperature-controlled shipping options",
+        "Documentation for customs clearance"
+      ]),
+      primaryCtaLabel: "Request Export Quote",
+      primaryCtaHref: "/contact",
+      primaryCtaIcon: "Ship",
+      secondaryCtaLabel: "Register as Importer",
+      secondaryCtaHref: "/register",
+      cardTitle: "Export Ready",
+      cardSubtitle: "Serving international buyers worldwide",
+      cardIcon: "Ship",
+      cardItems: JSON.stringify([
+        { icon: "Boxes", value: "20,000+", label: "Products" },
+        { icon: "Globe", value: "Worldwide", label: "Shipping" },
+        { icon: "FileCheck", value: "Full", label: "Documentation" },
+        { icon: "Shield", value: "Genuine", label: "UK Products" }
+      ]),
+      position: 2,
+      isActive: true,
+    },
+  ];
+
+  await db.delete(homeSections);
+  console.log("Cleared existing home sections");
+
+  for (const section of homeSectionsData) {
+    await db.insert(homeSections).values(section);
+    console.log(`Home section created: ${section.sectionKey}`);
   }
 
   console.log("Database seed completed!");

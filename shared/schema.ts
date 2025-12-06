@@ -260,6 +260,91 @@ export const companyLocations = pgTable("company_locations", {
 });
 
 // ============================================
+// HOMEPAGE STATS TABLE
+// ============================================
+export const homeStats = pgTable("home_stats", {
+  id: serial("id").primaryKey(),
+  value: varchar("value", { length: 50 }).notNull(),
+  label: varchar("label", { length: 100 }).notNull(),
+  type: varchar("type", { length: 20 }).notNull().default("stat"), // "stat" or "badge"
+  iconName: varchar("icon_name", { length: 50 }),
+  position: integer("position").notNull().default(0),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ============================================
+// HOMEPAGE FEATURES TABLE
+// ============================================
+export const homeFeatures = pgTable("home_features", {
+  id: serial("id").primaryKey(),
+  iconName: varchar("icon_name", { length: 50 }).notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description").notNull(),
+  position: integer("position").notNull().default(0),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ============================================
+// HOMEPAGE CATEGORIES TABLE
+// ============================================
+export const homeCategories = pgTable("home_categories", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  productCount: varchar("product_count", { length: 50 }).notNull(),
+  iconName: varchar("icon_name", { length: 50 }).notNull(),
+  linkHref: text("link_href"),
+  position: integer("position").notNull().default(0),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ============================================
+// HOMEPAGE PROCESS STEPS TABLE
+// ============================================
+export const homeProcessSteps = pgTable("home_process_steps", {
+  id: serial("id").primaryKey(),
+  stepNumber: integer("step_number").notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description").notNull(),
+  position: integer("position").notNull().default(0),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ============================================
+// HOMEPAGE SECTIONS TABLE (for Partner With Us, Export Services, etc.)
+// ============================================
+export const homeSections = pgTable("home_sections", {
+  id: serial("id").primaryKey(),
+  sectionKey: varchar("section_key", { length: 100 }).notNull().unique(),
+  badgeText: varchar("badge_text", { length: 100 }),
+  badgeIcon: varchar("badge_icon", { length: 50 }),
+  title: varchar("title", { length: 500 }).notNull(),
+  subtitle: text("subtitle"),
+  description: text("description"),
+  bulletPoints: text("bullet_points"), // JSON array stored as text
+  primaryCtaLabel: varchar("primary_cta_label", { length: 100 }),
+  primaryCtaHref: text("primary_cta_href"),
+  primaryCtaIcon: varchar("primary_cta_icon", { length: 50 }),
+  secondaryCtaLabel: varchar("secondary_cta_label", { length: 100 }),
+  secondaryCtaHref: text("secondary_cta_href"),
+  cardTitle: varchar("card_title", { length: 255 }),
+  cardSubtitle: text("card_subtitle"),
+  cardIcon: varchar("card_icon", { length: 50 }),
+  cardItems: text("card_items"), // JSON array stored as text
+  position: integer("position").notNull().default(0),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ============================================
 // RELATIONS
 // ============================================
 export const usersRelations = relations(users, ({ many }) => ({
@@ -461,6 +546,56 @@ export const insertCompanyLocationSchema = createInsertSchema(companyLocations).
 export const selectCompanyLocationSchema = createSelectSchema(companyLocations);
 export type InsertCompanyLocation = z.infer<typeof insertCompanyLocationSchema>;
 export type CompanyLocation = typeof companyLocations.$inferSelect;
+
+// Homepage stats schemas
+export const insertHomeStatSchema = createInsertSchema(homeStats).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const selectHomeStatSchema = createSelectSchema(homeStats);
+export type InsertHomeStat = z.infer<typeof insertHomeStatSchema>;
+export type HomeStat = typeof homeStats.$inferSelect;
+
+// Homepage features schemas
+export const insertHomeFeatureSchema = createInsertSchema(homeFeatures).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const selectHomeFeatureSchema = createSelectSchema(homeFeatures);
+export type InsertHomeFeature = z.infer<typeof insertHomeFeatureSchema>;
+export type HomeFeature = typeof homeFeatures.$inferSelect;
+
+// Homepage categories schemas
+export const insertHomeCategorySchema = createInsertSchema(homeCategories).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const selectHomeCategorySchema = createSelectSchema(homeCategories);
+export type InsertHomeCategory = z.infer<typeof insertHomeCategorySchema>;
+export type HomeCategory = typeof homeCategories.$inferSelect;
+
+// Homepage process steps schemas
+export const insertHomeProcessStepSchema = createInsertSchema(homeProcessSteps).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const selectHomeProcessStepSchema = createSelectSchema(homeProcessSteps);
+export type InsertHomeProcessStep = z.infer<typeof insertHomeProcessStepSchema>;
+export type HomeProcessStep = typeof homeProcessSteps.$inferSelect;
+
+// Homepage sections schemas
+export const insertHomeSectionSchema = createInsertSchema(homeSections).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const selectHomeSectionSchema = createSelectSchema(homeSections);
+export type InsertHomeSection = z.infer<typeof insertHomeSectionSchema>;
+export type HomeSection = typeof homeSections.$inferSelect;
 
 // ============================================
 // FORM VALIDATION SCHEMAS
