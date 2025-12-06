@@ -200,16 +200,17 @@ async function seed() {
   }
 
   // Create comprehensive real UK pharmaceutical products with images
+  // Format: parentCategory = top level (OTC Medicines, Vitamins, etc.), subcategoryName = specific category
   const productData = [
     // PAIN RELIEF - Nurofen products
-    { sku: "NUR-IBU-200-16", ean: "5000158100169", productName: "Nurofen Ibuprofen 200mg Tablets", brandName: "Nurofen", categoryName: "Pain Relief", wholesalePrice: "2.45", rrp: "4.49", packSize: "16 tablets", moq: 12, isFeatured: true, imageUrl: "/attached_assets/stock_images/medicine_tablets_pil_ba80ee84.jpg", description: "Fast-acting pain relief for headaches, dental pain, period pain and muscular aches." },
-    { sku: "NUR-IBU-400-24", ean: "5000158100244", productName: "Nurofen Ibuprofen 400mg Tablets", brandName: "Nurofen", categoryName: "Pain Relief", wholesalePrice: "3.25", rrp: "5.99", packSize: "24 tablets", moq: 12, isFeatured: true, imageUrl: "/attached_assets/stock_images/medicine_tablets_pil_abb03774.jpg", description: "Maximum strength ibuprofen for effective relief from pain and inflammation." },
-    { sku: "NUR-EXPRESS-16", ean: "5000158105102", productName: "Nurofen Express 256mg Sodium Ibuprofen", brandName: "Nurofen", categoryName: "Pain Relief", wholesalePrice: "3.80", rrp: "6.99", packSize: "16 caplets", moq: 12, isFeatured: true, imageUrl: "/attached_assets/stock_images/medicine_tablets_pil_3180d043.jpg", description: "Absorbed faster than standard ibuprofen tablets for speedy pain relief." },
-    { sku: "NUR-MIGRAINE-12", ean: "5000158105287", productName: "Nurofen Migraine Pain 342mg Caplets", brandName: "Nurofen", categoryName: "Pain Relief", wholesalePrice: "4.20", rrp: "7.99", packSize: "12 caplets", moq: 12, isFeatured: false, imageUrl: "/attached_assets/stock_images/medicine_tablets_pil_429b1afa.jpg", description: "Specifically formulated for the relief of migraine headaches." },
+    { sku: "NUR-IBU-200-16", ean: "5000158100169", productName: "Nurofen Ibuprofen 200mg Tablets", brandName: "Nurofen", parentCategory: "OTC Medicines", subcategoryName: "Pain Relief", wholesalePrice: "2.45", rrp: "4.49", packSize: "16 tablets", moq: 12, isFeatured: true, imageUrl: "/attached_assets/stock_images/medicine_tablets_pil_ba80ee84.jpg", description: "Fast-acting pain relief for headaches, dental pain, period pain and muscular aches." },
+    { sku: "NUR-IBU-400-24", ean: "5000158100244", productName: "Nurofen Ibuprofen 400mg Tablets", brandName: "Nurofen", parentCategory: "OTC Medicines", subcategoryName: "Pain Relief", wholesalePrice: "3.25", rrp: "5.99", packSize: "24 tablets", moq: 12, isFeatured: true, imageUrl: "/attached_assets/stock_images/medicine_tablets_pil_abb03774.jpg", description: "Maximum strength ibuprofen for effective relief from pain and inflammation." },
+    { sku: "NUR-EXPRESS-16", ean: "5000158105102", productName: "Nurofen Express 256mg Sodium Ibuprofen", brandName: "Nurofen", parentCategory: "OTC Medicines", subcategoryName: "Pain Relief", wholesalePrice: "3.80", rrp: "6.99", packSize: "16 caplets", moq: 12, isFeatured: true, imageUrl: "/attached_assets/stock_images/medicine_tablets_pil_3180d043.jpg", description: "Absorbed faster than standard ibuprofen tablets for speedy pain relief." },
+    { sku: "NUR-MIGRAINE-12", ean: "5000158105287", productName: "Nurofen Migraine Pain 342mg Caplets", brandName: "Nurofen", parentCategory: "OTC Medicines", subcategoryName: "Pain Relief", wholesalePrice: "4.20", rrp: "7.99", packSize: "12 caplets", moq: 12, isFeatured: false, imageUrl: "/attached_assets/stock_images/medicine_tablets_pil_429b1afa.jpg", description: "Specifically formulated for the relief of migraine headaches." },
     // PAIN RELIEF - Panadol products  
-    { sku: "PAN-ORI-16", ean: "5014017600173", productName: "Panadol Original Paracetamol 500mg", brandName: "Panadol", categoryName: "Pain Relief", wholesalePrice: "1.95", rrp: "3.79", packSize: "16 tablets", moq: 24, isFeatured: true, imageUrl: "/attached_assets/stock_images/medicine_tablets_pil_7bfe6df1.jpg", description: "Gentle yet effective pain relief with paracetamol." },
-    { sku: "PAN-EXTRA-16", ean: "5014017600210", productName: "Panadol Extra Advance 500mg/65mg", brandName: "Panadol", categoryName: "Pain Relief", wholesalePrice: "2.50", rrp: "4.79", packSize: "16 tablets", moq: 24, isFeatured: true, imageUrl: "/attached_assets/stock_images/medicine_tablets_pil_daeebc79.jpg", description: "Paracetamol with caffeine for enhanced pain relief." },
-    { sku: "PAN-ACTIFAST-20", ean: "5014017600302", productName: "Panadol Actifast Soluble 500mg", brandName: "Panadol", categoryName: "Pain Relief", wholesalePrice: "3.10", rrp: "5.99", packSize: "20 effervescent", moq: 12, isFeatured: false, imageUrl: "/attached_assets/stock_images/medicine_tablets_pil_cd311152.jpg", description: "Dissolves quickly for fast-acting pain relief." },
+    { sku: "PAN-ORI-16", ean: "5014017600173", productName: "Panadol Original Paracetamol 500mg", brandName: "Panadol", parentCategory: "OTC Medicines", subcategoryName: "Pain Relief", wholesalePrice: "1.95", rrp: "3.79", packSize: "16 tablets", moq: 24, isFeatured: true, imageUrl: "/attached_assets/stock_images/medicine_tablets_pil_7bfe6df1.jpg", description: "Gentle yet effective pain relief with paracetamol." },
+    { sku: "PAN-EXTRA-16", ean: "5014017600210", productName: "Panadol Extra Advance 500mg/65mg", brandName: "Panadol", parentCategory: "OTC Medicines", subcategoryName: "Pain Relief", wholesalePrice: "2.50", rrp: "4.79", packSize: "16 tablets", moq: 24, isFeatured: true, imageUrl: "/attached_assets/stock_images/medicine_tablets_pil_daeebc79.jpg", description: "Paracetamol with caffeine for enhanced pain relief." },
+    { sku: "PAN-ACTIFAST-20", ean: "5014017600302", productName: "Panadol Actifast Soluble 500mg", brandName: "Panadol", parentCategory: "OTC Medicines", subcategoryName: "Pain Relief", wholesalePrice: "3.10", rrp: "5.99", packSize: "20 effervescent", moq: 12, isFeatured: false, imageUrl: "/attached_assets/stock_images/medicine_tablets_pil_cd311152.jpg", description: "Dissolves quickly for fast-acting pain relief." },
     // COLD & FLU - Lemsip products
     { sku: "LEM-MAX-10", ean: "5011417560808", productName: "Lemsip Max Cold & Flu Lemon", brandName: "Lemsip", categoryName: "Cold & Flu", wholesalePrice: "3.20", rrp: "5.99", packSize: "10 sachets", moq: 12, isFeatured: true, imageUrl: "/attached_assets/stock_images/cough_syrup_medicine_8a8cf9b3.jpg", description: "Maximum strength hot lemon drink for cold and flu symptoms." },
     { sku: "LEM-MAX-CAPS-16", ean: "5011417560815", productName: "Lemsip Max All In One Capsules", brandName: "Lemsip", categoryName: "Cold & Flu", wholesalePrice: "3.80", rrp: "6.99", packSize: "16 capsules", moq: 12, isFeatured: true, imageUrl: "/attached_assets/stock_images/medicine_tablets_pil_3ab75966.jpg", description: "All-in-one relief for cold and flu symptoms in capsule form." },
@@ -312,44 +313,86 @@ async function seed() {
     { sku: "ACC-STRIPS-50", ean: "4015630074020", productName: "Accu-Chek Guide Test Strips 50 Pack", brandName: "Accu-Chek", categoryName: "Glucose Monitors", wholesalePrice: "14.50", rrp: "27.99", packSize: "50 strips", moq: 4, isFeatured: false, imageUrl: "/attached_assets/stock_images/first_aid_bandage_me_cce8b7ef.jpg", description: "Blood glucose test strips for Accu-Chek Guide." },
   ];
 
+  // Build subcategory to parent map
+  const allCategories = await db.select().from(categories);
+  const categoryParentMap: Record<number, number | null> = {};
+  const categoryNameToIdMap: Record<string, number> = {};
+  for (const cat of allCategories) {
+    categoryParentMap[cat.id] = cat.parentId;
+    categoryNameToIdMap[cat.name] = cat.id;
+  }
+
   for (const product of productData) {
     const brandId = brandMap[product.brandName];
-    const categoryId = createdCategories[product.categoryName];
+    if (!brandId) {
+      console.log(`Warning: Brand not found for product ${product.productName}: ${product.brandName}`);
+      continue;
+    }
+
+    // Handle both old categoryName and new parentCategory/subcategoryName format
+    let categoryId: number | null = null;
+    let subcategoryId: number | null = null;
     
-    if (brandId && categoryId) {
-      const existing = await db.select().from(products).where(eq(products.sku, product.sku));
-      if (existing.length === 0) {
-        await db.insert(products).values({
-          sku: product.sku,
-          ean: product.ean,
-          productName: product.productName,
-          shortDescription: product.description,
-          brandId,
-          categoryId,
-          wholesalePrice: product.wholesalePrice,
-          rrp: product.rrp,
-          packSize: product.packSize,
-          moq: product.moq,
-          isFeatured: product.isFeatured,
-          isActive: true,
-          imageUrl: product.imageUrl,
-          uom: "each",
-          vatRate: "0.20",
-          countryOfOrigin: "United Kingdom",
-        });
-        console.log(`Product created: ${product.productName}`);
-      } else {
-        // Update existing product with new data
-        await db.update(products)
-          .set({
-            ean: product.ean,
-            shortDescription: product.description,
-            imageUrl: product.imageUrl,
-            countryOfOrigin: "United Kingdom",
-          })
-          .where(eq(products.sku, product.sku));
-        console.log(`Product updated: ${product.productName}`);
+    if ('parentCategory' in product && 'subcategoryName' in product) {
+      // New format with explicit parent and subcategory
+      categoryId = categoryNameToIdMap[product.parentCategory] || null;
+      subcategoryId = categoryNameToIdMap[product.subcategoryName] || null;
+    } else if ('categoryName' in product) {
+      // Old format - determine if it's a parent or subcategory
+      const catId = categoryNameToIdMap[(product as any).categoryName];
+      if (catId) {
+        const parentId = categoryParentMap[catId];
+        if (parentId) {
+          // This is a subcategory
+          categoryId = parentId;
+          subcategoryId = catId;
+        } else {
+          // This is a top-level category
+          categoryId = catId;
+          subcategoryId = null;
+        }
       }
+    }
+    
+    if (!categoryId) {
+      console.log(`Warning: Category not found for product ${product.productName}`);
+      continue;
+    }
+    
+    const existing = await db.select().from(products).where(eq(products.sku, product.sku));
+    if (existing.length === 0) {
+      await db.insert(products).values({
+        sku: product.sku,
+        ean: product.ean,
+        productName: product.productName,
+        shortDescription: product.description,
+        brandId,
+        categoryId,
+        subcategoryId,
+        wholesalePrice: product.wholesalePrice,
+        rrp: product.rrp,
+        packSize: product.packSize,
+        moq: product.moq,
+        isFeatured: product.isFeatured,
+        isActive: true,
+        imageUrl: product.imageUrl,
+        uom: "each",
+        vatRate: "0.20",
+        countryOfOrigin: "United Kingdom",
+      });
+      console.log(`Product created: ${product.productName}`);
+    } else {
+      // Update existing product with new data
+      await db.update(products)
+        .set({
+          ean: product.ean,
+          shortDescription: product.description,
+          imageUrl: product.imageUrl,
+          countryOfOrigin: "United Kingdom",
+          subcategoryId,
+        })
+        .where(eq(products.sku, product.sku));
+      console.log(`Product updated: ${product.productName}`);
     }
   }
 

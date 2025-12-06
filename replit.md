@@ -94,11 +94,25 @@ Preferred communication style: Simple, everyday language.
 
 **Seed Data Strategy:**
 - Admin user (admin@pharmaoasis.com / Admin!234)
-- Sample brands (8 brands with mix of direct distributors)
-- Category hierarchy (top-level + subcategories)
-- Sample products across multiple categories and brands
+- 37 real UK pharmaceutical and healthcare brands including:
+  - OTC Medicines: Nurofen, Panadol, Calpol, Lemsip, Strepsils, Gaviscon, Rennie, Imodium, Benylin, Piriteze, Piriton
+  - Vitamins & Supplements: Seven Seas, Vitabiotics, Centrum, Berocca, Floradix, Solgar
+  - Skincare: E45, CeraVe, La Roche-Posay, Simple, Nivea
+  - Oral Care: Sensodyne, Corsodyl, Colgate, Bonjela, Anbesol
+  - First Aid: Elastoplast, Savlon, Dettol
+  - Baby Care: Sudocrem, Bepanthen, Infacol, Dentinox
+  - Medical Devices: Omron, Accu-Chek
+- 78 realistic pharmaceutical products with:
+  - EAN barcodes for each product
+  - Realistic UK wholesale and RRP pricing
+  - Product descriptions
+  - Stock images assigned from /attached_assets/stock_images/
+  - Proper categoryId and subcategoryId relationships
+- 25+ subcategories including: Pain Relief, Cold & Flu, Cough & Sore Throat, Heartburn & Indigestion, Allergy Relief, Multivitamins, Omega 3 & Fish Oils, Iron Supplements, Energy & Immunity, Toothpaste, Mouthwash, Mouth Ulcers, Plasters, Antiseptics, Moisturisers, Dry Skin, Baby Pain Relief, Nappy Rash, Teething, Colic Relief
 - CMS blocks for static page content
 - Default site settings
+- 9 hero slide banners for homepage carousel
+- 4 company locations (UK HQ, UK Warehouse, Netherlands, India)
 
 ### External Dependencies
 
