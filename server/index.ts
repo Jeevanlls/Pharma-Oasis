@@ -64,19 +64,52 @@ app.use((req, res, next) => {
 });
 
 // Auto-seed database if empty (for production first-time setup)
-async function autoSeedIfEmpty() {
-  try {
-    const adminUser = await db.select().from(users).where(eq(users.email, "admin@pharmaoasis.com"));
-    if (adminUser.length === 0) {
-      log("Database appears empty, auto-seeding demo data...");
-      const { seed } = await import("./seed");
-      await seed();
-      log("Auto-seed completed successfully");
-    } else {
-      log("Database already has data, skipping auto-seed");
+// This includes retry logic to wait for tables to exist after migrations
+async function autoSeedIfEmpty(retries = 10, delayMs = 2000) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      // First check if the users table exists
+      const tableCheck = await db.execute(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables 
+          WHERE table_schema = 'public' 
+          AND table_name = 'users'
+        );
+      `);
+      
+      const tableExists = tableCheck.rows[0]?.exists === true;
+      
+      if (!tableExists) {
+        if (attempt < retries) {
+          log(`Attempt ${attempt}/${retries}: Database tables not ready, waiting ${delayMs}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+          continue;
+        } else {
+          log("Database tables not found after all retries. Please run migrations.");
+          return;
+        }
+      }
+      
+      // Tables exist, check for admin user
+      const adminUser = await db.select().from(users).where(eq(users.email, "admin@pharmaoasis.com"));
+      if (adminUser.length === 0) {
+        log("Database appears empty, auto-seeding demo data...");
+        const { seed } = await import("./seed");
+        await seed();
+        log("Auto-seed completed successfully!");
+      } else {
+        log("Database already has data, skipping auto-seed");
+      }
+      return; // Success, exit the retry loop
+      
+    } catch (error: any) {
+      if (attempt < retries) {
+        log(`Attempt ${attempt}/${retries}: Database not ready (${error.message}), waiting ${delayMs}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      } else {
+        log(`Auto-seed failed after ${retries} attempts: ${error.message}`);
+      }
     }
-  } catch (error) {
-    log(`Auto-seed check failed: ${error}`);
   }
 }
 

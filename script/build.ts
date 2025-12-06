@@ -1,6 +1,10 @@
 import { build as esbuild } from "esbuild";
 import { build as viteBuild } from "vite";
 import { rm, readFile } from "fs/promises";
+import { exec } from "child_process";
+import { promisify } from "util";
+
+const execAsync = promisify(exec);
 
 // server deps to bundle to reduce openat(2) syscalls
 // which helps cold start times
@@ -59,6 +63,17 @@ async function buildAll() {
     external: externals,
     logLevel: "info",
   });
+
+  // Run database migrations to ensure tables exist
+  console.log("running database migrations...");
+  try {
+    const { stdout, stderr } = await execAsync("npm run db:push");
+    if (stdout) console.log(stdout);
+    if (stderr) console.log(stderr);
+    console.log("database migrations complete!");
+  } catch (err: any) {
+    console.log("database migrations output:", err.stdout || err.message);
+  }
 }
 
 buildAll().catch((err) => {
