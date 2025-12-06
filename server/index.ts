@@ -3,6 +3,9 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import path from "path";
+import { db } from "./db";
+import { users } from "@shared/schema";
+import { eq } from "drizzle-orm";
 
 const app = express();
 const httpServer = createServer(app);
@@ -60,7 +63,27 @@ app.use((req, res, next) => {
   next();
 });
 
+// Auto-seed database if empty (for production first-time setup)
+async function autoSeedIfEmpty() {
+  try {
+    const adminUser = await db.select().from(users).where(eq(users.email, "admin@pharmaoasis.com"));
+    if (adminUser.length === 0) {
+      log("Database appears empty, auto-seeding demo data...");
+      const { seed } = await import("./seed");
+      await seed();
+      log("Auto-seed completed successfully");
+    } else {
+      log("Database already has data, skipping auto-seed");
+    }
+  } catch (error) {
+    log(`Auto-seed check failed: ${error}`);
+  }
+}
+
 (async () => {
+  // Auto-seed on startup if database is empty
+  await autoSeedIfEmpty();
+  
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
