@@ -117,7 +117,10 @@ Preferred communication style: Simple, everyday language.
 ### External Dependencies
 
 **Third-Party Services:**
-- PostgreSQL database (Replit provisioned)
+- PostgreSQL database (Neon - external, shared between development and production)
+  - Connection via NEON_DATABASE_URL environment variable
+  - Both dev and prod connect to the same Neon database for content parity
+  - Falls back to Replit's DATABASE_URL if NEON_DATABASE_URL not set
 - SMTP email service (Nodemailer with environment configuration)
 - Email notifications sent to NOTIFICATION_EMAIL for:
   - New customer registrations

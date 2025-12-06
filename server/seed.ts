@@ -746,7 +746,9 @@ export async function seed() {
 }
 
 // Only run if called directly (not imported)
-if (require.main === module) {
+// ESM-compatible check
+const isMainModule = import.meta.url === `file://${process.argv[1]}`;
+if (isMainModule) {
   seed()
     .then(() => process.exit(0))
     .catch((error) => {
