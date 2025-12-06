@@ -544,10 +544,11 @@ export default function SupplierRegistrationPage() {
                             <Checkbox
                               checked={field.value}
                               onCheckedChange={field.onChange}
+                              data-testid="checkbox-marketing-consent"
                             />
                           </FormControl>
                           <div className="space-y-1 leading-none">
-                            <FormLabel>Marketing Communications</FormLabel>
+                            <FormLabel>Marketing Communications (Optional)</FormLabel>
                             <FormDescription>
                               I agree to receive updates about partnership opportunities from Pharma Oasis.
                             </FormDescription>
@@ -555,6 +556,21 @@ export default function SupplierRegistrationPage() {
                         </FormItem>
                       )}
                     />
+
+                    <div className="rounded-md border border-primary/20 bg-primary/5 p-4">
+                      <p className="text-sm text-muted-foreground">
+                        By submitting this application, you agree to our{" "}
+                        <Link href="/terms" className="text-primary hover:underline font-medium">
+                          Terms of Service
+                        </Link>{" "}
+                        and{" "}
+                        <Link href="/privacy" className="text-primary hover:underline font-medium">
+                          Privacy Policy
+                        </Link>. 
+                        Your data will be processed in accordance with UK GDPR regulations and used solely for 
+                        evaluating your supplier application.
+                      </p>
+                    </div>
                   </div>
 
                   <Button type="submit" className="w-full" disabled={isLoading} data-testid="button-submit-supplier">

@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { QuoteBasketProvider } from "@/lib/quote-basket";
 import { AdminLayout } from "@/components/layout/admin-layout";
+import { CookieConsentBanner } from "@/components/cookie-consent";
 
 import NotFound from "@/pages/not-found";
 import HomePage from "@/pages/home";
@@ -110,6 +111,7 @@ function App() {
           <TooltipProvider>
             <Toaster />
             <Router />
+            <CookieConsentBanner />
           </TooltipProvider>
         </QuoteBasketProvider>
       </AuthProvider>

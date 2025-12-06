@@ -688,6 +688,9 @@ export const contactFormSchema = z.object({
   email: z.string().email("Valid email is required"),
   phone: z.string().optional(),
   message: z.string().min(10, "Message must be at least 10 characters"),
+  privacyConsent: z.boolean().refine((val) => val === true, {
+    message: "You must agree to our Privacy Policy to submit this form",
+  }),
 });
 
 export type ContactFormData = z.infer<typeof contactFormSchema>;
