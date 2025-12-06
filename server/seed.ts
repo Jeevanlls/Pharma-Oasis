@@ -528,11 +528,11 @@ export async function seed() {
     console.log(`Hero slide created: ${slide.title}`);
   }
 
-  // Create company locations
+  // Create company locations - Single UK warehouse only
   const locationData = [
     {
       locationType: "headquarters",
-      locationName: "UK Head Office & Warehouse",
+      locationName: "UK Warehouse",
       companyName: "Pharma Oasis Limited",
       addressLine1: "Unit - J, Doddington Park Farmhouse",
       addressLine2: "Bridgemere",
@@ -543,42 +543,6 @@ export async function seed() {
       companyRegNumber: "11369972",
       wdaLicenceNumber: "53820",
       position: 1,
-      isActive: true,
-    },
-    {
-      locationType: "warehouse",
-      locationName: "UK Warehouse - Sutton",
-      companyName: "Pharma Oasis Ltd",
-      addressLine1: "Unit B004 (Big Yellow)",
-      addressLine2: "12 Kimpton Park Way, Off Old Fields Road",
-      city: "Sutton",
-      postcode: "SM3 9QS",
-      country: "United Kingdom",
-      position: 2,
-      isActive: true,
-    },
-    {
-      locationType: "branch",
-      locationName: "Netherlands Branch",
-      companyName: "Pharma Oasis B.V",
-      addressLine1: "Chain Logistics",
-      addressLine2: "Jagersveld 6a",
-      city: "Uden",
-      postcode: "5405 BW",
-      country: "The Netherlands",
-      position: 3,
-      isActive: true,
-    },
-    {
-      locationType: "branch",
-      locationName: "India Office",
-      companyName: "Pharma Oasis",
-      addressLine1: "Office No. 24, 2nd Floor",
-      addressLine2: "Jaipur Electronic Market, Durgapura",
-      city: "Jaipur, Rajasthan",
-      postcode: "302018",
-      country: "India",
-      position: 4,
       isActive: true,
     },
   ];
