@@ -12,6 +12,15 @@ import {
 } from "@shared/schema";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
+import {
+  sendCustomerRegistrationNotification,
+  sendSupplierRegistrationNotification,
+  sendContactFormNotification,
+  sendQuoteSubmissionNotification,
+  sendQuoteConfirmationToCustomer,
+  sendAccountApprovalEmail,
+  sendAccountRejectionEmail,
+} from "./email";
 
 declare module "express-session" {
   interface SessionData {
@@ -176,7 +185,12 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
         marketingConsent: data.marketingConsent,
       });
 
-      console.log(`[EMAIL] New customer registration: ${data.email} - ${data.companyName}`);
+      await sendCustomerRegistrationNotification({
+        email: data.email,
+        companyName: data.companyName,
+        contactName: data.primaryContactName,
+        phone: data.phoneNumber,
+      });
       
       res.status(201).json({ message: "Registration successful. Your account is pending approval." });
     } catch (error) {
@@ -330,7 +344,13 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
         marketingConsent: data.marketingConsent,
       });
 
-      console.log(`[EMAIL] New supplier lead: ${data.email} - ${data.companyName}`);
+      await sendSupplierRegistrationNotification({
+        email: data.email,
+        companyName: data.companyName,
+        contactName: data.contactName,
+        phone: data.phoneNumber,
+        productCategories: data.productCategoriesSupply,
+      });
       
       res.status(201).json({ message: "Supplier application submitted successfully" });
     } catch (error) {
@@ -355,7 +375,13 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
         status: "new",
       });
 
-      console.log(`[EMAIL] New contact message from: ${data.email}`);
+      await sendContactFormNotification({
+        name: data.name,
+        email: data.email,
+        subject: "Contact Form Submission",
+        message: data.message,
+        phone: data.phone,
+      });
       
       res.status(201).json({ message: "Message sent successfully" });
     } catch (error) {
@@ -414,7 +440,24 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
         });
       }
 
-      console.log(`[EMAIL] New quote request #${quote.id} from ${req.user.companyName}`);
+      const totalValueFormatted = `£${Number(totalEstimate).toFixed(2)}`;
+      
+      await sendQuoteSubmissionNotification({
+        quoteId: quote.id,
+        customerEmail: req.user.email,
+        customerName: req.user.primaryContactName || req.user.companyName,
+        companyName: req.user.companyName,
+        itemCount: validItems.length,
+        totalValue: totalValueFormatted,
+      });
+
+      await sendQuoteConfirmationToCustomer({
+        email: req.user.email,
+        contactName: req.user.primaryContactName || req.user.companyName,
+        quoteId: quote.id,
+        itemCount: validItems.length,
+        totalValue: totalValueFormatted,
+      });
 
       res.status(201).json({ quote, message: "Quote request submitted successfully" });
     } catch (error) {
@@ -482,8 +525,6 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
       
       const updatedQuote = await storage.updateQuote(quoteId, { status });
       
-      console.log(`[EMAIL] Quote #${quoteId} ${status} by ${req.user.companyName}`);
-      
       res.json(updatedQuote);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -550,9 +591,17 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
       }
 
       if (status === "active") {
-        console.log(`[EMAIL] Account approved: ${user.email}`);
+        await sendAccountApprovalEmail({
+          email: user.email,
+          contactName: user.primaryContactName || user.companyName || "Customer",
+          companyName: user.companyName || "Your Company",
+        });
       } else if (status === "rejected") {
-        console.log(`[EMAIL] Account rejected: ${user.email}`);
+        await sendAccountRejectionEmail({
+          email: user.email,
+          contactName: user.primaryContactName || user.companyName || "Customer",
+          companyName: user.companyName || "Your Company",
+        });
       }
 
       const { passwordHash, ...safeUser } = user;
