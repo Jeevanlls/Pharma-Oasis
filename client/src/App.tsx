@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -38,6 +38,7 @@ import AdminHomepagePage from "@/pages/admin/homepage";
 
 function AdminRoute({ component: Component }: { component: React.ComponentType }) {
   const { isAdmin, isLoading } = useAuth();
+  const [, setLocation] = useLocation();
   
   if (isLoading) {
     return (
@@ -48,7 +49,8 @@ function AdminRoute({ component: Component }: { component: React.ComponentType }
   }
   
   if (!isAdmin) {
-    return <HomePage />;
+    setLocation("/login");
+    return null;
   }
 
   return (
