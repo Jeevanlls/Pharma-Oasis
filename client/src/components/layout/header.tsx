@@ -5,7 +5,6 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/lib/auth";
 import { useQuoteBasket } from "@/lib/quote-basket";
-import { ThemeSelector } from "@/components/theme-selector";
 import logoImage from "@assets/01_1764977214745.png";
 import {
   Menu,
@@ -74,10 +73,6 @@ export function Header() {
           </nav>
 
           <div className="flex items-center gap-2">
-            <div className="hidden sm:flex">
-              <ThemeSelector />
-            </div>
-
             {isAuthenticated && (
               <Link href="/quote">
                 <Button
@@ -280,12 +275,6 @@ export function Header() {
                     )}
                   </div>
 
-                  <div className="border-t pt-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Appearance</span>
-                      <ThemeSelector />
-                    </div>
-                  </div>
                 </div>
               </SheetContent>
             </Sheet>
