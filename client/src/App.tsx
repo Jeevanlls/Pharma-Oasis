@@ -34,6 +34,7 @@ import AdminCmsPage from "@/pages/admin/cms";
 import AdminSettingsPage from "@/pages/admin/settings";
 import AdminHeroSlidesPage from "@/pages/admin/hero-slides";
 import AdminFeaturedBrandsPage from "@/pages/admin/featured-brands";
+import AdminHomepagePage from "@/pages/admin/homepage";
 
 function AdminRoute({ component: Component }: { component: React.ComponentType }) {
   const { isAdmin, isLoading } = useAuth();
@@ -86,6 +87,7 @@ function Router() {
       <Route path="/admin/settings">{() => <AdminRoute component={AdminSettingsPage} />}</Route>
       <Route path="/admin/hero-slides">{() => <AdminRoute component={AdminHeroSlidesPage} />}</Route>
       <Route path="/admin/featured-brands">{() => <AdminRoute component={AdminFeaturedBrandsPage} />}</Route>
+      <Route path="/admin/homepage">{() => <AdminRoute component={AdminHomepagePage} />}</Route>
       
       <Route component={NotFound} />
     </Switch>

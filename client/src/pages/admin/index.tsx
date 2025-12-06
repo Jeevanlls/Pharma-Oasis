@@ -21,6 +21,7 @@ import {
   Upload,
   Globe,
   AlertCircle,
+  Home,
 } from "lucide-react";
 
 interface DashboardStats {
@@ -66,6 +67,7 @@ export default function AdminDashboard() {
     { label: "Products", icon: Package, href: "/admin/products" },
     { label: "Brands", icon: Building2, href: "/admin/brands" },
     { label: "Categories", icon: Tag, href: "/admin/categories" },
+    { label: "Homepage", icon: Home, href: "/admin/homepage" },
     { label: "CSV Import", icon: Upload, href: "/admin/import" },
     { label: "Supplier Leads", icon: Globe, href: "/admin/suppliers" },
     { label: "Messages", icon: MessageSquare, href: "/admin/messages" },
