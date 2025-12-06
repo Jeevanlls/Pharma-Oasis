@@ -1,0 +1,359 @@
+import { Resend } from 'resend';
+
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+
+const FROM_EMAIL = process.env.FROM_EMAIL || 'Pharma Oasis <noreply@pharmaoasis.com>';
+const NOTIFICATION_EMAIL = process.env.NOTIFICATION_EMAIL || 'admin@pharmaoasis.com';
+
+interface EmailResult {
+  success: boolean;
+  error?: string;
+}
+
+async function sendEmail(to: string, subject: string, html: string): Promise<EmailResult> {
+  if (!resend) {
+    console.log(`[EMAIL - DEV MODE] To: ${to}, Subject: ${subject}`);
+    console.log(`[EMAIL - DEV MODE] Body preview: ${html.substring(0, 200)}...`);
+    return { success: true };
+  }
+
+  try {
+    await resend.emails.send({
+      from: FROM_EMAIL,
+      to,
+      subject,
+      html,
+    });
+    console.log(`[EMAIL] Sent to ${to}: ${subject}`);
+    return { success: true };
+  } catch (error: any) {
+    console.error(`[EMAIL ERROR] Failed to send to ${to}:`, error?.message || error);
+    return { success: false, error: error?.message || 'Unknown error' };
+  }
+}
+
+export async function sendCustomerRegistrationNotification(data: {
+  email: string;
+  companyName: string;
+  contactName: string;
+  phone: string;
+}): Promise<EmailResult> {
+  const subject = `New Customer Registration: ${data.companyName}`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background: #1e40af; color: white; padding: 20px; text-align: center;">
+        <h1 style="margin: 0;">New Customer Registration</h1>
+      </div>
+      <div style="padding: 20px; background: #f8fafc;">
+        <h2 style="color: #1e40af; margin-top: 0;">Registration Details</h2>
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr>
+            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; font-weight: bold; width: 140px;">Company Name:</td>
+            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;">${data.companyName}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; font-weight: bold;">Contact Name:</td>
+            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;">${data.contactName}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; font-weight: bold;">Email:</td>
+            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;">${data.email}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; font-weight: bold;">Phone:</td>
+            <td style="padding: 8px 0;">${data.phone}</td>
+          </tr>
+        </table>
+        <div style="margin-top: 20px; padding: 15px; background: #fef3c7; border-radius: 8px;">
+          <p style="margin: 0; color: #92400e;">
+            <strong>Action Required:</strong> Please review this registration in the admin panel and approve or reject the account.
+          </p>
+        </div>
+      </div>
+      <div style="padding: 15px; background: #e2e8f0; text-align: center; font-size: 12px; color: #64748b;">
+        This is an automated notification from Pharma Oasis B2B Platform
+      </div>
+    </div>
+  `;
+
+  return sendEmail(NOTIFICATION_EMAIL, subject, html);
+}
+
+export async function sendSupplierRegistrationNotification(data: {
+  email: string;
+  companyName: string;
+  contactName: string;
+  phone: string;
+  productCategories?: string;
+}): Promise<EmailResult> {
+  const subject = `New Supplier Application: ${data.companyName}`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background: #059669; color: white; padding: 20px; text-align: center;">
+        <h1 style="margin: 0;">New Supplier Application</h1>
+      </div>
+      <div style="padding: 20px; background: #f8fafc;">
+        <h2 style="color: #059669; margin-top: 0;">Application Details</h2>
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr>
+            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; font-weight: bold; width: 140px;">Company Name:</td>
+            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;">${data.companyName}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; font-weight: bold;">Contact Name:</td>
+            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;">${data.contactName}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; font-weight: bold;">Email:</td>
+            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;">${data.email}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; font-weight: bold;">Phone:</td>
+            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;">${data.phone}</td>
+          </tr>
+          ${data.productCategories ? `
+          <tr>
+            <td style="padding: 8px 0; font-weight: bold;">Product Categories:</td>
+            <td style="padding: 8px 0;">${data.productCategories}</td>
+          </tr>
+          ` : ''}
+        </table>
+        <div style="margin-top: 20px; padding: 15px; background: #d1fae5; border-radius: 8px;">
+          <p style="margin: 0; color: #065f46;">
+            <strong>New Supplier Lead:</strong> Review this application in the admin panel to assess partnership opportunities.
+          </p>
+        </div>
+      </div>
+      <div style="padding: 15px; background: #e2e8f0; text-align: center; font-size: 12px; color: #64748b;">
+        This is an automated notification from Pharma Oasis B2B Platform
+      </div>
+    </div>
+  `;
+
+  return sendEmail(NOTIFICATION_EMAIL, subject, html);
+}
+
+export async function sendContactFormNotification(data: {
+  name: string;
+  email: string;
+  subject: string;
+  message: string;
+  phone?: string;
+}): Promise<EmailResult> {
+  const emailSubject = `Contact Form: ${data.subject}`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background: #6366f1; color: white; padding: 20px; text-align: center;">
+        <h1 style="margin: 0;">New Contact Message</h1>
+      </div>
+      <div style="padding: 20px; background: #f8fafc;">
+        <h2 style="color: #6366f1; margin-top: 0;">Message Details</h2>
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr>
+            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; font-weight: bold; width: 100px;">From:</td>
+            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;">${data.name}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; font-weight: bold;">Email:</td>
+            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;">${data.email}</td>
+          </tr>
+          ${data.phone ? `
+          <tr>
+            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; font-weight: bold;">Phone:</td>
+            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;">${data.phone}</td>
+          </tr>
+          ` : ''}
+          <tr>
+            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; font-weight: bold;">Subject:</td>
+            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;">${data.subject}</td>
+          </tr>
+        </table>
+        <div style="margin-top: 20px; padding: 15px; background: white; border: 1px solid #e2e8f0; border-radius: 8px;">
+          <p style="margin: 0; white-space: pre-wrap;">${data.message}</p>
+        </div>
+      </div>
+      <div style="padding: 15px; background: #e2e8f0; text-align: center; font-size: 12px; color: #64748b;">
+        Reply directly to ${data.email} to respond to this message
+      </div>
+    </div>
+  `;
+
+  return sendEmail(NOTIFICATION_EMAIL, emailSubject, html);
+}
+
+export async function sendQuoteSubmissionNotification(data: {
+  quoteId: number;
+  customerEmail: string;
+  customerName: string;
+  companyName: string;
+  itemCount: number;
+  totalValue: string;
+}): Promise<EmailResult> {
+  const subject = `New Quote Request #${data.quoteId} from ${data.companyName}`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background: #7c3aed; color: white; padding: 20px; text-align: center;">
+        <h1 style="margin: 0;">New Quote Request</h1>
+        <p style="margin: 5px 0 0 0; opacity: 0.9;">Quote #${data.quoteId}</p>
+      </div>
+      <div style="padding: 20px; background: #f8fafc;">
+        <h2 style="color: #7c3aed; margin-top: 0;">Quote Details</h2>
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr>
+            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; font-weight: bold; width: 140px;">Quote ID:</td>
+            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;">#${data.quoteId}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; font-weight: bold;">Company:</td>
+            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;">${data.companyName}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; font-weight: bold;">Contact:</td>
+            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;">${data.customerName}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; font-weight: bold;">Email:</td>
+            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;">${data.customerEmail}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; font-weight: bold;">Items:</td>
+            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;">${data.itemCount} product(s)</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; font-weight: bold;">Estimated Total:</td>
+            <td style="padding: 8px 0; font-size: 18px; color: #7c3aed;">${data.totalValue}</td>
+          </tr>
+        </table>
+        <div style="margin-top: 20px; padding: 15px; background: #ede9fe; border-radius: 8px;">
+          <p style="margin: 0; color: #5b21b6;">
+            <strong>Action Required:</strong> Review this quote in the admin panel and provide a response to the customer.
+          </p>
+        </div>
+      </div>
+      <div style="padding: 15px; background: #e2e8f0; text-align: center; font-size: 12px; color: #64748b;">
+        This is an automated notification from Pharma Oasis B2B Platform
+      </div>
+    </div>
+  `;
+
+  return sendEmail(NOTIFICATION_EMAIL, subject, html);
+}
+
+export async function sendAccountApprovalEmail(data: {
+  email: string;
+  contactName: string;
+  companyName: string;
+}): Promise<EmailResult> {
+  const subject = `Your Pharma Oasis Account Has Been Approved`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background: #059669; color: white; padding: 20px; text-align: center;">
+        <h1 style="margin: 0;">Account Approved!</h1>
+      </div>
+      <div style="padding: 20px; background: #f8fafc;">
+        <p style="font-size: 16px;">Dear ${data.contactName},</p>
+        <p>Great news! Your Pharma Oasis wholesale account for <strong>${data.companyName}</strong> has been approved.</p>
+        <p>You can now:</p>
+        <ul style="color: #374151;">
+          <li>Browse our full product catalogue with wholesale pricing</li>
+          <li>Request quotes for bulk orders</li>
+          <li>Access exclusive B2B features</li>
+        </ul>
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="https://pharmaoasis.com/login" style="display: inline-block; background: #059669; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold;">
+            Login to Your Account
+          </a>
+        </div>
+        <p style="color: #6b7280;">If you have any questions, please don't hesitate to contact our team.</p>
+      </div>
+      <div style="padding: 15px; background: #e2e8f0; text-align: center; font-size: 12px; color: #64748b;">
+        Pharma Oasis - Your Trusted Wholesale Partner
+      </div>
+    </div>
+  `;
+
+  return sendEmail(data.email, subject, html);
+}
+
+export async function sendAccountRejectionEmail(data: {
+  email: string;
+  contactName: string;
+  companyName: string;
+  reason?: string;
+}): Promise<EmailResult> {
+  const subject = `Update on Your Pharma Oasis Account Application`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background: #dc2626; color: white; padding: 20px; text-align: center;">
+        <h1 style="margin: 0;">Application Update</h1>
+      </div>
+      <div style="padding: 20px; background: #f8fafc;">
+        <p style="font-size: 16px;">Dear ${data.contactName},</p>
+        <p>Thank you for your interest in becoming a Pharma Oasis wholesale partner.</p>
+        <p>After reviewing your application for <strong>${data.companyName}</strong>, we regret to inform you that we are unable to approve your account at this time.</p>
+        ${data.reason ? `
+        <div style="padding: 15px; background: #fef2f2; border-radius: 8px; margin: 20px 0;">
+          <p style="margin: 0; color: #991b1b;"><strong>Reason:</strong> ${data.reason}</p>
+        </div>
+        ` : ''}
+        <p>If you believe this decision was made in error or would like to provide additional documentation, please contact our team at trade@pharmaoasis.com.</p>
+      </div>
+      <div style="padding: 15px; background: #e2e8f0; text-align: center; font-size: 12px; color: #64748b;">
+        Pharma Oasis - Your Trusted Wholesale Partner
+      </div>
+    </div>
+  `;
+
+  return sendEmail(data.email, subject, html);
+}
+
+export async function sendQuoteConfirmationToCustomer(data: {
+  email: string;
+  contactName: string;
+  quoteId: number;
+  itemCount: number;
+  totalValue: string;
+}): Promise<EmailResult> {
+  const subject = `Quote Request Received - #${data.quoteId}`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background: #1e40af; color: white; padding: 20px; text-align: center;">
+        <h1 style="margin: 0;">Quote Request Received</h1>
+        <p style="margin: 5px 0 0 0; opacity: 0.9;">Reference: #${data.quoteId}</p>
+      </div>
+      <div style="padding: 20px; background: #f8fafc;">
+        <p style="font-size: 16px;">Dear ${data.contactName},</p>
+        <p>Thank you for your quote request. We have received your submission and our team will review it shortly.</p>
+        <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 20px 0;">
+          <h3 style="margin-top: 0; color: #1e40af;">Quote Summary</h3>
+          <table style="width: 100%;">
+            <tr>
+              <td style="padding: 5px 0;">Quote Reference:</td>
+              <td style="text-align: right; font-weight: bold;">#${data.quoteId}</td>
+            </tr>
+            <tr>
+              <td style="padding: 5px 0;">Number of Items:</td>
+              <td style="text-align: right;">${data.itemCount} product(s)</td>
+            </tr>
+            <tr>
+              <td style="padding: 5px 0;">Estimated Total:</td>
+              <td style="text-align: right; font-weight: bold; color: #1e40af;">${data.totalValue}</td>
+            </tr>
+          </table>
+        </div>
+        <p><strong>What happens next?</strong></p>
+        <ol style="color: #374151;">
+          <li>Our team will review your quote request</li>
+          <li>We'll confirm product availability and pricing</li>
+          <li>You'll receive a formal quote within 1-2 business days</li>
+        </ol>
+        <p style="color: #6b7280;">You can track the status of your quote by logging into your account.</p>
+      </div>
+      <div style="padding: 15px; background: #e2e8f0; text-align: center; font-size: 12px; color: #64748b;">
+        Pharma Oasis - Your Trusted Wholesale Partner
+      </div>
+    </div>
+  `;
+
+  return sendEmail(data.email, subject, html);
+}
