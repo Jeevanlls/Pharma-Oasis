@@ -121,10 +121,7 @@ export default function RegisterPage() {
     setError(null);
 
     try {
-      await apiRequest("/api/auth/register", {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
+      await apiRequest("POST", "/api/auth/register", data);
 
       setIsSuccess(true);
       toast({

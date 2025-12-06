@@ -66,10 +66,7 @@ export default function AdminProductsPage() {
 
   const createMutation = useMutation({
     mutationFn: async (data: InsertProduct) => {
-      return apiRequest("/api/admin/products", {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
+      return apiRequest("POST", "/api/admin/products", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
@@ -84,10 +81,7 @@ export default function AdminProductsPage() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: Partial<InsertProduct> }) => {
-      return apiRequest(`/api/admin/products/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify(data),
-      });
+      return apiRequest("PATCH", `/api/admin/products/${id}`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
@@ -103,9 +97,7 @@ export default function AdminProductsPage() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      return apiRequest(`/api/admin/products/${id}`, {
-        method: "DELETE",
-      });
+      return apiRequest("DELETE", `/api/admin/products/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });

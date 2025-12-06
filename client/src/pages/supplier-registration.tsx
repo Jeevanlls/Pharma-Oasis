@@ -74,10 +74,7 @@ export default function SupplierRegistrationPage() {
   const onSubmit = async (data: SupplierRegistrationData) => {
     setIsLoading(true);
     try {
-      await apiRequest("/api/supplier-leads", {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
+      await apiRequest("POST", "/api/supplier-leads", data);
       setIsSuccess(true);
     } catch (error: any) {
       toast({

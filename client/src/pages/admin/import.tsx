@@ -44,10 +44,7 @@ export default function AdminImportPage() {
 
   const importMutation = useMutation({
     mutationFn: async (products: any[]) => {
-      return apiRequest("/api/admin/products/import", {
-        method: "POST",
-        body: JSON.stringify({ products }),
-      });
+      return apiRequest("POST", "/api/admin/products/import", { products });
     },
     onSuccess: (result: ImportResult) => {
       setImportResult(result);

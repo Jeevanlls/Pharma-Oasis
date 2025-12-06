@@ -88,10 +88,7 @@ export default function AdminSettingsPage() {
 
   const updateMutation = useMutation({
     mutationFn: async (data: Partial<SiteSettings>) => {
-      return apiRequest("/api/admin/settings", {
-        method: "PATCH",
-        body: JSON.stringify(data),
-      });
+      return apiRequest("PATCH", "/api/admin/settings", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });

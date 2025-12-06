@@ -42,13 +42,10 @@ export default function QuotePage() {
         quantity: item.quantity,
       }));
 
-      await apiRequest("/api/quotes", {
-        method: "POST",
-        body: JSON.stringify({
+      await apiRequest("POST", "/api/quotes", {
           items: quoteItems,
           customerNotes: customerNotes || undefined,
-        }),
-      });
+        });
 
       clearBasket();
       setCustomerNotes("");
