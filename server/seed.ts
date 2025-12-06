@@ -322,20 +322,27 @@ export async function seed() {
     categoryNameToIdMap[cat.name] = cat.id;
   }
 
-  for (const product of productData) {
-    const brandId = brandMap[product.brandName];
-    if (!brandId) {
-      console.log(`Warning: Brand not found for product ${product.productName}: ${product.brandName}`);
-      continue;
-    }
+  // Wrap product seeding in try-catch so it doesn't break the rest of the seed
+  try {
+    for (const product of productData) {
+      const brandId = brandMap[product.brandName];
+      if (!brandId) {
+        console.log(`Warning: Brand not found for product ${product.productName}: ${product.brandName}`);
+        continue;
+      }
 
-    // Determine parent category and subcategory from categoryName
-    let categoryId: number | null = null;
-    let subcategoryId: number | null = null;
-    
-    // categoryName refers to the subcategory - find it and its parent
-    const catId = categoryNameToIdMap[product.categoryName];
-    if (catId) {
+      // Determine parent category and subcategory from categoryName
+      let categoryId: number | null = null;
+      let subcategoryId: number | null = null;
+      
+      // categoryName refers to the subcategory - find it and its parent
+      const categoryName = product.categoryName;
+      if (!categoryName) {
+        console.log(`Warning: No categoryName for product ${product.productName}`);
+        continue;
+      }
+      const catId = categoryNameToIdMap[categoryName];
+      if (catId) {
       const parentId = categoryParentMap[catId];
       if (parentId) {
         // This is a subcategory - use parent as categoryId
@@ -387,7 +394,10 @@ export async function seed() {
         })
         .where(eq(products.sku, product.sku));
       console.log(`Product updated: ${product.productName}`);
+      }
     }
+  } catch (productError: any) {
+    console.log(`Warning: Product seeding encountered errors (continuing with rest of seed): ${productError.message}`);
   }
 
   // Create default site settings

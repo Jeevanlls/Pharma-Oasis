@@ -1479,4 +1479,31 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
       res.status(500).json({ message: "Failed to delete section" });
     }
   });
+
+  // ==================== ADMIN SEED ENDPOINT (for production first-time setup) ====================
+  // This endpoint requires admin login OR works if no admin exists (first-time setup)
+  app.post("/api/admin/seed", async (req, res) => {
+    try {
+      // Check if admin exists - allow seed if no admin (first-time setup) or if logged in as admin
+      const adminCheck = await storage.getUserByEmail("admin@pharmaoasis.com");
+      
+      if (adminCheck) {
+        // Admin exists - require authentication
+        if (!req.session.userId) {
+          return res.status(401).json({ message: "Authentication required" });
+        }
+        const user = await storage.getUser(req.session.userId);
+        if (!user || user.role !== "admin") {
+          return res.status(403).json({ message: "Admin access required" });
+        }
+      }
+      
+      const { seed } = await import("./seed");
+      await seed();
+      res.json({ success: true, message: "Database seeded successfully! Refresh your browser to see the changes." });
+    } catch (error: any) {
+      console.error("Seed error:", error);
+      res.status(500).json({ success: false, message: `Seed failed: ${error.message}` });
+    }
+  });
 }
