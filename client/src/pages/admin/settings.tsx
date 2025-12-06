@@ -19,13 +19,57 @@ import {
   Palette,
   Save,
   Loader2,
+  Database,
+  RefreshCw,
+  AlertTriangle,
 } from "lucide-react";
+import { useState } from "react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function AdminSettingsPage() {
   const { toast } = useToast();
+  const [showSeedDialog, setShowSeedDialog] = useState(false);
 
   const { data: settings, isLoading } = useQuery<SiteSettings>({
     queryKey: ["/api/admin/settings"],
+  });
+
+  const seedMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch("/api/admin/seed-database", {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Seed failed");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+      toast({ 
+        title: "Database seeded successfully", 
+        description: "All demo data has been added to the database." 
+      });
+      setShowSeedDialog(false);
+    },
+    onError: (error: Error) => {
+      toast({ 
+        title: "Failed to seed database", 
+        description: error.message,
+        variant: "destructive" 
+      });
+    },
   });
 
   const form = useForm({
@@ -124,6 +168,10 @@ export default function AdminSettingsPage() {
           <TabsTrigger value="access" className="gap-2">
             <Shield className="h-4 w-4" />
             Access
+          </TabsTrigger>
+          <TabsTrigger value="data" className="gap-2" data-testid="tab-data">
+            <Database className="h-4 w-4" />
+            Data
           </TabsTrigger>
         </TabsList>
 
@@ -378,9 +426,80 @@ export default function AdminSettingsPage() {
                 </Button>
               </div>
             </TabsContent>
+
+            <TabsContent value="data" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Database className="h-5 w-5" />
+                    Data Management
+                  </CardTitle>
+                  <CardDescription>
+                    Manage database and demo data
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="rounded-lg border p-4 space-y-4">
+                    <div className="flex items-start gap-3">
+                      <RefreshCw className="h-5 w-5 mt-0.5 text-blue-600" />
+                      <div className="space-y-1">
+                        <h4 className="font-medium">Load Demo Data</h4>
+                        <p className="text-sm text-muted-foreground">
+                          Populate the database with sample products, brands, categories, hero slides, homepage content, and other demo data. This is useful for setting up a new environment or restoring demo data after deployment.
+                        </p>
+                      </div>
+                    </div>
+                    <Button 
+                      type="button"
+                      variant="outline" 
+                      onClick={() => setShowSeedDialog(true)}
+                      disabled={seedMutation.isPending}
+                      data-testid="button-seed-database"
+                    >
+                      {seedMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      <Database className="mr-2 h-4 w-4" />
+                      Load Demo Data
+                    </Button>
+                  </div>
+
+                  <div className="rounded-lg border border-orange-200 bg-orange-50/50 dark:border-orange-800 dark:bg-orange-950/20 p-4">
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle className="h-5 w-5 mt-0.5 text-orange-600" />
+                      <div className="space-y-1">
+                        <h4 className="font-medium text-orange-800 dark:text-orange-200">Important Notice</h4>
+                        <p className="text-sm text-orange-700 dark:text-orange-300">
+                          Loading demo data will reset products, brands, categories, and homepage content to their default demo values. Existing demo data will be replaced. User accounts and quotes will be preserved.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
           </form>
         </Form>
       </Tabs>
+
+      <AlertDialog open={showSeedDialog} onOpenChange={setShowSeedDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Load Demo Data?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will populate the database with demo products, brands, categories, hero slides, and homepage content. Existing demo data will be replaced. User accounts and quotes will be preserved.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => seedMutation.mutate()}
+              disabled={seedMutation.isPending}
+            >
+              {seedMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Load Demo Data
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

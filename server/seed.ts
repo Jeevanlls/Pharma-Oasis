@@ -3,7 +3,7 @@ import { users, brands, categories, products, siteSettings, cmsBlocks, heroSlide
 import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 
-async function seed() {
+export async function seed() {
   console.log("Starting database seed...");
 
   // Create admin user
@@ -735,9 +735,12 @@ async function seed() {
   console.log("Database seed completed!");
 }
 
-seed()
-  .then(() => process.exit(0))
-  .catch((error) => {
-    console.error("Seed error:", error);
-    process.exit(1);
-  });
+// Only run if called directly (not imported)
+if (require.main === module) {
+  seed()
+    .then(() => process.exit(0))
+    .catch((error) => {
+      console.error("Seed error:", error);
+      process.exit(1);
+    });
+}

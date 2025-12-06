@@ -1044,6 +1044,18 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     }
   });
 
+  // Admin - Seed Database (for production)
+  app.post("/api/admin/seed-database", requireAdmin, async (req, res) => {
+    try {
+      const { seed } = await import("./seed");
+      await seed();
+      res.json({ success: true, message: "Database seeded successfully with demo data" });
+    } catch (error) {
+      console.error("Seed error:", error);
+      res.status(500).json({ message: "Failed to seed database", error: String(error) });
+    }
+  });
+
   // Admin - Dashboard Stats
   app.get("/api/admin/stats", requireAdmin, async (req, res) => {
     try {
