@@ -31,7 +31,14 @@ import {
   FileCheck,
   Boxes,
   BadgeCheck,
+  Pill,
+  Stethoscope,
+  Heart,
+  Sparkles,
+  Activity,
+  Cross,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 const stats = [
   { value: "50+", label: "Premium Brands" },
@@ -62,13 +69,13 @@ const features = [
   },
 ];
 
-const categories = [
-  { name: "Pharmaceuticals", count: "5,000+ products" },
-  { name: "OTC Medicines", count: "3,500+ products" },
-  { name: "Health & Wellness", count: "4,000+ products" },
-  { name: "Beauty & Skincare", count: "3,000+ products" },
-  { name: "Medical Devices", count: "2,500+ products" },
-  { name: "First Aid", count: "1,500+ products" },
+const categories: { name: string; count: string; icon: LucideIcon }[] = [
+  { name: "Pharmaceuticals", count: "5,000+ products", icon: Pill },
+  { name: "OTC Medicines", count: "3,500+ products", icon: Stethoscope },
+  { name: "Health & Wellness", count: "4,000+ products", icon: Heart },
+  { name: "Beauty & Skincare", count: "3,000+ products", icon: Sparkles },
+  { name: "Medical Devices", count: "2,500+ products", icon: Activity },
+  { name: "First Aid", count: "1,500+ products", icon: Cross },
 ];
 
 const processSteps = [
@@ -567,24 +574,27 @@ export default function HomePage() {
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {categories.map((category) => (
-              <Link key={category.name} href="/products">
-                <Card className="group cursor-pointer hover-elevate">
-                  <CardContent className="flex items-center justify-between p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                        <Package className="h-5 w-5" />
+            {categories.map((category) => {
+              const IconComponent = category.icon;
+              return (
+                <Link key={category.name} href="/products">
+                  <Card className="group cursor-pointer hover-elevate">
+                    <CardContent className="flex items-center justify-between p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                          <IconComponent className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <h3 className="font-medium">{category.name}</h3>
+                          <p className="text-sm text-muted-foreground">{category.count}</p>
+                        </div>
                       </div>
-                      <div>
-                        <h3 className="font-medium">{category.name}</h3>
-                        <p className="text-sm text-muted-foreground">{category.count}</p>
-                      </div>
-                    </div>
-                    <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-                  </CardContent>
-                </Card>
-              </Link>
-            ))}
+                      <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                    </CardContent>
+                  </Card>
+                </Link>
+              );
+            })}
           </div>
 
           <div className="mt-8 text-center">
