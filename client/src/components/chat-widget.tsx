@@ -163,14 +163,24 @@ export function ChatWidget() {
 
   if (!isOpen) {
     return (
-      <Button
-        onClick={handleOpen}
-        size="lg"
-        className="fixed bottom-6 right-6 z-50 rounded-full shadow-lg h-14 w-14 p-0"
-        data-testid="button-open-chat"
-      >
-        <MessageSquare className="h-6 w-6" />
-      </Button>
+      <div className="fixed bottom-6 right-6 z-50">
+        {/* Pulsing ring animation */}
+        <div className="absolute inset-0 rounded-full bg-primary/30 animate-ping" />
+        <div className="absolute inset-0 rounded-full bg-primary/20 animate-pulse" />
+        <Button
+          onClick={handleOpen}
+          size="lg"
+          className="relative rounded-full shadow-xl h-16 w-16 p-0 animate-bounce"
+          style={{ animationDuration: '2s', animationIterationCount: 'infinite' }}
+          data-testid="button-open-chat"
+        >
+          <MessageSquare className="h-7 w-7" />
+        </Button>
+        {/* Attention label */}
+        <div className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground text-xs font-bold px-2 py-1 rounded-full shadow-lg animate-pulse">
+          Chat
+        </div>
+      </div>
     );
   }
 
