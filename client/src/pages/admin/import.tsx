@@ -23,18 +23,18 @@ interface ImportResult {
 }
 
 const requiredColumns = [
-  "sku", "productName", "brand", "category", "wholesalePrice"
+  "sku", "productName", "brand", "category"
 ];
 
 const optionalColumns = [
   "ean", "subcategory", "shortDescription", "longDescription", "packSize",
-  "uom", "rrp", "moq", "vatRate", "isActive", "isFeatured", "imageUrl",
+  "uom", "wholesalePrice", "rrp", "moq", "vatRate", "isActive", "isFeatured", "imageUrl",
   "countryOfOrigin", "productType", "storageConditions"
 ];
 
-const sampleCsvData = `sku,productName,brand,category,subcategory,wholesalePrice,rrp,packSize,moq,isActive,isFeatured
-SKU-001,Sample Vitamin C 1000mg,VitaBoost,Vitamins & Supplements,Multivitamins,4.99,9.99,60 tablets,12,true,true
-SKU-002,Pain Relief Gel,PharmaCare Plus,OTC Medicines,Pain Relief,3.50,7.49,100ml,24,true,false`;
+const sampleCsvData = `sku,productName,brand,category,subcategory,packSize,moq,isActive,isFeatured
+SKU-001,Sample Vitamin C 1000mg,VitaBoost,Vitamins & Supplements,Multivitamins,60 tablets,12,true,true
+SKU-002,Pain Relief Gel,PharmaCare Plus,OTC Medicines,Pain Relief,100ml,24,true,false`;
 
 export default function AdminImportPage() {
   const [file, setFile] = useState<File | null>(null);
@@ -43,8 +43,9 @@ export default function AdminImportPage() {
   const { toast } = useToast();
 
   const importMutation = useMutation({
-    mutationFn: async (products: any[]) => {
-      return apiRequest("POST", "/api/admin/products/import", { products });
+    mutationFn: async (products: any[]): Promise<ImportResult> => {
+      const res = await apiRequest("POST", "/api/admin/products/import", { products });
+      return res.json();
     },
     onSuccess: (result: ImportResult) => {
       setImportResult(result);

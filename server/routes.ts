@@ -755,7 +755,7 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
             packSize: row.packSize || null,
             uom: row.uom || null,
             rrp: row.rrp || null,
-            wholesalePrice: row.wholesalePrice,
+            wholesalePrice: row.wholesalePrice || null,
             moq: row.moq ? Number(row.moq) : 1,
             vatRate: row.vatRate || null,
             isActive: row.isActive !== false,
