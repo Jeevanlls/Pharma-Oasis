@@ -357,3 +357,52 @@ export async function sendQuoteConfirmationToCustomer(data: {
 
   return sendEmail(data.email, subject, html);
 }
+
+export async function sendChatLeadNotification(data: {
+  name?: string;
+  email?: string;
+  phone?: string;
+  company?: string;
+  interest?: string;
+  sessionId: string;
+}): Promise<EmailResult> {
+  const notificationEmail = process.env.NOTIFICATION_EMAIL;
+  if (!notificationEmail) {
+    return { success: false, error: "No notification email configured" };
+  }
+
+  const subject = `New Chat Lead Captured - Pharma Oasis`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background: #7c3aed; color: white; padding: 20px; text-align: center;">
+        <h1 style="margin: 0;">New Chat Lead</h1>
+        <p style="margin: 5px 0 0 0; opacity: 0.9;">AI Chatbot Lead Capture</p>
+      </div>
+      <div style="padding: 20px; background: #f8fafc;">
+        <p style="font-size: 16px;">A visitor has provided their contact details via the AI chatbot.</p>
+        <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 20px 0;">
+          <h3 style="margin-top: 0; color: #7c3aed;">Lead Details</h3>
+          <table style="width: 100%;">
+            ${data.name ? `<tr><td style="padding: 8px 0; font-weight: bold;">Name:</td><td>${data.name}</td></tr>` : ''}
+            ${data.company ? `<tr><td style="padding: 8px 0; font-weight: bold;">Company:</td><td>${data.company}</td></tr>` : ''}
+            ${data.email ? `<tr><td style="padding: 8px 0; font-weight: bold;">Email:</td><td><a href="mailto:${data.email}">${data.email}</a></td></tr>` : ''}
+            ${data.phone ? `<tr><td style="padding: 8px 0; font-weight: bold;">Phone:</td><td><a href="tel:${data.phone}">${data.phone}</a></td></tr>` : ''}
+            ${data.interest ? `<tr><td style="padding: 8px 0; font-weight: bold;">Interest:</td><td>${data.interest}</td></tr>` : ''}
+            <tr><td style="padding: 8px 0; font-weight: bold;">Session ID:</td><td style="font-size: 12px; color: #666;">${data.sessionId}</td></tr>
+          </table>
+        </div>
+        <p><strong>Recommended Action:</strong></p>
+        <ul style="color: #374151;">
+          <li>Contact this lead within 24 hours</li>
+          <li>Review the chat history in the admin panel</li>
+          <li>Follow up on their specific interests</li>
+        </ul>
+      </div>
+      <div style="padding: 15px; background: #e2e8f0; text-align: center; font-size: 12px; color: #64748b;">
+        Pharma Oasis - Your Trusted Wholesale Partner
+      </div>
+    </div>
+  `;
+
+  return sendEmail(notificationEmail, subject, html);
+}

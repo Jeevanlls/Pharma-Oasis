@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Header } from "./header";
 import { Footer } from "./footer";
 import { WhatsAppButton } from "../whatsapp-button";
+import { ChatWidget } from "../chat-widget";
 
 interface PublicLayoutProps {
   children: ReactNode;
@@ -16,6 +17,7 @@ export function PublicLayout({ children }: PublicLayoutProps) {
       </main>
       <Footer />
       <WhatsAppButton />
+      <ChatWidget />
     </div>
   );
 }
