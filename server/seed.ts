@@ -438,6 +438,15 @@ export async function seed() {
       { label: "Terms of Use", url: "/terms" },
       { label: "Cookie Policy", url: "/cookies" }
     ]), contentType: "json" },
+    { key: "contact_page_subtitle", section: "contact", content: "Have questions about our products or services? Our team is here to help.", contentType: "text" },
+    { key: "contact_business_hours", section: "contact", content: JSON.stringify([
+      { day: "Monday - Friday", hours: "9am - 6pm" },
+      { day: "Saturday", hours: "9am - 1pm" },
+      { day: "Sunday", hours: "Closed" }
+    ]), contentType: "json" },
+    { key: "contact_response_time", section: "contact", content: "24 hours", contentType: "text" },
+    { key: "contact_urgent_title", section: "contact", content: "Need Urgent Assistance?", contentType: "text" },
+    { key: "contact_urgent_text", section: "contact", content: "For urgent orders or time-sensitive inquiries, please call our priority line.", contentType: "text" },
   ];
 
   for (const block of cmsData) {

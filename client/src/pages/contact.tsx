@@ -12,7 +12,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { contactFormSchema, type ContactFormData, type CompanyLocation } from "@shared/schema";
+import { contactFormSchema, type ContactFormData, type CompanyLocation, type CmsBlock } from "@shared/schema";
 import { Mail, Phone, MapPin, Clock, Loader2, CheckCircle2 } from "lucide-react";
 
 interface SiteSettings {
@@ -21,6 +21,11 @@ interface SiteSettings {
   contact_email?: string;
   contact_phone?: string;
   active_theme?: string;
+}
+
+interface BusinessHour {
+  day: string;
+  hours: string;
 }
 
 export default function ContactPage() {
@@ -36,9 +41,37 @@ export default function ContactPage() {
     queryKey: ["/api/company-locations"],
   });
 
+  const { data: cmsBlocks = [] } = useQuery<CmsBlock[]>({
+    queryKey: ["/api/cms-blocks/contact"],
+  });
+
   const contactEmail = siteSettings?.contact_email || "trade@pharmaoasis.com";
   const contactPhone = siteSettings?.contact_phone || "+44 7481 640640";
   const headquarters = locations.find(l => l.locationType === "headquarters");
+
+  // Get CMS content
+  const getContent = (key: string, fallback: string) => {
+    const block = cmsBlocks.find(b => b.key === key);
+    return block?.content || fallback;
+  };
+
+  const pageSubtitle = getContent("contact_page_subtitle", "Have questions about our products or services? Our team is here to help.");
+  const responseTime = getContent("contact_response_time", "24 hours");
+  const urgentTitle = getContent("contact_urgent_title", "Need Urgent Assistance?");
+  const urgentText = getContent("contact_urgent_text", "For urgent orders or time-sensitive inquiries, please call our priority line.");
+
+  // Parse business hours
+  let businessHours: BusinessHour[] = [];
+  try {
+    const hoursJson = getContent("contact_business_hours", "[]");
+    businessHours = JSON.parse(hoursJson);
+  } catch {
+    businessHours = [
+      { day: "Monday - Friday", hours: "9am - 6pm" },
+      { day: "Saturday", hours: "9am - 1pm" },
+      { day: "Sunday", hours: "Closed" }
+    ];
+  }
 
   const form = useForm<ContactFormData>({
     resolver: zodResolver(contactFormSchema),
@@ -77,7 +110,7 @@ export default function ContactPage() {
               Contact Us
             </h1>
             <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
-              Have questions about our products or services? Our team is here to help.
+              {pageSubtitle}
             </p>
           </div>
 
@@ -87,7 +120,7 @@ export default function ContactPage() {
                 <CardHeader>
                   <CardTitle style={{ fontFamily: "DM Sans, sans-serif" }}>Send us a message</CardTitle>
                   <CardDescription>
-                    Fill out the form below and we'll get back to you within 24 hours.
+                    Fill out the form below and we'll get back to you within {responseTime}.
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -269,9 +302,12 @@ export default function ContactPage() {
                       <div>
                         <h3 className="font-medium">Business Hours</h3>
                         <p className="mt-1 text-sm text-muted-foreground">
-                          Monday - Friday: 9am - 6pm<br />
-                          Saturday: 9am - 1pm<br />
-                          Sunday: Closed
+                          {businessHours.map((item, index) => (
+                            <span key={index}>
+                              {item.day}: {item.hours}
+                              {index < businessHours.length - 1 && <br />}
+                            </span>
+                          ))}
                         </p>
                       </div>
                     </div>
@@ -281,9 +317,9 @@ export default function ContactPage() {
 
               <Card className="bg-primary text-primary-foreground">
                 <CardContent className="pt-6">
-                  <h3 className="font-semibold mb-2">Need Urgent Assistance?</h3>
+                  <h3 className="font-semibold mb-2">{urgentTitle}</h3>
                   <p className="text-sm text-primary-foreground/80 mb-4">
-                    For urgent orders or time-sensitive inquiries, please call our priority line.
+                    {urgentText}
                   </p>
                   <Button 
                     variant="secondary" 
