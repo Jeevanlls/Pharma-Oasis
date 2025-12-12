@@ -753,6 +753,7 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
             categoryId: category.id,
             subcategoryId: subcategory?.id || null,
             packSize: row.packSize || null,
+            caseSize: row.caseSize || null,
             uom: row.uom || null,
             rrp: row.rrp || null,
             wholesalePrice: row.wholesalePrice || null,

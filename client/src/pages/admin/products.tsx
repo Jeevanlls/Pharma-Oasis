@@ -57,6 +57,7 @@ export default function AdminProductsPage() {
       wholesalePrice: "",
       rrp: "",
       packSize: "",
+      caseSize: "",
       moq: 1,
       isActive: true,
       isFeatured: false,
@@ -125,6 +126,7 @@ export default function AdminProductsPage() {
       wholesalePrice: product.wholesalePrice,
       rrp: product.rrp || "",
       packSize: product.packSize || "",
+      caseSize: product.caseSize || "",
       moq: product.moq || 1,
       isActive: product.isActive,
       isFeatured: product.isFeatured,
@@ -144,6 +146,7 @@ export default function AdminProductsPage() {
       wholesalePrice: "",
       rrp: "",
       packSize: "",
+      caseSize: "",
       moq: 1,
       isActive: true,
       isFeatured: false,
@@ -429,9 +432,9 @@ export default function AdminProductsPage() {
                   name="wholesalePrice"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Wholesale Price *</FormLabel>
+                      <FormLabel>Wholesale Price</FormLabel>
                       <FormControl>
-                        <Input type="number" step="0.01" placeholder="0.00" {...field} />
+                        <Input type="number" step="0.01" placeholder="0.00" {...field} value={field.value || ""} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -465,19 +468,34 @@ export default function AdminProductsPage() {
                 />
               </div>
 
-              <FormField
-                control={form.control}
-                name="packSize"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Pack Size</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g. 100 tablets" {...field} value={field.value || ""} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="grid gap-4 sm:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="packSize"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Pack Size</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g. 100 tablets" {...field} value={field.value || ""} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="caseSize"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Case Size</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g. 12" {...field} value={field.value || ""} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
               <FormField
                 control={form.control}

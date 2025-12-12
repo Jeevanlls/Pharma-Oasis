@@ -287,8 +287,12 @@ function ProductCard({ product, brands, quantity, onQuantityChange, onAddToQuote
           {product.productName}
         </h3>
 
-        {product.packSize && (
-          <p className="mb-2 text-sm text-muted-foreground">{product.packSize}</p>
+        {(product.packSize || product.caseSize) && (
+          <div className="mb-2 text-sm text-muted-foreground">
+            {product.packSize && <span>{product.packSize}</span>}
+            {product.packSize && product.caseSize && <span> | </span>}
+            {product.caseSize && <span>Case: {product.caseSize}</span>}
+          </div>
         )}
 
         <div className="mt-auto space-y-3">

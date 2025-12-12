@@ -27,12 +27,12 @@ const requiredColumns = [
 ];
 
 const optionalColumns = [
-  "ean", "subcategory", "shortDescription", "longDescription", "packSize",
+  "ean", "subcategory", "shortDescription", "longDescription", "packSize", "caseSize",
   "uom", "wholesalePrice", "rrp", "moq", "vatRate", "isActive", "isFeatured", "imageUrl",
   "countryOfOrigin", "productType", "storageConditions"
 ];
 
-const sampleCsvData = `sku,productName,brand,category,subcategory,packSize,moq,isActive,isFeatured
+const sampleCsvData = `sku,productName,brand,category,subcategory,packSize,caseSize,isActive,isFeatured
 SKU-001,Sample Vitamin C 1000mg,VitaBoost,Vitamins & Supplements,Multivitamins,60 tablets,12,true,true
 SKU-002,Pain Relief Gel,PharmaCare Plus,OTC Medicines,Pain Relief,100ml,24,true,false`;
 
