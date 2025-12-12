@@ -1,7 +1,9 @@
 import type { Express } from "express";
 import type { Server } from "http";
 import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
 import { storage } from "./storage";
+import { pool } from "./db";
 import { 
   loginSchema, 
   customerRegistrationSchema, 
@@ -34,9 +36,18 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     app.set("trust proxy", 1);
   }
 
-  // Session middleware
+  // Create PostgreSQL session store for persistent sessions
+  const PgSession = connectPgSimple(session);
+  const sessionStore = new PgSession({
+    pool: pool,
+    tableName: "session",
+    createTableIfMissing: true,
+  });
+
+  // Session middleware with PostgreSQL store
   app.use(
     session({
+      store: sessionStore,
       secret: process.env.SESSION_SECRET || "pharma-oasis-dev-secret-change-in-production",
       resave: false,
       saveUninitialized: false,

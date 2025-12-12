@@ -10,7 +10,29 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useForm } from "react-hook-form";
-import type { SiteSettings } from "@shared/schema";
+// Settings response type from the API (uses snake_case from DB)
+// Form uses camelCase so we define both
+interface SiteSettings {
+  site_name?: string;
+  site_tagline?: string;
+  contact_email?: string;
+  contact_phone?: string;
+  company_address?: string;
+  minimum_order_value?: string;
+  active_theme?: string;
+  maintenance_mode?: string;
+  registration_enabled?: string;
+  // camelCase aliases for form compatibility
+  siteName?: string;
+  siteTagline?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  companyAddress?: string;
+  minimumOrderValue?: string;
+  activeTheme?: string;
+  maintenanceMode?: boolean;
+  registrationEnabled?: boolean;
+}
 import { 
   Settings,
   Globe,
