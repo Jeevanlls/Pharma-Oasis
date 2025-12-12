@@ -5,7 +5,10 @@ import * as schema from "@shared/schema";
 const { Pool } = pg;
 
 // Use external Neon database if available, otherwise fall back to Replit's DATABASE_URL
+const usingNeon = !!process.env.NEON_DATABASE_URL;
 let connectionString = process.env.NEON_DATABASE_URL || process.env.DATABASE_URL;
+console.log(`Database: Using ${usingNeon ? 'NEON_DATABASE_URL (shared)' : 'DATABASE_URL (Replit)'}`);
+
 
 // Clean up connection string if it contains psql command prefix
 if (connectionString && connectionString.startsWith("psql ")) {
