@@ -651,6 +651,75 @@ export type InsertMediaAsset = z.infer<typeof insertMediaAssetSchema>;
 export type MediaAsset = typeof mediaAssets.$inferSelect;
 
 // ============================================
+// AI CHAT TABLES
+// ============================================
+
+export const chatSessions = pgTable("chat_sessions", {
+  id: serial("id").primaryKey(),
+  sessionId: varchar("session_id", { length: 100 }).notNull().unique(),
+  visitorName: varchar("visitor_name", { length: 255 }),
+  visitorEmail: varchar("visitor_email", { length: 255 }),
+  visitorPhone: varchar("visitor_phone", { length: 50 }),
+  visitorCompany: varchar("visitor_company", { length: 255 }),
+  status: varchar("status", { length: 20 }).notNull().default("active"),
+  leadCaptured: boolean("lead_captured").default(false),
+  messageCount: integer("message_count").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const chatMessages = pgTable("chat_messages", {
+  id: serial("id").primaryKey(),
+  sessionId: varchar("session_id", { length: 100 }).notNull(),
+  role: varchar("role", { length: 20 }).notNull(),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const chatLeads = pgTable("chat_leads", {
+  id: serial("id").primaryKey(),
+  sessionId: varchar("session_id", { length: 100 }).notNull(),
+  name: varchar("name", { length: 255 }),
+  email: varchar("email", { length: 255 }),
+  phone: varchar("phone", { length: 50 }),
+  company: varchar("company", { length: 255 }),
+  interest: text("interest"),
+  status: varchar("status", { length: 20 }).notNull().default("new"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Chat sessions schemas
+export const insertChatSessionSchema = createInsertSchema(chatSessions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const selectChatSessionSchema = createSelectSchema(chatSessions);
+export type InsertChatSession = z.infer<typeof insertChatSessionSchema>;
+export type ChatSession = typeof chatSessions.$inferSelect;
+
+// Chat messages schemas
+export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({
+  id: true,
+  createdAt: true,
+});
+export const selectChatMessageSchema = createSelectSchema(chatMessages);
+export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
+export type ChatMessage = typeof chatMessages.$inferSelect;
+
+// Chat leads schemas
+export const insertChatLeadSchema = createInsertSchema(chatLeads).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const selectChatLeadSchema = createSelectSchema(chatLeads);
+export type InsertChatLead = z.infer<typeof insertChatLeadSchema>;
+export type ChatLead = typeof chatLeads.$inferSelect;
+
+// ============================================
 // FORM VALIDATION SCHEMAS
 // ============================================
 
