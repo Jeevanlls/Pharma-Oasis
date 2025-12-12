@@ -16,6 +16,7 @@ import {
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { processImage, deleteImageFile, validateImageFile, getImageCategories, isValidImageCategory } from "./imageProcessor";
+import { ObjectStorageService, ObjectNotFoundError, ObjectStorageConfigError } from "./objectStorage";
 import {
   sendCustomerRegistrationNotification,
   sendSupplierRegistrationNotification,
@@ -96,6 +97,27 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     req.user = user;
     next();
   };
+
+  // ==================== OBJECT STORAGE - SERVE UPLOADED IMAGES ====================
+  app.get("/objects/*", async (req, res) => {
+    const objectStorageService = new ObjectStorageService();
+    try {
+      if (!objectStorageService.isConfigured()) {
+        return res.status(503).json({ error: "Object Storage not configured" });
+      }
+      const objectFile = await objectStorageService.getObjectFile(req.path);
+      await objectStorageService.downloadObject(objectFile, res);
+    } catch (error) {
+      if (error instanceof ObjectNotFoundError) {
+        return res.status(404).json({ error: "File not found" });
+      }
+      if (error instanceof ObjectStorageConfigError) {
+        return res.status(503).json({ error: "Object Storage not configured" });
+      }
+      console.error("Error serving object:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  });
 
   // ==================== AUTH ROUTES ====================
   app.get("/api/auth/me", async (req, res) => {
@@ -1630,6 +1652,13 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
 
   app.post("/api/admin/uploads", requireAdmin, upload.single("image"), async (req: any, res) => {
     try {
+      const objectStorageCheck = new ObjectStorageService();
+      if (!objectStorageCheck.isConfigured()) {
+        return res.status(503).json({ 
+          message: "Image upload is not available. Object Storage needs to be configured in the Replit tools panel." 
+        });
+      }
+
       if (!req.file) {
         return res.status(400).json({ message: "No file uploaded" });
       }

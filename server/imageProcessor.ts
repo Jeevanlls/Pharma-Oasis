@@ -1,6 +1,6 @@
 import sharp from "sharp";
 import path from "path";
-import fs from "fs";
+import { ObjectStorageService } from "./objectStorage";
 
 export interface ProcessedImage {
   filename: string;
@@ -62,14 +62,6 @@ const PRESETS: Record<string, ImagePreset> = {
   },
 };
 
-const UPLOADS_DIR = path.join(process.cwd(), "attached_assets", "uploads");
-
-function ensureUploadsDirExists(): void {
-  if (!fs.existsSync(UPLOADS_DIR)) {
-    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-  }
-}
-
 function generateFilename(originalName: string, category: string, preset: ImagePreset): string {
   const timestamp = Date.now();
   const randomSuffix = Math.random().toString(36).substring(2, 8);
@@ -84,11 +76,9 @@ export async function processImage(
   originalFilename: string,
   category: string
 ): Promise<ProcessedImage> {
-  ensureUploadsDirExists();
-
+  const objectStorage = new ObjectStorageService();
   const preset = PRESETS[category] || PRESETS.general;
   const filename = generateFilename(originalFilename, category, preset);
-  const outputPath = path.join(UPLOADS_DIR, filename);
 
   let transformer = sharp(buffer)
     .resize(preset.width, preset.height, {
@@ -104,47 +94,54 @@ export async function processImage(
     transformer = transformer.webp({ quality: preset.quality });
   }
 
-  await transformer.toFile(outputPath);
-
-  const metadata = await sharp(outputPath).metadata();
-  const stats = fs.statSync(outputPath);
+  const processedBuffer = await transformer.toBuffer();
+  const metadata = await sharp(processedBuffer).metadata();
+  
+  const mimeType = `image/${preset.format}`;
+  const url = await objectStorage.uploadBuffer(processedBuffer, category, filename, mimeType);
 
   const result: ProcessedImage = {
     filename,
-    url: `/attached_assets/uploads/${filename}`,
+    url,
     width: metadata.width || preset.width,
     height: metadata.height || preset.height,
-    fileSize: stats.size,
-    mimeType: `image/${preset.format}`,
+    fileSize: processedBuffer.length,
+    mimeType,
   };
 
   if (category === "product") {
     const thumbnailPreset = PRESETS.product_thumbnail;
     const thumbnailFilename = generateFilename(originalFilename, "product_thumb", thumbnailPreset);
-    const thumbnailPath = path.join(UPLOADS_DIR, thumbnailFilename);
 
-    await sharp(buffer)
+    const thumbnailBuffer = await sharp(buffer)
       .resize(thumbnailPreset.width, thumbnailPreset.height, {
         fit: thumbnailPreset.fit,
         background: thumbnailPreset.background,
       })
       .jpeg({ quality: thumbnailPreset.quality })
-      .toFile(thumbnailPath);
+      .toBuffer();
 
-    result.thumbnailUrl = `/attached_assets/uploads/${thumbnailFilename}`;
+    const thumbnailUrl = await objectStorage.uploadBuffer(
+      thumbnailBuffer,
+      "product_thumb",
+      thumbnailFilename,
+      "image/jpeg"
+    );
+
+    result.thumbnailUrl = thumbnailUrl;
   }
 
   return result;
 }
 
 export async function deleteImageFile(url: string): Promise<void> {
-  if (!url.startsWith("/attached_assets/uploads/")) return;
+  if (!url.startsWith("/objects/")) return;
   
-  const filename = path.basename(url);
-  const filePath = path.join(UPLOADS_DIR, filename);
-  
-  if (fs.existsSync(filePath)) {
-    fs.unlinkSync(filePath);
+  try {
+    const objectStorage = new ObjectStorageService();
+    await objectStorage.deleteObject(url);
+  } catch (error) {
+    console.error("Error deleting image from object storage:", error);
   }
 }
 
