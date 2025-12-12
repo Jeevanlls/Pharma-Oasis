@@ -422,6 +422,22 @@ export async function seed() {
     { key: "homepage_hero_title", section: "homepage", content: "Your Wholesale Partner for Healthcare Excellence", contentType: "text" },
     { key: "homepage_hero_subtitle", section: "homepage", content: "Access 20,000+ healthcare products at competitive wholesale prices. Pharma Oasis is a licensed distributor trusted by pharmacies across the United Kingdom.", contentType: "text" },
     { key: "about_company", section: "about", content: "Pharma Oasis is a leading UK healthcare wholesaler, supplying over 3,000 pharmacies nationwide with pharmaceutical, wellness, and beauty products. We are MHRA licensed and GDP compliant.", contentType: "text" },
+    { key: "footer_tagline", section: "footer", content: "Trusted wholesale partner to 3,000+ UK pharmacies. Licensed healthcare, wellness and beauty distributor.", contentType: "text" },
+    { key: "footer_copyright", section: "footer", content: "Pharma Oasis Limited. All rights reserved.", contentType: "text" },
+    { key: "footer_quick_links", section: "footer", content: JSON.stringify([
+      { label: "Product Catalogue", url: "/products" },
+      { label: "Our Brands", url: "/brands" },
+      { label: "How to Order", url: "/how-to-order" },
+      { label: "Register as Customer", url: "/register" },
+      { label: "Become a Supplier", url: "/supplier-registration" },
+      { label: "About Us", url: "/about" },
+      { label: "Contact Us", url: "/contact" }
+    ]), contentType: "json" },
+    { key: "footer_policy_links", section: "footer", content: JSON.stringify([
+      { label: "Privacy Policy", url: "/privacy" },
+      { label: "Terms of Use", url: "/terms" },
+      { label: "Cookie Policy", url: "/cookies" }
+    ]), contentType: "json" },
   ];
 
   for (const block of cmsData) {

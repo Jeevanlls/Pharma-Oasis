@@ -576,6 +576,18 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
   });
 
   // ==================== CMS & SETTINGS (PUBLIC) ====================
+  
+  // Get CMS blocks by section (for footer, etc.)
+  app.get("/api/cms-blocks/:section", async (req, res) => {
+    try {
+      const blocks = await storage.getCmsBlocksBySection(req.params.section);
+      res.json(blocks);
+    } catch (error) {
+      console.error("Error fetching CMS blocks:", error);
+      res.status(500).json({ message: "Failed to fetch content" });
+    }
+  });
+
   app.get("/api/cms/:key", async (req, res) => {
     try {
       const block = await storage.getCmsBlock(req.params.key);

@@ -2,7 +2,7 @@ import { Link } from "wouter";
 import { Mail, Phone, Truck, Building2, Globe, Shield, Award } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import logoImage from "@assets/01_1764977214745.png";
-import type { CompanyLocation } from "@shared/schema";
+import type { CompanyLocation, CmsBlock } from "@shared/schema";
 
 interface SiteSettings {
   site_name?: string;
@@ -10,6 +10,11 @@ interface SiteSettings {
   contact_email?: string;
   contact_phone?: string;
   active_theme?: string;
+}
+
+interface FooterLink {
+  label: string;
+  url: string;
 }
 
 function MHRALogo() {
@@ -60,11 +65,53 @@ export function Footer() {
     queryKey: ["/api/site-settings"],
   });
 
+  const { data: cmsBlocks = [] } = useQuery<CmsBlock[]>({
+    queryKey: ["/api/cms-blocks/footer"],
+  });
+
   const contactEmail = siteSettings?.contact_email || "trade@pharmaoasis.com";
   const contactPhone = siteSettings?.contact_phone || "+44 7481 640640";
 
   const headquarters = locations.find(l => l.locationType === "headquarters");
   const otherLocations = locations.filter(l => l.locationType !== "headquarters");
+
+  // Get footer content from CMS
+  const getContent = (key: string, fallback: string) => {
+    const block = cmsBlocks.find(b => b.key === key);
+    return block?.content || fallback;
+  };
+
+  const footerTagline = getContent("footer_tagline", "Trusted wholesale partner to 3,000+ UK pharmacies. Licensed healthcare, wellness and beauty distributor.");
+  const footerCopyright = getContent("footer_copyright", "Pharma Oasis Limited. All rights reserved.");
+
+  // Parse JSON links
+  const quickLinksJson = getContent("footer_quick_links", "[]");
+  const policyLinksJson = getContent("footer_policy_links", "[]");
+  
+  let quickLinks: FooterLink[] = [];
+  let policyLinks: FooterLink[] = [];
+  
+  try {
+    quickLinks = JSON.parse(quickLinksJson);
+  } catch { 
+    quickLinks = [
+      { label: "Product Catalogue", url: "/products" },
+      { label: "Our Brands", url: "/brands" },
+      { label: "How to Order", url: "/how-to-order" },
+      { label: "Register as Customer", url: "/register" },
+      { label: "Become a Supplier", url: "/supplier-registration" }
+    ];
+  }
+  
+  try {
+    policyLinks = JSON.parse(policyLinksJson);
+  } catch {
+    policyLinks = [
+      { label: "Privacy Policy", url: "/privacy" },
+      { label: "Terms of Service", url: "/terms" },
+      { label: "Cookie Policy", url: "/cookies" }
+    ];
+  }
 
   return (
     <footer className="bg-sidebar text-sidebar-foreground">
@@ -80,8 +127,7 @@ export function Footer() {
                 />
               </div>
               <p className="text-sm text-sidebar-foreground/80 leading-relaxed">
-                Trusted wholesale partner to 3,000+ UK pharmacies. Licensed healthcare,
-                wellness and beauty distributor.
+                {footerTagline}
               </p>
               <div className="flex flex-col gap-2 pt-2">
                 <MHRALogo />
@@ -92,31 +138,13 @@ export function Footer() {
             <div className="space-y-4">
               <h3 className="font-semibold">Quick Links</h3>
               <ul className="space-y-2 text-sm">
-                <li>
-                  <Link href="/products" className="text-sidebar-foreground/80 hover:text-sidebar-foreground transition-colors">
-                    Product Catalogue
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/brands" className="text-sidebar-foreground/80 hover:text-sidebar-foreground transition-colors">
-                    Our Brands
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/how-to-order" className="text-sidebar-foreground/80 hover:text-sidebar-foreground transition-colors">
-                    How to Order
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/register" className="text-sidebar-foreground/80 hover:text-sidebar-foreground transition-colors">
-                    Register as Customer
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/supplier-registration" className="text-sidebar-foreground/80 hover:text-sidebar-foreground transition-colors">
-                    Become a Supplier
-                  </Link>
-                </li>
+                {quickLinks.map((link, index) => (
+                  <li key={index}>
+                    <Link href={link.url} className="text-sidebar-foreground/80 hover:text-sidebar-foreground transition-colors">
+                      {link.label}
+                    </Link>
+                  </li>
+                ))}
               </ul>
             </div>
 
@@ -216,18 +244,14 @@ export function Footer() {
         <div className="border-t border-sidebar-border py-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-xs text-sidebar-foreground/60">
-              © {new Date().getFullYear()} Pharma Oasis Ltd. All rights reserved.
+              © {new Date().getFullYear()} {footerCopyright}
             </p>
             <div className="flex flex-wrap gap-4 text-xs text-sidebar-foreground/60">
-              <Link href="/privacy" className="hover:text-sidebar-foreground transition-colors">
-                Privacy Policy
-              </Link>
-              <Link href="/terms" className="hover:text-sidebar-foreground transition-colors">
-                Terms of Service
-              </Link>
-              <Link href="/cookies" className="hover:text-sidebar-foreground transition-colors">
-                Cookie Policy
-              </Link>
+              {policyLinks.map((link, index) => (
+                <Link key={index} href={link.url} className="hover:text-sidebar-foreground transition-colors">
+                  {link.label}
+                </Link>
+              ))}
             </div>
           </div>
         </div>
