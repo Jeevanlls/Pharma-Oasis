@@ -1139,7 +1139,14 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
 
   app.patch("/api/admin/settings", requireAdmin, async (req, res) => {
     try {
-      const settings = await storage.updateSiteSettings(req.body);
+      // Convert camelCase keys to snake_case for database storage
+      const camelToSnake = (str: string) => str.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+      const convertedBody: Record<string, string> = {};
+      for (const [key, value] of Object.entries(req.body)) {
+        const snakeKey = camelToSnake(key);
+        convertedBody[snakeKey] = String(value);
+      }
+      const settings = await storage.updateSiteSettings(convertedBody);
       res.json(settings);
     } catch (error) {
       res.status(500).json({ message: "Failed to save settings" });
