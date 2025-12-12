@@ -4,6 +4,7 @@ import { PublicLayout } from "@/components/layout/public-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useQuoteBasket } from "@/lib/quote-basket";
 import { useAuth } from "@/lib/auth";
@@ -13,7 +14,6 @@ import {
   ShoppingCart, 
   Trash2, 
   Plus, 
-  Minus, 
   Package, 
   ArrowRight, 
   Loader2,
@@ -198,35 +198,17 @@ export default function QuotePage() {
                             </Button>
                           </div>
 
-                          <div className="mt-3 flex flex-wrap items-center justify-between gap-4">
-                            <div className="flex items-center rounded-md border">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 rounded-r-none"
-                                onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
-                                disabled={item.quantity <= 1}
-                              >
-                                <Minus className="h-3 w-3" />
-                              </Button>
-                              <span className="w-12 text-center text-sm">{item.quantity}</span>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 rounded-l-none"
-                                onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
-                              >
-                                <Plus className="h-3 w-3" />
-                              </Button>
-                            </div>
-
-                            <div className="text-right">
-                              <p className="font-medium">
-                                £{(Number(item.product.wholesalePrice) * item.quantity).toFixed(2)}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                £{Number(item.product.wholesalePrice).toFixed(2)} each
-                              </p>
+                          <div className="mt-3 flex flex-wrap items-center gap-4">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm text-muted-foreground">Qty:</span>
+                              <Input
+                                type="number"
+                                min="1"
+                                value={item.quantity}
+                                onChange={(e) => updateQuantity(item.product.id, parseInt(e.target.value) || 1)}
+                                className="w-20 text-center"
+                                data-testid={`input-qty-basket-${item.product.id}`}
+                              />
                             </div>
                           </div>
                         </div>
@@ -257,15 +239,11 @@ export default function QuotePage() {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Products</span>
-                      <span>{itemCount} items</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Estimated Total</span>
-                      <span className="font-medium">£{totalEstimate.toFixed(2)}</span>
+                      <span className="text-muted-foreground">Total Products</span>
+                      <span className="font-medium">{itemCount} items</span>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      * Final pricing will be confirmed in your quotation
+                      Pricing will be provided in your quotation
                     </p>
 
                     <div className="pt-4 border-t">

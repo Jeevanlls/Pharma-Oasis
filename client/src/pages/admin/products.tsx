@@ -332,38 +332,45 @@ export default function AdminProductsPage() {
                 />
               </div>
 
+              <FormField
+                control={form.control}
+                name="brandId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Brand *</FormLabel>
+                    <Select onValueChange={(v) => field.onChange(Number(v))} value={String(field.value || "")}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select brand" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {brands?.map((brand) => (
+                          <SelectItem key={brand.id} value={String(brand.id)}>
+                            {brand.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <div className="grid gap-4 sm:grid-cols-2">
-                <FormField
-                  control={form.control}
-                  name="brandId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Brand *</FormLabel>
-                      <Select onValueChange={(v) => field.onChange(Number(v))} value={String(field.value || "")}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select brand" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {brands?.map((brand) => (
-                            <SelectItem key={brand.id} value={String(brand.id)}>
-                              {brand.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
                 <FormField
                   control={form.control}
                   name="categoryId"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Category *</FormLabel>
-                      <Select onValueChange={(v) => field.onChange(Number(v))} value={String(field.value || "")}>
+                      <Select 
+                        onValueChange={(v) => {
+                          field.onChange(Number(v));
+                          form.setValue('subcategoryId', undefined);
+                        }} 
+                        value={String(field.value || "")}
+                      >
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select category" />
@@ -380,6 +387,39 @@ export default function AdminProductsPage() {
                       <FormMessage />
                     </FormItem>
                   )}
+                />
+                <FormField
+                  control={form.control}
+                  name="subcategoryId"
+                  render={({ field }) => {
+                    const selectedCategoryId = form.watch('categoryId');
+                    const subcategories = categories?.filter(c => c.parentId === selectedCategoryId) || [];
+                    
+                    return (
+                      <FormItem>
+                        <FormLabel>Subcategory</FormLabel>
+                        <Select 
+                          onValueChange={(v) => field.onChange(v ? Number(v) : undefined)} 
+                          value={field.value ? String(field.value) : ""}
+                          disabled={!selectedCategoryId || subcategories.length === 0}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder={subcategories.length === 0 ? "No subcategories" : "Select subcategory"} />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {subcategories.map((subcategory) => (
+                              <SelectItem key={subcategory.id} value={String(subcategory.id)}>
+                                {subcategory.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
                 />
               </div>
 

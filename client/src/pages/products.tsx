@@ -15,8 +15,6 @@ import type { Product, Brand, Category } from "@shared/schema";
 import { 
   Search, 
   Package, 
-  Plus, 
-  Minus, 
   ShoppingCart, 
   Filter,
   X,
@@ -62,10 +60,10 @@ export default function ProductsPage() {
 
   const topLevelCategories = categories?.filter(c => !c.parentId) || [];
 
-  const handleQuantityChange = (productId: number, delta: number) => {
+  const handleQuantityChange = (productId: number, newQuantity: number) => {
     setQuantities(prev => ({
       ...prev,
-      [productId]: Math.max(1, (prev[productId] || 1) + delta),
+      [productId]: Math.max(1, newQuantity),
     }));
   };
 
@@ -220,7 +218,7 @@ export default function ProductsPage() {
                     product={product}
                     brands={brands}
                     quantity={quantities[product.id] || 1}
-                    onQuantityChange={(delta) => handleQuantityChange(product.id, delta)}
+                    onQuantityChange={(qty) => handleQuantityChange(product.id, qty)}
                     onAddToQuote={() => handleAddToQuote(product)}
                     isAuthenticated={isAuthenticated}
                   />
@@ -251,7 +249,7 @@ interface ProductCardProps {
   product: Product;
   brands?: Brand[];
   quantity: number;
-  onQuantityChange: (delta: number) => void;
+  onQuantityChange: (newQuantity: number) => void;
   onAddToQuote: () => void;
   isAuthenticated: boolean;
 }
@@ -299,50 +297,17 @@ function ProductCard({ product, brands, quantity, onQuantityChange, onAddToQuote
         )}
 
         <div className="mt-auto space-y-3">
-          <div className="flex items-baseline justify-between gap-2">
-            <div>
-              <p className="text-lg font-semibold">
-                £{Number(product.wholesalePrice).toFixed(2)}
-              </p>
-              {product.rrp && (
-                <p className="text-xs text-muted-foreground">
-                  RRP: £{Number(product.rrp).toFixed(2)}
-                </p>
-              )}
-            </div>
-            {product.moq && product.moq > 1 && (
-              <Badge variant="secondary" className="text-xs">
-                MOQ: {product.moq}
-              </Badge>
-            )}
-          </div>
-
           {isAuthenticated ? (
             <div className="flex gap-2">
-              <div className="flex items-center rounded-md border">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 rounded-r-none"
-                  onClick={() => onQuantityChange(-1)}
-                  disabled={quantity <= 1}
-                  data-testid={`button-decrease-qty-${product.id}`}
-                >
-                  <Minus className="h-3 w-3" />
-                </Button>
-                <span className="w-10 text-center text-sm" data-testid={`text-qty-${product.id}`}>
-                  {quantity}
-                </span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 rounded-l-none"
-                  onClick={() => onQuantityChange(1)}
-                  data-testid={`button-increase-qty-${product.id}`}
-                >
-                  <Plus className="h-3 w-3" />
-                </Button>
-              </div>
+              <Input
+                type="number"
+                min="1"
+                value={quantity}
+                onChange={(e) => onQuantityChange(parseInt(e.target.value) || 1)}
+                className="w-20 text-center"
+                placeholder="Qty"
+                data-testid={`input-qty-${product.id}`}
+              />
               <Button
                 className="flex-1 gap-1"
                 size="sm"
@@ -350,13 +315,13 @@ function ProductCard({ product, brands, quantity, onQuantityChange, onAddToQuote
                 data-testid={`button-add-to-quote-${product.id}`}
               >
                 <ShoppingCart className="h-4 w-4" />
-                Add
+                Request Quote
               </Button>
             </div>
           ) : (
             <Link href="/login">
               <Button variant="outline" className="w-full" size="sm">
-                Login to Order
+                Login to Request Quote
               </Button>
             </Link>
           )}
