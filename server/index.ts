@@ -63,6 +63,54 @@ app.use((req, res, next) => {
   next();
 });
 
+// Ensure chat tables exist (creates them if missing)
+async function ensureChatTables() {
+  try {
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS chat_sessions (
+        id SERIAL PRIMARY KEY,
+        session_id VARCHAR(100) UNIQUE NOT NULL,
+        status VARCHAR(20) DEFAULT 'active',
+        visitor_name VARCHAR(100),
+        visitor_email VARCHAR(255),
+        visitor_phone VARCHAR(50),
+        visitor_company VARCHAR(200),
+        lead_captured BOOLEAN DEFAULT false,
+        message_count INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS chat_messages (
+        id SERIAL PRIMARY KEY,
+        session_id VARCHAR(100) NOT NULL,
+        role VARCHAR(20) NOT NULL,
+        content TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS chat_leads (
+        id SERIAL PRIMARY KEY,
+        session_id VARCHAR(100),
+        name VARCHAR(100),
+        email VARCHAR(255),
+        phone VARCHAR(50),
+        company VARCHAR(200),
+        interest TEXT,
+        status VARCHAR(20) DEFAULT 'new',
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    log("Chat tables verified/created");
+  } catch (error: any) {
+    log(`Warning: Could not verify chat tables: ${error.message}`);
+  }
+}
+
 // Auto-seed database if empty (for production first-time setup)
 // This includes retry logic to wait for tables to exist after migrations
 async function autoSeedIfEmpty(retries = 10, delayMs = 2000) {
@@ -114,6 +162,9 @@ async function autoSeedIfEmpty(retries = 10, delayMs = 2000) {
 }
 
 (async () => {
+  // Ensure chat tables exist
+  await ensureChatTables();
+  
   // Auto-seed on startup if database is empty
   await autoSeedIfEmpty();
   
