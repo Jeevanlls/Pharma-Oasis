@@ -6,6 +6,7 @@ import path from "path";
 import { db } from "./db";
 import { users } from "@shared/schema";
 import { eq } from "drizzle-orm";
+import { setupChatWebSocket } from "./chat-websocket";
 
 const app = express();
 const httpServer = createServer(app);
@@ -201,6 +202,9 @@ async function autoSeedIfEmpty(retries = 10, delayMs = 2000) {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || "5000", 10);
+  
+  setupChatWebSocket(httpServer);
+  
   httpServer.listen(
     {
       port,

@@ -24,7 +24,7 @@ export function ChatWidget() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [showLeadForm, setShowLeadForm] = useState(false);
+  const [showIntroForm, setShowIntroForm] = useState(true);
   const [leadFormData, setLeadFormData] = useState<LeadFormData>({
     name: "",
     email: "",
@@ -32,24 +32,74 @@ export function ChatWidget() {
     company: "",
   });
   const [leadSubmitted, setLeadSubmitted] = useState(false);
+  const [adminActive, setAdminActive] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const wsRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const startSession = async () => {
+  useEffect(() => {
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+    };
+  }, []);
+
+  const connectWebSocket = (sid: string) => {
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const ws = new WebSocket(`${protocol}//${window.location.host}/ws/chat`);
+    
+    ws.onopen = () => {
+      ws.send(JSON.stringify({ type: "join_session", sessionId: sid }));
+    };
+
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === "new_message" && data.message) {
+        if (data.message.role === "admin" || data.message.role === "assistant") {
+          setMessages(prev => [...prev, { 
+            role: data.message.role === "admin" ? "assistant" : data.message.role, 
+            content: data.message.content 
+          }]);
+          setIsLoading(false);
+        }
+      } else if (data.type === "admin_joined") {
+        setAdminActive(true);
+      } else if (data.type === "admin_left") {
+        setAdminActive(false);
+      }
+    };
+
+    ws.onerror = () => {
+      console.log("WebSocket error, falling back to REST");
+    };
+
+    wsRef.current = ws;
+  };
+
+  const startSessionWithLead = async () => {
+    if (!leadFormData.name.trim() || !leadFormData.email.trim()) return;
+    
     try {
-      const response = await apiRequest("POST", "/api/chat/session");
+      const response = await apiRequest("POST", "/api/chat/session", {
+        visitorName: leadFormData.name,
+        visitorEmail: leadFormData.email,
+        visitorCompany: leadFormData.company,
+      });
       const data = await response.json();
       setSessionId(data.sessionId);
+      setShowIntroForm(false);
+      setLeadSubmitted(true);
       setMessages([
         {
           role: "assistant",
-          content:
-            "Hello! I'm your Pharma Oasis assistant. I can help you learn about our wholesale pharmaceutical products, explore our catalogue, and answer questions about becoming a trade partner. How can I assist you today?",
+          content: `Hi ${leadFormData.name.split(' ')[0]}! How can I help you today?`,
         },
       ]);
+      connectWebSocket(data.sessionId);
     } catch (error) {
       console.error("Failed to start chat session:", error);
     }
@@ -58,9 +108,6 @@ export function ChatWidget() {
   const handleOpen = () => {
     setIsOpen(true);
     setIsMinimized(false);
-    if (!sessionId) {
-      startSession();
-    }
   };
 
   const handleClose = () => {
@@ -91,16 +138,6 @@ export function ChatWidget() {
         { role: "assistant", content: data.response },
       ]);
 
-      if (
-        messages.length >= 3 &&
-        !showLeadForm &&
-        !leadSubmitted &&
-        (data.response.toLowerCase().includes("quote") ||
-          data.response.toLowerCase().includes("contact") ||
-          data.response.toLowerCase().includes("get in touch"))
-      ) {
-        setTimeout(() => setShowLeadForm(true), 1000);
-      }
     } catch (error) {
       console.error("Failed to send message:", error);
       setMessages((prev) => [
@@ -123,35 +160,6 @@ export function ChatWidget() {
     }
   };
 
-  const submitLeadForm = async () => {
-    if (!sessionId) return;
-    if (!leadFormData.email && !leadFormData.phone) {
-      return;
-    }
-
-    try {
-      await apiRequest("POST", "/api/chat/lead", {
-        sessionId,
-        ...leadFormData,
-        interest: messages
-          .filter((m) => m.role === "user")
-          .map((m) => m.content)
-          .join(" | "),
-      });
-      setLeadSubmitted(true);
-      setShowLeadForm(false);
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content:
-            "Thank you for sharing your details! Our sales team will be in touch with you shortly. Is there anything else I can help you with?",
-        },
-      ]);
-    } catch (error) {
-      console.error("Failed to submit lead:", error);
-    }
-  };
 
   if (!isOpen) {
     return (
@@ -231,133 +239,124 @@ export function ChatWidget() {
       </CardHeader>
 
       <CardContent className="flex-1 overflow-y-auto p-3 space-y-3 min-h-0">
-        {messages.map((message, index) => (
-          <div
-            key={index}
-            className={`flex gap-2 ${message.role === "user" ? "justify-end" : "justify-start"}`}
-          >
-            {message.role === "assistant" && (
+        {showIntroForm ? (
+          <div className="space-y-3">
+            <div className="flex gap-2">
               <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                 <Bot className="h-4 w-4 text-primary" />
               </div>
-            )}
-            <div
-              className={`max-w-[80%] rounded-lg p-3 text-sm ${
-                message.role === "user"
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted"
-              }`}
-              data-testid={`chat-message-${message.role}-${index}`}
-            >
-              {message.content}
+              <div className="bg-muted rounded-lg p-3 text-sm">
+                Hi! I'm here to help. Quick intro first?
+              </div>
             </div>
-            {message.role === "user" && (
-              <div className="h-7 w-7 rounded-full bg-secondary flex items-center justify-center shrink-0">
-                <User className="h-4 w-4" />
+            <div className="space-y-2 pt-2">
+              <Input
+                placeholder="Your name *"
+                value={leadFormData.name}
+                onChange={(e) =>
+                  setLeadFormData({ ...leadFormData, name: e.target.value })
+                }
+                className="h-9 text-sm"
+                data-testid="input-intro-name"
+              />
+              <Input
+                placeholder="Email address *"
+                type="email"
+                value={leadFormData.email}
+                onChange={(e) =>
+                  setLeadFormData({ ...leadFormData, email: e.target.value })
+                }
+                className="h-9 text-sm"
+                data-testid="input-intro-email"
+              />
+              <Input
+                placeholder="Company (optional)"
+                value={leadFormData.company}
+                onChange={(e) =>
+                  setLeadFormData({ ...leadFormData, company: e.target.value })
+                }
+                className="h-9 text-sm"
+                data-testid="input-intro-company"
+              />
+              <Button
+                className="w-full"
+                onClick={startSessionWithLead}
+                disabled={!leadFormData.name.trim() || !leadFormData.email.trim()}
+                data-testid="button-start-chat"
+              >
+                Start Chat
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <>
+            {messages.map((message, index) => (
+              <div
+                key={index}
+                className={`flex gap-2 ${message.role === "user" ? "justify-end" : "justify-start"}`}
+              >
+                {message.role === "assistant" && (
+                  <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Bot className="h-4 w-4 text-primary" />
+                  </div>
+                )}
+                <div
+                  className={`max-w-[80%] rounded-lg p-3 text-sm ${
+                    message.role === "user"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted"
+                  }`}
+                  data-testid={`chat-message-${message.role}-${index}`}
+                >
+                  {message.content}
+                </div>
+                {message.role === "user" && (
+                  <div className="h-7 w-7 rounded-full bg-secondary flex items-center justify-center shrink-0">
+                    <User className="h-4 w-4" />
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {isLoading && (
+              <div className="flex gap-2 justify-start">
+                <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                  <Bot className="h-4 w-4 text-primary" />
+                </div>
+                <div className="bg-muted rounded-lg p-3">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                </div>
               </div>
             )}
-          </div>
-        ))}
-
-        {isLoading && (
-          <div className="flex gap-2 justify-start">
-            <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-              <Bot className="h-4 w-4 text-primary" />
-            </div>
-            <div className="bg-muted rounded-lg p-3">
-              <Loader2 className="h-4 w-4 animate-spin" />
-            </div>
-          </div>
-        )}
-
-        {showLeadForm && !leadSubmitted && (
-          <div className="bg-accent/50 rounded-lg p-3 space-y-2">
-            <p className="text-sm font-medium">
-              Would you like us to contact you with more information?
-            </p>
-            <Input
-              placeholder="Your name"
-              value={leadFormData.name}
-              onChange={(e) =>
-                setLeadFormData({ ...leadFormData, name: e.target.value })
-              }
-              className="h-8 text-sm"
-              data-testid="input-lead-name"
-            />
-            <Input
-              placeholder="Company name"
-              value={leadFormData.company}
-              onChange={(e) =>
-                setLeadFormData({ ...leadFormData, company: e.target.value })
-              }
-              className="h-8 text-sm"
-              data-testid="input-lead-company"
-            />
-            <Input
-              placeholder="Email address"
-              type="email"
-              value={leadFormData.email}
-              onChange={(e) =>
-                setLeadFormData({ ...leadFormData, email: e.target.value })
-              }
-              className="h-8 text-sm"
-              data-testid="input-lead-email"
-            />
-            <Input
-              placeholder="Phone number"
-              type="tel"
-              value={leadFormData.phone}
-              onChange={(e) =>
-                setLeadFormData({ ...leadFormData, phone: e.target.value })
-              }
-              className="h-8 text-sm"
-              data-testid="input-lead-phone"
-            />
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                onClick={submitLeadForm}
-                disabled={!leadFormData.email && !leadFormData.phone}
-                data-testid="button-submit-lead"
-              >
-                Send
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setShowLeadForm(false)}
-                data-testid="button-skip-lead"
-              >
-                Maybe later
-              </Button>
-            </div>
-          </div>
+          </>
         )}
 
         <div ref={messagesEndRef} />
       </CardContent>
 
-      <CardFooter className="p-3 border-t shrink-0">
-        <div className="flex gap-2 w-full">
-          <Input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Type a message..."
-            disabled={isLoading}
-            className="flex-1"
-            data-testid="input-chat-message"
-          />
-          <Button
-            size="icon"
-            onClick={sendMessage}
-            disabled={!input.trim() || isLoading}
-            data-testid="button-send-message"
-          >
-            <Send className="h-4 w-4" />
-          </Button>
-        </div>
-      </CardFooter>
+      {!showIntroForm && (
+        <CardFooter className="p-3 border-t shrink-0">
+          <div className="flex gap-2 w-full">
+            <Input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Type a message..."
+              disabled={isLoading}
+              className="flex-1"
+              data-testid="input-chat-message"
+            />
+            <Button
+              size="icon"
+              onClick={sendMessage}
+              disabled={!input.trim() || isLoading}
+              data-testid="button-send-message"
+            >
+              <Send className="h-4 w-4" />
+            </Button>
+          </div>
+        </CardFooter>
+      )}
     </Card>
   );
 }

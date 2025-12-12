@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,9 @@ import {
   Calendar,
   Bot,
   Loader2,
+  Send,
+  Radio,
+  UserCog,
 } from "lucide-react";
 
 export default function AdminChatLeadsPage() {
@@ -31,7 +34,100 @@ export default function AdminChatLeadsPage() {
   const [selectedSession, setSelectedSession] = useState<ChatSession | null>(null);
   const [sessionMessages, setSessionMessages] = useState<ChatMessage[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
+  const [liveSession, setLiveSession] = useState<ChatSession | null>(null);
+  const [liveMessages, setLiveMessages] = useState<any[]>([]);
+  const [liveInput, setLiveInput] = useState("");
+  const [isConnected, setIsConnected] = useState(false);
+  const wsRef = useRef<WebSocket | null>(null);
+  const liveMessagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+  
+  const { data: userData } = useQuery<{ user: { id: number } }>({
+    queryKey: ["/api/auth/me"],
+  });
+
+  useEffect(() => {
+    liveMessagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [liveMessages]);
+
+  useEffect(() => {
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+    };
+  }, []);
+
+  const joinLiveChat = (session: ChatSession) => {
+    if (wsRef.current) {
+      wsRef.current.close();
+    }
+
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const ws = new WebSocket(`${protocol}//${window.location.host}/ws/chat`);
+    
+    ws.onopen = () => {
+      setIsConnected(true);
+      ws.send(JSON.stringify({
+        type: "join_session",
+        sessionId: session.sessionId,
+        adminId: userData?.user?.id,
+      }));
+    };
+
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === "history") {
+        setLiveMessages(data.messages || []);
+      } else if (data.type === "new_message") {
+        setLiveMessages(prev => [...prev, data.message]);
+      } else if (data.type === "admin_joined" || data.type === "admin_left") {
+        toast({ 
+          title: data.type === "admin_joined" ? "Admin joined" : "Admin left",
+          description: `Admin ID: ${data.adminId}` 
+        });
+      }
+    };
+
+    ws.onclose = () => {
+      setIsConnected(false);
+    };
+
+    ws.onerror = () => {
+      toast({ title: "Connection error", variant: "destructive" });
+    };
+
+    wsRef.current = ws;
+    setLiveSession(session);
+    setLiveMessages([]);
+  };
+
+  const sendLiveMessage = () => {
+    if (!liveInput.trim() || !wsRef.current || !liveSession) return;
+    
+    wsRef.current.send(JSON.stringify({
+      type: "admin_message",
+      sessionId: liveSession.sessionId,
+      adminId: userData?.user?.id,
+      content: liveInput.trim(),
+    }));
+    
+    setLiveInput("");
+  };
+
+  const leaveLiveChat = () => {
+    if (wsRef.current) {
+      wsRef.current.send(JSON.stringify({
+        type: "leave_session",
+        sessionId: liveSession?.sessionId,
+        adminId: userData?.user?.id,
+      }));
+      wsRef.current.close();
+    }
+    setLiveSession(null);
+    setLiveMessages([]);
+    setIsConnected(false);
+  };
 
   const { data: leads, isLoading: leadsLoading } = useQuery<ChatLead[]>({
     queryKey: ["/api/admin/chat/leads"],
@@ -308,15 +404,25 @@ export default function AdminChatLeadsPage() {
                         </div>
                       </div>
 
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => viewSessionMessages(session)}
-                        data-testid={`button-view-session-${session.id}`}
-                      >
-                        <Eye className="h-4 w-4 mr-1" />
-                        View Conversation
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => viewSessionMessages(session)}
+                          data-testid={`button-view-session-${session.id}`}
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          View
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => joinLiveChat(session)}
+                          data-testid={`button-join-chat-${session.id}`}
+                        >
+                          <Radio className="h-4 w-4 mr-1" />
+                          Join Live
+                        </Button>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -393,6 +499,97 @@ export default function AdminChatLeadsPage() {
               </div>
             )}
           </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!liveSession} onOpenChange={() => leaveLiveChat()}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Radio className="h-5 w-5 text-green-500 animate-pulse" />
+              Live Chat
+              {isConnected && (
+                <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 ml-2">
+                  Connected
+                </Badge>
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              {liveSession?.visitorName ? (
+                <span>Chatting with {liveSession.visitorName}</span>
+              ) : (
+                <span>Session: {liveSession?.sessionId.substring(0, 30)}...</span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          <ScrollArea className="flex-1 min-h-0 max-h-[350px] pr-4">
+            <div className="space-y-3 py-4">
+              {liveMessages.map((message, index) => (
+                <div
+                  key={message.id || index}
+                  className={`flex gap-2 ${message.role === "user" ? "justify-end" : "justify-start"}`}
+                >
+                  {(message.role === "assistant" || message.role === "admin") && (
+                    <div className={`h-7 w-7 rounded-full flex items-center justify-center shrink-0 ${
+                      message.role === "admin" ? "bg-blue-100 dark:bg-blue-900" : "bg-primary/10"
+                    }`}>
+                      {message.role === "admin" ? (
+                        <UserCog className="h-4 w-4 text-blue-600 dark:text-blue-300" />
+                      ) : (
+                        <Bot className="h-4 w-4 text-primary" />
+                      )}
+                    </div>
+                  )}
+                  <div
+                    className={`max-w-[80%] rounded-lg p-3 text-sm ${
+                      message.role === "user"
+                        ? "bg-primary text-primary-foreground"
+                        : message.role === "admin"
+                        ? "bg-blue-100 dark:bg-blue-900 text-blue-900 dark:text-blue-100"
+                        : "bg-muted"
+                    }`}
+                  >
+                    {message.role === "admin" && (
+                      <div className="text-xs font-medium mb-1 opacity-70">You</div>
+                    )}
+                    {message.content}
+                  </div>
+                  {message.role === "user" && (
+                    <div className="h-7 w-7 rounded-full bg-secondary flex items-center justify-center shrink-0">
+                      <User className="h-4 w-4" />
+                    </div>
+                  )}
+                </div>
+              ))}
+              <div ref={liveMessagesEndRef} />
+            </div>
+          </ScrollArea>
+
+          <div className="border-t pt-3 flex gap-2">
+            <Input
+              value={liveInput}
+              onChange={(e) => setLiveInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  sendLiveMessage();
+                }
+              }}
+              placeholder="Type your message..."
+              disabled={!isConnected}
+              className="flex-1"
+              data-testid="input-live-message"
+            />
+            <Button
+              size="icon"
+              onClick={sendLiveMessage}
+              disabled={!liveInput.trim() || !isConnected}
+              data-testid="button-send-live-message"
+            >
+              <Send className="h-4 w-4" />
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

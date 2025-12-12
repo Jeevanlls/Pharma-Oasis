@@ -1,10 +1,7 @@
 import type { Express } from "express";
 import type { Server } from "http";
-import session from "express-session";
-import connectPgSimple from "connect-pg-simple";
 import multer from "multer";
 import { storage } from "./storage";
-import { pool } from "./db";
 import { 
   loginSchema, 
   customerRegistrationSchema, 
@@ -26,6 +23,7 @@ import {
   sendAccountApprovalEmail,
   sendAccountRejectionEmail,
 } from "./email";
+import { sessionMiddleware } from "./session-store";
 
 declare module "express-session" {
   interface SessionData {
@@ -39,29 +37,8 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     app.set("trust proxy", 1);
   }
 
-  // Create PostgreSQL session store for persistent sessions
-  const PgSession = connectPgSimple(session);
-  const sessionStore = new PgSession({
-    pool: pool,
-    tableName: "session",
-    createTableIfMissing: true,
-  });
-
   // Session middleware with PostgreSQL store
-  app.use(
-    session({
-      store: sessionStore,
-      secret: process.env.SESSION_SECRET || "pharma-oasis-dev-secret-change-in-production",
-      resave: false,
-      saveUninitialized: false,
-      cookie: {
-        secure: process.env.NODE_ENV === "production",
-        httpOnly: true,
-        sameSite: "lax", // Allow navigation to keep session
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-      },
-    })
-  );
+  app.use(sessionMiddleware);
 
   // Auth middleware
   const requireAuth = (req: any, res: any, next: any) => {
@@ -1744,8 +1721,35 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
   // ==================== AI CHAT ENDPOINTS ====================
   app.post("/api/chat/session", async (req, res) => {
     try {
+      const { visitorName, visitorEmail, visitorCompany } = req.body || {};
       const sessionId = `chat_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-      const session = await storage.createChatSession({ sessionId, status: "active" });
+      const session = await storage.createChatSession({ 
+        sessionId, 
+        status: "active",
+        visitorName: visitorName || null,
+        visitorEmail: visitorEmail || null,
+        visitorCompany: visitorCompany || null,
+        leadCaptured: !!(visitorName && visitorEmail),
+      });
+      
+      if (visitorName && visitorEmail) {
+        await storage.createChatLead({
+          sessionId,
+          name: visitorName,
+          email: visitorEmail,
+          company: visitorCompany || null,
+          status: "new",
+        });
+        
+        const { sendChatLeadNotification } = await import("./email");
+        sendChatLeadNotification({
+          name: visitorName,
+          email: visitorEmail,
+          company: visitorCompany,
+          sessionId,
+        }).catch(console.error);
+      }
+      
       res.json({ sessionId: session.sessionId });
     } catch (error) {
       console.error("Create chat session error:", error);
@@ -1902,6 +1906,18 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
       res.json(messages);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch chat messages" });
+    }
+  });
+
+  app.get("/api/admin/chat/session/:sessionId", requireAdmin, async (req, res) => {
+    try {
+      const session = await storage.getChatSession(req.params.sessionId);
+      if (!session) {
+        return res.status(404).json({ message: "Session not found" });
+      }
+      res.json(session);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch session" });
     }
   });
 
