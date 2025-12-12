@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 import { Mail, Phone, Truck, Building2, Globe, Shield, Award } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { SiFacebook, SiInstagram, SiX, SiLinkedin, SiYoutube, SiTiktok } from "react-icons/si";
 import logoImage from "@assets/01_1764977214745.png";
 import type { CompanyLocation, CmsBlock } from "@shared/schema";
 
@@ -10,6 +11,12 @@ interface SiteSettings {
   contact_email?: string;
   contact_phone?: string;
   active_theme?: string;
+  social_facebook?: string;
+  social_instagram?: string;
+  social_twitter?: string;
+  social_linkedin?: string;
+  social_youtube?: string;
+  social_tiktok?: string;
 }
 
 interface FooterLink {
@@ -246,12 +253,90 @@ export function Footer() {
             <p className="text-xs text-sidebar-foreground/60">
               © {new Date().getFullYear()} {footerCopyright}
             </p>
-            <div className="flex flex-wrap gap-4 text-xs text-sidebar-foreground/60">
-              {policyLinks.map((link, index) => (
-                <Link key={index} href={link.url} className="hover:text-sidebar-foreground transition-colors">
-                  {link.label}
-                </Link>
-              ))}
+            <div className="flex items-center gap-6">
+              {/* Social Media Icons */}
+              <div className="flex items-center gap-3">
+                {siteSettings?.social_facebook && (
+                  <a 
+                    href={siteSettings.social_facebook} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-sidebar-foreground/60 hover:text-sidebar-primary transition-colors"
+                    aria-label="Facebook"
+                    data-testid="link-social-facebook"
+                  >
+                    <SiFacebook className="h-5 w-5" />
+                  </a>
+                )}
+                {siteSettings?.social_instagram && (
+                  <a 
+                    href={siteSettings.social_instagram} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-sidebar-foreground/60 hover:text-sidebar-primary transition-colors"
+                    aria-label="Instagram"
+                    data-testid="link-social-instagram"
+                  >
+                    <SiInstagram className="h-5 w-5" />
+                  </a>
+                )}
+                {siteSettings?.social_twitter && (
+                  <a 
+                    href={siteSettings.social_twitter} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-sidebar-foreground/60 hover:text-sidebar-primary transition-colors"
+                    aria-label="X (Twitter)"
+                    data-testid="link-social-twitter"
+                  >
+                    <SiX className="h-5 w-5" />
+                  </a>
+                )}
+                {siteSettings?.social_linkedin && (
+                  <a 
+                    href={siteSettings.social_linkedin} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-sidebar-foreground/60 hover:text-sidebar-primary transition-colors"
+                    aria-label="LinkedIn"
+                    data-testid="link-social-linkedin"
+                  >
+                    <SiLinkedin className="h-5 w-5" />
+                  </a>
+                )}
+                {siteSettings?.social_youtube && (
+                  <a 
+                    href={siteSettings.social_youtube} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-sidebar-foreground/60 hover:text-sidebar-primary transition-colors"
+                    aria-label="YouTube"
+                    data-testid="link-social-youtube"
+                  >
+                    <SiYoutube className="h-5 w-5" />
+                  </a>
+                )}
+                {siteSettings?.social_tiktok && (
+                  <a 
+                    href={siteSettings.social_tiktok} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-sidebar-foreground/60 hover:text-sidebar-primary transition-colors"
+                    aria-label="TikTok"
+                    data-testid="link-social-tiktok"
+                  >
+                    <SiTiktok className="h-5 w-5" />
+                  </a>
+                )}
+              </div>
+              {/* Policy Links */}
+              <div className="flex flex-wrap gap-4 text-xs text-sidebar-foreground/60">
+                {policyLinks.map((link, index) => (
+                  <Link key={index} href={link.url} className="hover:text-sidebar-foreground transition-colors">
+                    {link.label}
+                  </Link>
+                ))}
+              </div>
             </div>
           </div>
         </div>

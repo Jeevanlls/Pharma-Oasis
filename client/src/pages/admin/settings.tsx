@@ -23,6 +23,12 @@ interface SiteSettings {
   active_theme?: string;
   maintenance_mode?: string;
   registration_enabled?: string;
+  social_facebook?: string;
+  social_instagram?: string;
+  social_twitter?: string;
+  social_linkedin?: string;
+  social_youtube?: string;
+  social_tiktok?: string;
   // camelCase aliases for form compatibility
   siteName?: string;
   siteTagline?: string;
@@ -34,6 +40,12 @@ interface SiteSettings {
   activeTheme?: string;
   maintenanceMode?: boolean;
   registrationEnabled?: boolean;
+  socialFacebook?: string;
+  socialInstagram?: string;
+  socialTwitter?: string;
+  socialLinkedin?: string;
+  socialYoutube?: string;
+  socialTiktok?: string;
 }
 import { 
   Settings,
@@ -108,6 +120,12 @@ export default function AdminSettingsPage() {
       activeTheme: "professional",
       maintenanceMode: false,
       registrationEnabled: true,
+      socialFacebook: "",
+      socialInstagram: "",
+      socialTwitter: "",
+      socialLinkedin: "",
+      socialYoutube: "",
+      socialTiktok: "",
     },
   });
 
@@ -141,6 +159,12 @@ export default function AdminSettingsPage() {
         activeTheme: settings.active_theme || "professional",
         maintenanceMode: settings.maintenance_mode === "true",
         registrationEnabled: settings.registration_enabled !== "false",
+        socialFacebook: settings.social_facebook || "",
+        socialInstagram: settings.social_instagram || "",
+        socialTwitter: settings.social_twitter || "",
+        socialLinkedin: settings.social_linkedin || "",
+        socialYoutube: settings.social_youtube || "",
+        socialTiktok: settings.social_tiktok || "",
       }, { keepDirty: false });
     }
   }, [settings, form]);
@@ -340,6 +364,105 @@ export default function AdminSettingsPage() {
                       </FormItem>
                     )}
                   />
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Globe className="h-5 w-5" />
+                    Social Media Links
+                  </CardTitle>
+                  <CardDescription>
+                    Add your social media profile URLs. Icons will appear in the footer.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <FormField
+                      control={form.control}
+                      name="socialFacebook"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Facebook</FormLabel>
+                          <FormControl>
+                            <Input placeholder="https://facebook.com/yourpage" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="socialInstagram"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Instagram</FormLabel>
+                          <FormControl>
+                            <Input placeholder="https://instagram.com/yourprofile" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="socialTwitter"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>X (Twitter)</FormLabel>
+                          <FormControl>
+                            <Input placeholder="https://x.com/yourhandle" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="socialLinkedin"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>LinkedIn</FormLabel>
+                          <FormControl>
+                            <Input placeholder="https://linkedin.com/company/yourcompany" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="socialYoutube"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>YouTube</FormLabel>
+                          <FormControl>
+                            <Input placeholder="https://youtube.com/@yourchannel" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="socialTiktok"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>TikTok</FormLabel>
+                          <FormControl>
+                            <Input placeholder="https://tiktok.com/@yourprofile" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                 </CardContent>
               </Card>
 
