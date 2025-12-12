@@ -29,6 +29,11 @@ declare module "express-session" {
 }
 
 export async function registerRoutes(server: Server, app: Express): Promise<void> {
+  // Trust proxy for production (required behind reverse proxies like Replit)
+  if (process.env.NODE_ENV === "production") {
+    app.set("trust proxy", 1);
+  }
+
   // Session middleware
   app.use(
     session({
@@ -38,7 +43,7 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
       cookie: {
         secure: process.env.NODE_ENV === "production",
         httpOnly: true,
-        sameSite: "strict", // CSRF protection
+        sameSite: "lax", // Allow navigation to keep session
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       },
     })
