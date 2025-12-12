@@ -1741,6 +1741,170 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     }
   });
 
+  // ==================== AI CHAT ENDPOINTS ====================
+  app.post("/api/chat/session", async (req, res) => {
+    try {
+      const sessionId = `chat_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+      const session = await storage.createChatSession({ sessionId, status: "active" });
+      res.json({ sessionId: session.sessionId });
+    } catch (error) {
+      console.error("Create chat session error:", error);
+      res.status(500).json({ message: "Failed to create chat session" });
+    }
+  });
+
+  app.post("/api/chat/message", async (req, res) => {
+    try {
+      const { sessionId, message } = req.body;
+      
+      if (!sessionId || !message) {
+        return res.status(400).json({ message: "Session ID and message are required" });
+      }
+
+      // Save user message
+      await storage.createChatMessage({ sessionId, role: "user", content: message });
+
+      // Get conversation history
+      const history = await storage.getChatMessages(sessionId);
+      const messages = history.map(m => ({ role: m.role as "user" | "assistant", content: m.content }));
+
+      // Generate AI response
+      const { generateChatResponse, extractLeadInfo } = await import("./ai-chat");
+      const response = await generateChatResponse(messages, sessionId);
+
+      // Save assistant response
+      await storage.createChatMessage({ sessionId, role: "assistant", content: response });
+
+      // Update session message count
+      await storage.updateChatSession(sessionId, { messageCount: history.length + 2 });
+
+      // Try to extract lead info from the conversation
+      const leadInfo = extractLeadInfo(messages);
+      if (leadInfo.email || leadInfo.phone) {
+        const existingSession = await storage.getChatSession(sessionId);
+        if (existingSession && !existingSession.leadCaptured) {
+          await storage.createChatLead({
+            sessionId,
+            email: leadInfo.email,
+            phone: leadInfo.phone,
+            interest: leadInfo.interest,
+            status: "new",
+          });
+          await storage.updateChatSession(sessionId, { 
+            leadCaptured: true,
+            visitorEmail: leadInfo.email,
+            visitorPhone: leadInfo.phone,
+          });
+
+          // Send notification email for new lead
+          try {
+            const { sendChatLeadNotification } = await import("./email");
+            await sendChatLeadNotification({
+              email: leadInfo.email,
+              phone: leadInfo.phone,
+              interest: leadInfo.interest,
+              sessionId,
+            });
+          } catch (emailError) {
+            console.error("Failed to send lead notification:", emailError);
+          }
+        }
+      }
+
+      res.json({ response });
+    } catch (error) {
+      console.error("Chat message error:", error);
+      res.status(500).json({ message: "Failed to process message", response: "I apologize, I'm having trouble right now. Please contact us at trade@pharmaoasis.com." });
+    }
+  });
+
+  app.get("/api/chat/history/:sessionId", async (req, res) => {
+    try {
+      const messages = await storage.getChatMessages(req.params.sessionId);
+      res.json(messages);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch chat history" });
+    }
+  });
+
+  app.post("/api/chat/lead", async (req, res) => {
+    try {
+      const { sessionId, name, email, phone, company, interest } = req.body;
+      
+      const lead = await storage.createChatLead({
+        sessionId,
+        name,
+        email,
+        phone,
+        company,
+        interest,
+        status: "new",
+      });
+
+      // Update session with lead info
+      await storage.updateChatSession(sessionId, {
+        leadCaptured: true,
+        visitorName: name,
+        visitorEmail: email,
+        visitorPhone: phone,
+        visitorCompany: company,
+      });
+
+      // Send notification email
+      try {
+        const { sendChatLeadNotification } = await import("./email");
+        await sendChatLeadNotification({ name, email, phone, company, interest, sessionId });
+      } catch (emailError) {
+        console.error("Failed to send lead notification:", emailError);
+      }
+
+      res.json({ success: true, lead });
+    } catch (error) {
+      console.error("Create lead error:", error);
+      res.status(500).json({ message: "Failed to save lead information" });
+    }
+  });
+
+  // Admin chat routes
+  app.get("/api/admin/chat/sessions", requireAdmin, async (req, res) => {
+    try {
+      const sessions = await storage.getAllChatSessions();
+      res.json(sessions);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch chat sessions" });
+    }
+  });
+
+  app.get("/api/admin/chat/leads", requireAdmin, async (req, res) => {
+    try {
+      const leads = await storage.getAllChatLeads();
+      res.json(leads);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch chat leads" });
+    }
+  });
+
+  app.patch("/api/admin/chat/leads/:id", requireAdmin, async (req, res) => {
+    try {
+      const lead = await storage.updateChatLead(Number(req.params.id), req.body);
+      if (!lead) {
+        return res.status(404).json({ message: "Lead not found" });
+      }
+      res.json(lead);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update lead" });
+    }
+  });
+
+  app.get("/api/admin/chat/messages/:sessionId", requireAdmin, async (req, res) => {
+    try {
+      const messages = await storage.getChatMessages(req.params.sessionId);
+      res.json(messages);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch chat messages" });
+    }
+  });
+
   // ==================== ADMIN SEED ENDPOINT (for production first-time setup) ====================
   // This endpoint requires admin login OR works if no admin exists (first-time setup)
   app.post("/api/admin/seed", async (req, res) => {

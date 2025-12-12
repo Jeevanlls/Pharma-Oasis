@@ -2,7 +2,7 @@ import {
   users, brands, categories, products, quotes, quoteItems, 
   supplierLeads, cmsBlocks, siteSettings, contactMessages, heroSlides, companyLocations,
   homeStats, homeFeatures, homeCategories, homeProcessSteps, homeSections,
-  footerSections, mediaAssets,
+  footerSections, mediaAssets, chatSessions, chatMessages, chatLeads,
   type User, type InsertUser,
   type Brand, type InsertBrand,
   type Category, type InsertCategory,
@@ -22,6 +22,9 @@ import {
   type HomeSection, type InsertHomeSection,
   type FooterSection, type InsertFooterSection,
   type MediaAsset, type InsertMediaAsset,
+  type ChatSession, type InsertChatSession,
+  type ChatMessage, type InsertChatMessage,
+  type ChatLead, type InsertChatLead,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, ilike, desc, asc, sql, isNull, inArray } from "drizzle-orm";
@@ -144,6 +147,17 @@ export interface IStorage {
   createMediaAsset(asset: InsertMediaAsset): Promise<MediaAsset>;
   deleteMediaAsset(id: number): Promise<void>;
   getAllMediaAssets(category?: string): Promise<MediaAsset[]>;
+
+  // Chat
+  getChatSession(sessionId: string): Promise<ChatSession | undefined>;
+  createChatSession(session: InsertChatSession): Promise<ChatSession>;
+  updateChatSession(sessionId: string, updates: Partial<InsertChatSession>): Promise<ChatSession | undefined>;
+  getChatMessages(sessionId: string): Promise<ChatMessage[]>;
+  createChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
+  getAllChatSessions(): Promise<ChatSession[]>;
+  createChatLead(lead: InsertChatLead): Promise<ChatLead>;
+  getAllChatLeads(): Promise<ChatLead[]>;
+  updateChatLead(id: number, updates: Partial<InsertChatLead>): Promise<ChatLead | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -964,6 +978,57 @@ export class DatabaseStorage implements IStorage {
         .orderBy(desc(mediaAssets.createdAt));
     }
     return db.select().from(mediaAssets).orderBy(desc(mediaAssets.createdAt));
+  }
+
+  // ==================== CHAT ====================
+  async getChatSession(sessionId: string): Promise<ChatSession | undefined> {
+    const [session] = await db.select().from(chatSessions).where(eq(chatSessions.sessionId, sessionId));
+    return session;
+  }
+
+  async createChatSession(session: InsertChatSession): Promise<ChatSession> {
+    const [created] = await db.insert(chatSessions).values(session).returning();
+    return created;
+  }
+
+  async updateChatSession(sessionId: string, updates: Partial<InsertChatSession>): Promise<ChatSession | undefined> {
+    const [updated] = await db.update(chatSessions)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(chatSessions.sessionId, sessionId))
+      .returning();
+    return updated;
+  }
+
+  async getChatMessages(sessionId: string): Promise<ChatMessage[]> {
+    return db.select().from(chatMessages)
+      .where(eq(chatMessages.sessionId, sessionId))
+      .orderBy(asc(chatMessages.createdAt));
+  }
+
+  async createChatMessage(message: InsertChatMessage): Promise<ChatMessage> {
+    const [created] = await db.insert(chatMessages).values(message).returning();
+    return created;
+  }
+
+  async getAllChatSessions(): Promise<ChatSession[]> {
+    return db.select().from(chatSessions).orderBy(desc(chatSessions.createdAt));
+  }
+
+  async createChatLead(lead: InsertChatLead): Promise<ChatLead> {
+    const [created] = await db.insert(chatLeads).values(lead).returning();
+    return created;
+  }
+
+  async getAllChatLeads(): Promise<ChatLead[]> {
+    return db.select().from(chatLeads).orderBy(desc(chatLeads.createdAt));
+  }
+
+  async updateChatLead(id: number, updates: Partial<InsertChatLead>): Promise<ChatLead | undefined> {
+    const [updated] = await db.update(chatLeads)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(chatLeads.id, id))
+      .returning();
+    return updated;
   }
 }
 
