@@ -17,6 +17,7 @@ interface SiteSettings {
   site_tagline?: string;
   contact_email?: string;
   contact_phone?: string;
+  whatsapp_number?: string;
   company_address?: string;
   minimum_order_value?: string;
   active_theme?: string;
@@ -27,6 +28,7 @@ interface SiteSettings {
   siteTagline?: string;
   contactEmail?: string;
   contactPhone?: string;
+  whatsappNumber?: string;
   companyAddress?: string;
   minimumOrderValue?: string;
   activeTheme?: string;
@@ -100,6 +102,7 @@ export default function AdminSettingsPage() {
       siteTagline: "",
       contactEmail: "",
       contactPhone: "",
+      whatsappNumber: "",
       companyAddress: "",
       minimumOrderValue: "",
       activeTheme: "professional",
@@ -132,6 +135,7 @@ export default function AdminSettingsPage() {
         siteTagline: settings.site_tagline || "",
         contactEmail: settings.contact_email || "",
         contactPhone: settings.contact_phone || "",
+        whatsappNumber: settings.whatsapp_number || "",
         companyAddress: settings.company_address || "",
         minimumOrderValue: settings.minimum_order_value || "",
         activeTheme: settings.active_theme || "professional",
@@ -301,6 +305,23 @@ export default function AdminSettingsPage() {
                         <FormControl>
                           <Input placeholder="+44 20 1234 5678" {...field} />
                         </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="whatsappNumber"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>WhatsApp Number</FormLabel>
+                        <FormControl>
+                          <Input placeholder="+447481640640" {...field} />
+                        </FormControl>
+                        <FormDescription>
+                          Enter the full number with country code (e.g., +447481640640). A floating WhatsApp chat button will appear on all public pages.
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}

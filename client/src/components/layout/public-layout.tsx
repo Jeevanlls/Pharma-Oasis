@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Header } from "./header";
 import { Footer } from "./footer";
+import { WhatsAppButton } from "../whatsapp-button";
 
 interface PublicLayoutProps {
   children: ReactNode;
@@ -14,6 +15,7 @@ export function PublicLayout({ children }: PublicLayoutProps) {
         {children}
       </main>
       <Footer />
+      <WhatsAppButton />
     </div>
   );
 }
