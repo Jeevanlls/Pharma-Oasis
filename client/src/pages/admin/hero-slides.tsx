@@ -24,6 +24,7 @@ import {
   ArrowDown,
   EyeOff,
 } from "lucide-react";
+import { ImageUpload } from "@/components/admin/ImageUpload";
 
 export default function AdminHeroSlidesPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -364,12 +365,32 @@ export default function AdminHeroSlidesPage() {
                 name="imageUrl"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Image URL *</FormLabel>
-                    <FormControl>
-                      <Input placeholder="https://..." {...field} data-testid="input-slide-image" />
-                    </FormControl>
+                    <FormLabel>Hero Image *</FormLabel>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3">
+                        <ImageUpload
+                          category="hero"
+                          currentImageUrl={field.value || undefined}
+                          onImageUploaded={(url) => field.onChange(url)}
+                          label="Upload Hero Image"
+                        />
+                        <span className="text-xs text-muted-foreground">or</span>
+                      </div>
+                      <FormControl>
+                        <Input placeholder="Enter image URL..." {...field} data-testid="input-slide-image" />
+                      </FormControl>
+                      {field.value && (
+                        <div className="mt-2">
+                          <img 
+                            src={field.value} 
+                            alt="Hero preview" 
+                            className="h-24 w-auto object-cover rounded border"
+                          />
+                        </div>
+                      )}
+                    </div>
                     <FormDescription>
-                      Recommended size: 1920x600 pixels for best display
+                      Recommended size: 1920x720 pixels for best display
                     </FormDescription>
                     <FormMessage />
                   </FormItem>

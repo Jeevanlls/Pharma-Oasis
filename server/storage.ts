@@ -2,6 +2,7 @@ import {
   users, brands, categories, products, quotes, quoteItems, 
   supplierLeads, cmsBlocks, siteSettings, contactMessages, heroSlides, companyLocations,
   homeStats, homeFeatures, homeCategories, homeProcessSteps, homeSections,
+  footerSections, mediaAssets,
   type User, type InsertUser,
   type Brand, type InsertBrand,
   type Category, type InsertCategory,
@@ -19,6 +20,8 @@ import {
   type HomeCategory, type InsertHomeCategory,
   type HomeProcessStep, type InsertHomeProcessStep,
   type HomeSection, type InsertHomeSection,
+  type FooterSection, type InsertFooterSection,
+  type MediaAsset, type InsertMediaAsset,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, ilike, desc, asc, sql, isNull, inArray } from "drizzle-orm";
@@ -126,6 +129,21 @@ export interface IStorage {
   deleteCompanyLocation(id: number): Promise<void>;
   getAllCompanyLocations(): Promise<CompanyLocation[]>;
   getActiveCompanyLocations(): Promise<CompanyLocation[]>;
+
+  // Footer Sections
+  getFooterSection(id: number): Promise<FooterSection | undefined>;
+  getFooterSectionByKey(sectionKey: string): Promise<FooterSection | undefined>;
+  createFooterSection(section: InsertFooterSection): Promise<FooterSection>;
+  updateFooterSection(id: number, updates: Partial<InsertFooterSection>): Promise<FooterSection | undefined>;
+  deleteFooterSection(id: number): Promise<void>;
+  getAllFooterSections(): Promise<FooterSection[]>;
+  getActiveFooterSections(): Promise<FooterSection[]>;
+
+  // Media Assets
+  getMediaAsset(id: number): Promise<MediaAsset | undefined>;
+  createMediaAsset(asset: InsertMediaAsset): Promise<MediaAsset>;
+  deleteMediaAsset(id: number): Promise<void>;
+  getAllMediaAssets(category?: string): Promise<MediaAsset[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -884,6 +902,68 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(homeSections)
       .where(eq(homeSections.isActive, true))
       .orderBy(asc(homeSections.position));
+  }
+
+  // ==================== FOOTER SECTIONS ====================
+  async getFooterSection(id: number): Promise<FooterSection | undefined> {
+    const [section] = await db.select().from(footerSections).where(eq(footerSections.id, id));
+    return section;
+  }
+
+  async getFooterSectionByKey(sectionKey: string): Promise<FooterSection | undefined> {
+    const [section] = await db.select().from(footerSections).where(eq(footerSections.sectionKey, sectionKey));
+    return section;
+  }
+
+  async createFooterSection(section: InsertFooterSection): Promise<FooterSection> {
+    const [created] = await db.insert(footerSections).values(section).returning();
+    return created;
+  }
+
+  async updateFooterSection(id: number, updates: Partial<InsertFooterSection>): Promise<FooterSection | undefined> {
+    const [updated] = await db.update(footerSections)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(footerSections.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteFooterSection(id: number): Promise<void> {
+    await db.delete(footerSections).where(eq(footerSections.id, id));
+  }
+
+  async getAllFooterSections(): Promise<FooterSection[]> {
+    return db.select().from(footerSections).orderBy(asc(footerSections.sectionKey));
+  }
+
+  async getActiveFooterSections(): Promise<FooterSection[]> {
+    return db.select().from(footerSections)
+      .where(eq(footerSections.isActive, true))
+      .orderBy(asc(footerSections.sectionKey));
+  }
+
+  // ==================== MEDIA ASSETS ====================
+  async getMediaAsset(id: number): Promise<MediaAsset | undefined> {
+    const [asset] = await db.select().from(mediaAssets).where(eq(mediaAssets.id, id));
+    return asset;
+  }
+
+  async createMediaAsset(asset: InsertMediaAsset): Promise<MediaAsset> {
+    const [created] = await db.insert(mediaAssets).values(asset).returning();
+    return created;
+  }
+
+  async deleteMediaAsset(id: number): Promise<void> {
+    await db.delete(mediaAssets).where(eq(mediaAssets.id, id));
+  }
+
+  async getAllMediaAssets(category?: string): Promise<MediaAsset[]> {
+    if (category) {
+      return db.select().from(mediaAssets)
+        .where(eq(mediaAssets.category, category))
+        .orderBy(desc(mediaAssets.createdAt));
+    }
+    return db.select().from(mediaAssets).orderBy(desc(mediaAssets.createdAt));
   }
 }
 

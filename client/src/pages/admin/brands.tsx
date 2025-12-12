@@ -23,6 +23,7 @@ import {
   Award,
   EyeOff,
 } from "lucide-react";
+import { ImageUpload } from "@/components/admin/ImageUpload";
 
 export default function AdminBrandsPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -290,10 +291,30 @@ export default function AdminBrandsPage() {
                 name="logoUrl"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Logo URL</FormLabel>
-                    <FormControl>
-                      <Input placeholder="https://..." {...field} value={field.value || ""} />
-                    </FormControl>
+                    <FormLabel>Brand Logo</FormLabel>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3">
+                        <ImageUpload
+                          category="brand"
+                          currentImageUrl={field.value || undefined}
+                          onImageUploaded={(url) => field.onChange(url)}
+                          label="Upload Logo"
+                        />
+                        <span className="text-xs text-muted-foreground">or</span>
+                      </div>
+                      <FormControl>
+                        <Input placeholder="Enter logo URL..." {...field} value={field.value || ""} />
+                      </FormControl>
+                      {field.value && (
+                        <div className="mt-2">
+                          <img 
+                            src={field.value} 
+                            alt="Logo preview" 
+                            className="h-12 w-auto object-contain rounded border p-1"
+                          />
+                        </div>
+                      )}
+                    </div>
                     <FormMessage />
                   </FormItem>
                 )}

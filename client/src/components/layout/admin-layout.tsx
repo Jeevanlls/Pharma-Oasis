@@ -30,6 +30,7 @@ import {
   Home,
   Image,
   Star,
+  ScrollText,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 
@@ -56,6 +57,7 @@ const homepageMenuItems = [
 
 const siteMenuItems = [
   { title: "CMS", href: "/admin/cms", icon: LayoutDashboard },
+  { title: "Footer Content", href: "/admin/footer-content", icon: ScrollText },
   { title: "Settings", href: "/admin/settings", icon: Settings },
 ];
 

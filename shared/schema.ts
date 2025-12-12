@@ -345,6 +345,39 @@ export const homeSections = pgTable("home_sections", {
 });
 
 // ============================================
+// FOOTER SECTIONS TABLE (Privacy Policy, Terms, Cookie Policy, etc.)
+// ============================================
+export const footerSections = pgTable("footer_sections", {
+  id: serial("id").primaryKey(),
+  sectionKey: varchar("section_key", { length: 100 }).notNull().unique(), // "privacy_policy", "terms", "cookie_policy", "global_presence", "head_office"
+  title: varchar("title", { length: 255 }).notNull(),
+  content: text("content").notNull(), // Markdown or rich text content
+  metaDescription: text("meta_description"), // SEO meta description
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ============================================
+// MEDIA ASSETS TABLE (for uploaded images)
+// ============================================
+export const mediaAssets = pgTable("media_assets", {
+  id: serial("id").primaryKey(),
+  filename: varchar("filename", { length: 255 }).notNull(),
+  originalFilename: varchar("original_filename", { length: 255 }).notNull(),
+  mimeType: varchar("mime_type", { length: 100 }).notNull(),
+  fileSize: integer("file_size").notNull(), // in bytes
+  width: integer("width"),
+  height: integer("height"),
+  category: varchar("category", { length: 50 }).notNull(), // "brand", "product", "hero", "general"
+  url: text("url").notNull(), // Path to the asset
+  thumbnailUrl: text("thumbnail_url"), // Optional thumbnail for products/general
+  altText: varchar("alt_text", { length: 255 }),
+  uploadedBy: integer("uploaded_by"), // User ID who uploaded
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ============================================
 // RELATIONS
 // ============================================
 export const usersRelations = relations(users, ({ many }) => ({
@@ -596,6 +629,25 @@ export const insertHomeSectionSchema = createInsertSchema(homeSections).omit({
 export const selectHomeSectionSchema = createSelectSchema(homeSections);
 export type InsertHomeSection = z.infer<typeof insertHomeSectionSchema>;
 export type HomeSection = typeof homeSections.$inferSelect;
+
+// Footer sections schemas
+export const insertFooterSectionSchema = createInsertSchema(footerSections).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const selectFooterSectionSchema = createSelectSchema(footerSections);
+export type InsertFooterSection = z.infer<typeof insertFooterSectionSchema>;
+export type FooterSection = typeof footerSections.$inferSelect;
+
+// Media assets schemas
+export const insertMediaAssetSchema = createInsertSchema(mediaAssets).omit({
+  id: true,
+  createdAt: true,
+});
+export const selectMediaAssetSchema = createSelectSchema(mediaAssets);
+export type InsertMediaAsset = z.infer<typeof insertMediaAssetSchema>;
+export type MediaAsset = typeof mediaAssets.$inferSelect;
 
 // ============================================
 // FORM VALIDATION SCHEMAS

@@ -2,6 +2,7 @@ import type { Express } from "express";
 import type { Server } from "http";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
+import multer from "multer";
 import { storage } from "./storage";
 import { pool } from "./db";
 import { 
@@ -14,6 +15,7 @@ import {
 } from "@shared/schema";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
+import { processImage, deleteImageFile, validateImageFile, getImageCategories, isValidImageCategory } from "./imageProcessor";
 import {
   sendCustomerRegistrationNotification,
   sendSupplierRegistrationNotification,
@@ -1542,6 +1544,151 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
       res.json({ message: "Section deleted" });
     } catch (error) {
       res.status(500).json({ message: "Failed to delete section" });
+    }
+  });
+
+  // ==================== ADMIN - FOOTER SECTIONS ====================
+  app.get("/api/footer-sections", async (req, res) => {
+    try {
+      const sections = await storage.getActiveFooterSections();
+      res.json(sections);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch footer sections" });
+    }
+  });
+
+  app.get("/api/footer-sections/:key", async (req, res) => {
+    try {
+      const section = await storage.getFooterSectionByKey(req.params.key);
+      if (!section) {
+        return res.status(404).json({ message: "Section not found" });
+      }
+      res.json(section);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch footer section" });
+    }
+  });
+
+  app.get("/api/admin/footer-sections", requireAdmin, async (req, res) => {
+    try {
+      const sections = await storage.getAllFooterSections();
+      res.json(sections);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch footer sections" });
+    }
+  });
+
+  app.post("/api/admin/footer-sections", requireAdmin, async (req, res) => {
+    try {
+      const section = await storage.createFooterSection(req.body);
+      res.status(201).json(section);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create footer section" });
+    }
+  });
+
+  app.patch("/api/admin/footer-sections/:id", requireAdmin, async (req, res) => {
+    try {
+      const section = await storage.updateFooterSection(Number(req.params.id), req.body);
+      if (!section) {
+        return res.status(404).json({ message: "Section not found" });
+      }
+      res.json(section);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update footer section" });
+    }
+  });
+
+  app.delete("/api/admin/footer-sections/:id", requireAdmin, async (req, res) => {
+    try {
+      await storage.deleteFooterSection(Number(req.params.id));
+      res.json({ message: "Section deleted" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete footer section" });
+    }
+  });
+
+  // ==================== ADMIN - IMAGE UPLOADS ====================
+  const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024 },
+  });
+
+  app.get("/api/admin/uploads/categories", requireAdmin, (req, res) => {
+    res.json(getImageCategories());
+  });
+
+  app.get("/api/admin/uploads", requireAdmin, async (req, res) => {
+    try {
+      const category = req.query.category as string | undefined;
+      const assets = await storage.getAllMediaAssets(category);
+      res.json(assets);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch media assets" });
+    }
+  });
+
+  app.post("/api/admin/uploads", requireAdmin, upload.single("image"), async (req: any, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      const category = req.body.category || "general";
+      const altText = req.body.altText || "";
+
+      if (!isValidImageCategory(category)) {
+        return res.status(400).json({ message: `Invalid category. Allowed: ${getImageCategories().join(", ")}` });
+      }
+
+      const validation = validateImageFile(req.file.mimetype, req.file.size);
+      if (!validation.valid) {
+        return res.status(400).json({ message: validation.error });
+      }
+
+      const processed = await processImage(
+        req.file.buffer,
+        req.file.originalname,
+        category
+      );
+
+      const asset = await storage.createMediaAsset({
+        filename: processed.filename,
+        originalFilename: req.file.originalname,
+        mimeType: processed.mimeType,
+        fileSize: processed.fileSize,
+        width: processed.width,
+        height: processed.height,
+        category,
+        url: processed.url,
+        thumbnailUrl: processed.thumbnailUrl || null,
+        altText: altText || null,
+        uploadedBy: req.user?.id || null,
+      });
+
+      res.status(201).json(asset);
+    } catch (error: any) {
+      console.error("Upload error:", error);
+      res.status(500).json({ message: `Failed to upload image: ${error.message}` });
+    }
+  });
+
+  app.delete("/api/admin/uploads/:id", requireAdmin, async (req, res) => {
+    try {
+      const asset = await storage.getMediaAsset(Number(req.params.id));
+      if (!asset) {
+        return res.status(404).json({ message: "Asset not found" });
+      }
+
+      await deleteImageFile(asset.url);
+      if (asset.thumbnailUrl) {
+        await deleteImageFile(asset.thumbnailUrl);
+      }
+
+      await storage.deleteMediaAsset(asset.id);
+      res.json({ message: "Asset deleted" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete asset" });
     }
   });
 

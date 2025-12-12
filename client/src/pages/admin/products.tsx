@@ -27,6 +27,7 @@ import {
   Eye,
   EyeOff,
 } from "lucide-react";
+import { ImageUpload } from "@/components/admin/ImageUpload";
 
 export default function AdminProductsPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -416,7 +417,7 @@ export default function AdminProductsPage() {
                     <FormItem>
                       <FormLabel>MOQ</FormLabel>
                       <FormControl>
-                        <Input type="number" placeholder="1" {...field} onChange={(e) => field.onChange(Number(e.target.value))} />
+                        <Input type="number" placeholder="1" {...field} value={field.value ?? 1} onChange={(e) => field.onChange(Number(e.target.value))} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -457,10 +458,30 @@ export default function AdminProductsPage() {
                 name="imageUrl"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Image URL</FormLabel>
-                    <FormControl>
-                      <Input placeholder="https://..." {...field} value={field.value || ""} />
-                    </FormControl>
+                    <FormLabel>Product Image</FormLabel>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3">
+                        <ImageUpload
+                          category="product"
+                          currentImageUrl={field.value || undefined}
+                          onImageUploaded={(url) => field.onChange(url)}
+                          label="Upload Image"
+                        />
+                        <span className="text-xs text-muted-foreground">or</span>
+                      </div>
+                      <FormControl>
+                        <Input placeholder="Enter image URL..." {...field} value={field.value || ""} />
+                      </FormControl>
+                      {field.value && (
+                        <div className="mt-2">
+                          <img 
+                            src={field.value} 
+                            alt="Product preview" 
+                            className="h-16 w-16 object-contain rounded border p-1"
+                          />
+                        </div>
+                      )}
+                    </div>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -473,7 +494,7 @@ export default function AdminProductsPage() {
                   render={({ field }) => (
                     <FormItem className="flex items-center gap-2">
                       <FormControl>
-                        <Switch checked={field.value} onCheckedChange={field.onChange} />
+                        <Switch checked={field.value ?? true} onCheckedChange={field.onChange} />
                       </FormControl>
                       <FormLabel className="!mt-0">Active</FormLabel>
                     </FormItem>
@@ -485,7 +506,7 @@ export default function AdminProductsPage() {
                   render={({ field }) => (
                     <FormItem className="flex items-center gap-2">
                       <FormControl>
-                        <Switch checked={field.value} onCheckedChange={field.onChange} />
+                        <Switch checked={field.value ?? false} onCheckedChange={field.onChange} />
                       </FormControl>
                       <FormLabel className="!mt-0">Featured</FormLabel>
                     </FormItem>
