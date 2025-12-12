@@ -144,10 +144,15 @@ Environment variables required for email functionality:
 - PostgreSQL-backed session storage (connect-pg-simple)
 - Session secret from `SESSION_SECRET` environment variable
 
-**Image Handling:**
-- Products use external image URLs (image_url field)
-- No file upload system in v1
-- Placeholder images shown when image_url is empty
+**Image Handling (Replit Object Storage):**
+- Images persist in Replit Object Storage (survives deployments)
+- Upload endpoint: POST /api/admin/uploads (multipart form, admin-only)
+- Serving endpoint: GET /objects/{category}/{uuid}.{ext}
+- Image categories: brand (200x80 PNG), product (600x600 JPEG + thumbnail), hero (1920x720 WebP), general (800x600 JPEG)
+- Processing via Sharp library with automatic resizing and optimization
+- Required env var: DEFAULT_OBJECT_STORAGE_BUCKET_ID (auto-set by Replit Object Storage tool)
+- Graceful degradation: Returns 503 if Object Storage not configured
+- Database tracking via media_assets table (filename, URL, dimensions, category)
 
 **CSV Import Capability:**
 Admin panel includes product import from CSV with field mapping for:
