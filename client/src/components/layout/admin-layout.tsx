@@ -1,8 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { useQuery } from "@tanstack/react-query";
 import {
   Sidebar,
   SidebarContent,
@@ -69,12 +67,6 @@ export function AdminLayout({ children }: AdminLayoutProps) {
   const [location] = useLocation();
   const { user, logout } = useAuth();
 
-  const { data: leadsCount } = useQuery<{ count: number }>({
-    queryKey: ["/api/admin/chat/leads/count/new"],
-    refetchInterval: 30000,
-    enabled: !!user,
-  });
-
   const style = {
     "--sidebar-width": "16rem",
     "--sidebar-width-icon": "3rem",
@@ -111,12 +103,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                       >
                         <Link href={item.href}>
                           <item.icon className="h-4 w-4" />
-                          <span className="flex-1">{item.title}</span>
-                          {item.href === "/admin/chat-leads" && leadsCount?.count && leadsCount.count > 0 && (
-                            <Badge variant="destructive" className="ml-auto text-xs px-1.5 py-0.5 min-w-5 h-5 flex items-center justify-center">
-                              {leadsCount.count}
-                            </Badge>
-                          )}
+                          <span>{item.title}</span>
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
