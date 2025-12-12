@@ -37,6 +37,7 @@ import {
   Loader2,
   Info
 } from "lucide-react";
+import placeholderImage from "@assets/generated_images/product_placeholder_coming_soon.png";
 
 type QuoteWithItems = Quote & { items: (QuoteItem & { product: Product })[] };
 
@@ -333,17 +334,11 @@ export default function QuoteDetailPage() {
                       data-testid={`quote-item-${item.id}`}
                     >
                       <div className="h-16 w-16 flex-shrink-0 overflow-hidden rounded-md bg-muted">
-                        {item.product?.imageUrl ? (
-                          <img
-                            src={item.product.imageUrl}
-                            alt={item.product.productName}
-                            className="h-full w-full object-contain"
-                          />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center">
-                            <Package className="h-6 w-6 text-muted-foreground/30" />
-                          </div>
-                        )}
+                        <img
+                          src={item.product?.imageUrl || placeholderImage}
+                          alt={item.product?.imageUrl ? item.product.productName : "Image coming soon"}
+                          className="h-full w-full object-contain"
+                        />
                       </div>
                       
                       <div className="flex-1 min-w-0">

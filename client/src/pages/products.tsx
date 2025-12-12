@@ -22,6 +22,7 @@ import {
   Tag,
   Loader2,
 } from "lucide-react";
+import placeholderImage from "@assets/generated_images/product_placeholder_coming_soon.png";
 
 export default function ProductsPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -261,17 +262,11 @@ function ProductCard({ product, brands, quantity, onQuantityChange, onAddToQuote
     <Card className="group flex flex-col overflow-visible" data-testid={`card-product-${product.id}`}>
       <CardContent className="flex flex-1 flex-col p-4">
         <div className="relative mb-4 aspect-square overflow-hidden rounded-md bg-muted">
-          {product.imageUrl ? (
-            <img
-              src={product.imageUrl}
-              alt={product.productName}
-              className="h-full w-full object-contain"
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center">
-              <Package className="h-16 w-16 text-muted-foreground/30" />
-            </div>
-          )}
+          <img
+            src={product.imageUrl || placeholderImage}
+            alt={product.imageUrl ? product.productName : "Image coming soon"}
+            className="h-full w-full object-contain"
+          />
           {product.isFeatured && (
             <Badge className="absolute top-2 left-2" variant="default">
               Featured

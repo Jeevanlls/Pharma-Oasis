@@ -20,6 +20,7 @@ import {
   CheckCircle2,
   FileText,
 } from "lucide-react";
+import placeholderImage from "@assets/generated_images/product_placeholder_coming_soon.png";
 
 export default function QuotePage() {
   const [, setLocation] = useLocation();
@@ -163,17 +164,11 @@ export default function QuotePage() {
                     <CardContent className="p-4">
                       <div className="flex gap-4">
                         <div className="h-20 w-20 flex-shrink-0 overflow-hidden rounded-md bg-muted">
-                          {item.product.imageUrl ? (
-                            <img
-                              src={item.product.imageUrl}
-                              alt={item.product.productName}
-                              className="h-full w-full object-contain"
-                            />
-                          ) : (
-                            <div className="flex h-full w-full items-center justify-center">
-                              <Package className="h-8 w-8 text-muted-foreground/30" />
-                            </div>
-                          )}
+                          <img
+                            src={item.product.imageUrl || placeholderImage}
+                            alt={item.product.imageUrl ? item.product.productName : "Image coming soon"}
+                            className="h-full w-full object-contain"
+                          />
                         </div>
 
                         <div className="flex-1 min-w-0">
