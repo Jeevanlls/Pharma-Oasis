@@ -45,7 +45,7 @@ import {
   RefreshCw,
   AlertTriangle,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -125,6 +125,22 @@ export default function AdminSettingsPage() {
     updateMutation.mutate(data);
   };
 
+  useEffect(() => {
+    if (settings) {
+      form.reset({
+        siteName: settings.site_name || "",
+        siteTagline: settings.site_tagline || "",
+        contactEmail: settings.contact_email || "",
+        contactPhone: settings.contact_phone || "",
+        companyAddress: settings.company_address || "",
+        minimumOrderValue: settings.minimum_order_value || "",
+        activeTheme: settings.active_theme || "professional",
+        maintenanceMode: settings.maintenance_mode === "true",
+        registrationEnabled: settings.registration_enabled !== "false",
+      }, { keepDirty: false });
+    }
+  }, [settings, form]);
+
   if (isLoading) {
     return (
       <div className="space-y-8">
@@ -143,20 +159,6 @@ export default function AdminSettingsPage() {
         </div>
       </div>
     );
-  }
-
-  if (settings) {
-    form.reset({
-      siteName: settings.siteName || "",
-      siteTagline: settings.siteTagline || "",
-      contactEmail: settings.contactEmail || "",
-      contactPhone: settings.contactPhone || "",
-      companyAddress: settings.companyAddress || "",
-      minimumOrderValue: settings.minimumOrderValue || "",
-      activeTheme: settings.activeTheme || "professional",
-      maintenanceMode: settings.maintenanceMode || false,
-      registrationEnabled: settings.registrationEnabled ?? true,
-    }, { keepDirty: false });
   }
 
   return (
