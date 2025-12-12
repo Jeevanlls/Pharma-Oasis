@@ -163,7 +163,7 @@ export function ChatWidget() {
 
   if (!isOpen) {
     return (
-      <div className="fixed bottom-6 right-6 z-50">
+      <div className="fixed bottom-24 right-6 z-50">
         {/* Pulsing ring animation */}
         <div className="absolute inset-0 rounded-full bg-primary/30 animate-ping" />
         <div className="absolute inset-0 rounded-full bg-primary/20 animate-pulse" />
