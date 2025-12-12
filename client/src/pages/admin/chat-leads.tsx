@@ -131,10 +131,12 @@ export default function AdminChatLeadsPage() {
 
   const { data: leads, isLoading: leadsLoading } = useQuery<ChatLead[]>({
     queryKey: ["/api/admin/chat/leads"],
+    refetchInterval: 15000,
   });
 
   const { data: sessions, isLoading: sessionsLoading } = useQuery<ChatSession[]>({
     queryKey: ["/api/admin/chat/sessions"],
+    refetchInterval: 15000,
   });
 
   const updateLeadMutation = useMutation({

@@ -1888,6 +1888,16 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     }
   });
 
+  app.get("/api/admin/chat/leads/count/new", requireAdmin, async (req, res) => {
+    try {
+      const leads = await storage.getAllChatLeads();
+      const newCount = leads.filter(l => l.status === "new").length;
+      res.json({ count: newCount });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch leads count" });
+    }
+  });
+
   app.patch("/api/admin/chat/leads/:id", requireAdmin, async (req, res) => {
     try {
       const lead = await storage.updateChatLead(Number(req.params.id), req.body);
