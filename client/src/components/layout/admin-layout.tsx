@@ -72,6 +72,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
   const { data: leadsCount } = useQuery<{ count: number }>({
     queryKey: ["/api/admin/chat/leads/count/new"],
     refetchInterval: 30000,
+    enabled: !!user,
   });
 
   const style = {
