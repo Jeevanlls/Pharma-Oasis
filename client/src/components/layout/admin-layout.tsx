@@ -31,6 +31,7 @@ import {
   Image,
   Star,
   ScrollText,
+  Bot,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 
@@ -48,6 +49,7 @@ const mainMenuItems = [
   { title: "CSV Import", href: "/admin/import", icon: Upload },
   { title: "Suppliers", href: "/admin/suppliers", icon: Globe },
   { title: "Messages", href: "/admin/messages", icon: MessageSquare },
+  { title: "Chat Leads", href: "/admin/chat-leads", icon: Bot },
 ];
 
 const homepageMenuItems = [

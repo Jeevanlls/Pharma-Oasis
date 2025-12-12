@@ -36,6 +36,7 @@ import AdminSuppliersPage from "@/pages/admin/suppliers";
 import AdminMessagesPage from "@/pages/admin/messages";
 import AdminCmsPage from "@/pages/admin/cms";
 import AdminSettingsPage from "@/pages/admin/settings";
+import AdminChatLeadsPage from "@/pages/admin/chat-leads";
 import AdminHeroSlidesPage from "@/pages/admin/hero-slides";
 import AdminFeaturedBrandsPage from "@/pages/admin/featured-brands";
 import AdminHomepagePage from "@/pages/admin/homepage";
@@ -93,6 +94,7 @@ function Router() {
       <Route path="/admin/import">{() => <AdminRoute component={AdminImportPage} />}</Route>
       <Route path="/admin/suppliers">{() => <AdminRoute component={AdminSuppliersPage} />}</Route>
       <Route path="/admin/messages">{() => <AdminRoute component={AdminMessagesPage} />}</Route>
+      <Route path="/admin/chat-leads">{() => <AdminRoute component={AdminChatLeadsPage} />}</Route>
       <Route path="/admin/cms">{() => <AdminRoute component={AdminCmsPage} />}</Route>
       <Route path="/admin/settings">{() => <AdminRoute component={AdminSettingsPage} />}</Route>
       <Route path="/admin/hero-slides">{() => <AdminRoute component={AdminHeroSlidesPage} />}</Route>
