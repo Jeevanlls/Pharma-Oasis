@@ -140,6 +140,11 @@ export function Footer() {
                 <MHRALogo />
                 <GDPLogo />
               </div>
+              <div className="mt-3 p-2.5 rounded-md bg-amber-500/10 border border-amber-500/20">
+                <p className="text-[10px] leading-relaxed text-sidebar-foreground/80">
+                  <span className="font-semibold text-amber-400">Pharmaceutical Products:</span> Licensed medicines and pharmaceutical goods are supplied within the UK only to MHRA-approved wholesalers, hospitals, and registered pharmacies.
+                </p>
+              </div>
             </div>
 
             <div className="space-y-4">

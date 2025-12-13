@@ -23,6 +23,25 @@ export default function DistributionNetworkPage() {
 
           <DistributionNetwork />
 
+          {/* Pharmaceutical Disclaimer */}
+          <div className="mt-10 rounded-xl bg-amber-500/10 border-2 border-amber-500/30 p-5">
+            <div className="flex items-start gap-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-500/20">
+                <svg className="h-5 w-5 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <div>
+                <h4 className="font-bold text-amber-700 dark:text-amber-400 mb-1" style={{ fontFamily: "DM Sans, sans-serif" }}>
+                  UK Pharmaceutical Licensing Notice
+                </h4>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  <strong>Pharmaceutical products</strong> (licensed medicines and medicinal goods) are supplied <strong>within the United Kingdom only</strong> to MHRA-approved wholesalers, hospitals, and registered pharmacies. Our MHRA WDA(H) licence permits pharmaceutical distribution exclusively within the UK. Health, wellness, beauty, and non-pharmaceutical products are available for distribution to all customer types and export markets.
+                </p>
+              </div>
+            </div>
+          </div>
+
           {/* Partnership Opportunities Section */}
           <div className="mt-20">
             <div className="text-center mb-10">
