@@ -307,6 +307,41 @@ export async function sendAccountRejectionEmail(data: {
   return sendEmail(data.email, subject, html);
 }
 
+export async function sendRegistrationConfirmationToUser(data: {
+  email: string;
+  contactName: string;
+  companyName: string;
+}): Promise<EmailResult> {
+  const subject = `Welcome to Pharma Oasis - Registration Received`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background: #1e40af; color: white; padding: 20px; text-align: center;">
+        <h1 style="margin: 0;">Registration Received</h1>
+      </div>
+      <div style="padding: 20px; background: #f8fafc;">
+        <p style="font-size: 16px;">Dear ${data.contactName},</p>
+        <p>Thank you for registering with Pharma Oasis! We have received your wholesale account application for <strong>${data.companyName}</strong>.</p>
+        <div style="padding: 15px; background: #fef3c7; border-radius: 8px; margin: 20px 0;">
+          <p style="margin: 0; color: #92400e;"><strong>What happens next?</strong></p>
+          <p style="margin: 10px 0 0 0; color: #92400e;">Our team will review your application and verify your business credentials. This typically takes 1-2 business days.</p>
+        </div>
+        <p>Once approved, you'll receive an email confirmation and will be able to:</p>
+        <ul style="color: #374151;">
+          <li>Access wholesale pricing on all products</li>
+          <li>Request quotes for bulk orders</li>
+          <li>Manage your account and orders</li>
+        </ul>
+        <p style="color: #6b7280;">If you have any questions, please contact us at trade@pharmaoasis.com</p>
+      </div>
+      <div style="padding: 15px; background: #e2e8f0; text-align: center; font-size: 12px; color: #64748b;">
+        Pharma Oasis - Your Trusted Wholesale Partner
+      </div>
+    </div>
+  `;
+
+  return sendEmail(data.email, subject, html);
+}
+
 export async function sendQuoteConfirmationToCustomer(data: {
   email: string;
   contactName: string;

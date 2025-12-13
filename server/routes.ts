@@ -22,6 +22,7 @@ import {
   sendQuoteConfirmationToCustomer,
   sendAccountApprovalEmail,
   sendAccountRejectionEmail,
+  sendRegistrationConfirmationToUser,
 } from "./email";
 import { sessionMiddleware } from "./session-store";
 
@@ -207,6 +208,12 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
         companyName: data.companyName,
         contactName: data.primaryContactName,
         phone: data.phoneNumber,
+      });
+
+      await sendRegistrationConfirmationToUser({
+        email: data.email,
+        contactName: data.primaryContactName,
+        companyName: data.companyName,
       });
       
       res.status(201).json({ message: "Registration successful. Your account is pending approval." });
