@@ -116,6 +116,16 @@ Preferred communication style: Simple, everyday language.
 
 ### External Dependencies
 
+**CRITICAL: Database Configuration**
+- **PRODUCTION USES NEON_DATABASE_URL** - All database updates, migrations, and seeding MUST target the Neon database
+- The application connects to Neon via `NEON_DATABASE_URL` environment variable (set as a secret)
+- `drizzle.config.ts` uses `DATABASE_URL` (Replit's local DB) - this does NOT affect production
+- To update the production database schema or run seeds:
+  - Use scripts that import from `server/db.ts` (which uses NEON_DATABASE_URL)
+  - Run `npx tsx server/seed.ts` to seed the production Neon database
+  - For direct SQL on Neon, create a script using the pool from `server/db.ts`
+- The Replit `execute_sql_tool` connects to Replit's DATABASE_URL, NOT Neon - do not use it for production fixes
+
 **Third-Party Services:**
 - PostgreSQL database (Neon - external, shared between development and production)
   - Connection via NEON_DATABASE_URL environment variable
