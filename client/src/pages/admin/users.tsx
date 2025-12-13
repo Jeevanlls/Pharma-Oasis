@@ -290,11 +290,16 @@ export default function AdminUsersPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="customer">Customer</SelectItem>
+                      <SelectItem value="staff">Staff</SelectItem>
                       <SelectItem value="admin">Admin</SelectItem>
                     </SelectContent>
                   </Select>
                   <p className="text-sm text-muted-foreground">
-                    {selectedUser.role === "admin" ? "Full admin access" : "Customer account"}
+                    {selectedUser.role === "admin" 
+                      ? "Full admin access" 
+                      : selectedUser.role === "staff"
+                        ? "Limited access (Products, Categories, Brands)"
+                        : "Customer account"}
                   </p>
                 </div>
               </div>
@@ -356,6 +361,9 @@ function UserCard({ user, onApprove, onReject, onView, isPending }: UserCardProp
               <Badge variant={status.variant}>{status.label}</Badge>
               {user.role === "admin" && (
                 <Badge variant="outline">Admin</Badge>
+              )}
+              {user.role === "staff" && (
+                <Badge variant="outline">Staff</Badge>
               )}
             </div>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">

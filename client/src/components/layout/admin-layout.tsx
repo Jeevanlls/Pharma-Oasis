@@ -40,32 +40,39 @@ interface AdminLayoutProps {
 }
 
 const mainMenuItems = [
-  { title: "Dashboard", href: "/admin", icon: LayoutDashboard },
-  { title: "Users", href: "/admin/users", icon: Users },
-  { title: "Products", href: "/admin/products", icon: Package },
-  { title: "Brands", href: "/admin/brands", icon: Building2 },
-  { title: "Categories", href: "/admin/categories", icon: Tag },
-  { title: "Quotes", href: "/admin/quotes", icon: FileText },
-  { title: "CSV Import", href: "/admin/import", icon: Upload },
-  { title: "Suppliers", href: "/admin/suppliers", icon: Globe },
-  { title: "Messages", href: "/admin/messages", icon: MessageSquare },
-  { title: "Chat Leads", href: "/admin/chat-leads", icon: Bot },
+  { title: "Dashboard", href: "/admin", icon: LayoutDashboard, staffAccess: true },
+  { title: "Users", href: "/admin/users", icon: Users, staffAccess: false },
+  { title: "Products", href: "/admin/products", icon: Package, staffAccess: true },
+  { title: "Brands", href: "/admin/brands", icon: Building2, staffAccess: true },
+  { title: "Categories", href: "/admin/categories", icon: Tag, staffAccess: true },
+  { title: "Quotes", href: "/admin/quotes", icon: FileText, staffAccess: false },
+  { title: "CSV Import", href: "/admin/import", icon: Upload, staffAccess: true },
+  { title: "Suppliers", href: "/admin/suppliers", icon: Globe, staffAccess: false },
+  { title: "Messages", href: "/admin/messages", icon: MessageSquare, staffAccess: false },
+  { title: "Chat Leads", href: "/admin/chat-leads", icon: Bot, staffAccess: false },
 ];
 
 const homepageMenuItems = [
-  { title: "Hero Slides", href: "/admin/hero-slides", icon: Image },
-  { title: "Featured Brands", href: "/admin/featured-brands", icon: Star },
+  { title: "Hero Slides", href: "/admin/hero-slides", icon: Image, staffAccess: false },
+  { title: "Featured Brands", href: "/admin/featured-brands", icon: Star, staffAccess: false },
 ];
 
 const siteMenuItems = [
-  { title: "CMS", href: "/admin/cms", icon: LayoutDashboard },
-  { title: "Footer Content", href: "/admin/footer-content", icon: ScrollText },
-  { title: "Settings", href: "/admin/settings", icon: Settings },
+  { title: "CMS", href: "/admin/cms", icon: LayoutDashboard, staffAccess: false },
+  { title: "Footer Content", href: "/admin/footer-content", icon: ScrollText, staffAccess: false },
+  { title: "Settings", href: "/admin/settings", icon: Settings, staffAccess: false },
 ];
 
 export function AdminLayout({ children }: AdminLayoutProps) {
   const [location] = useLocation();
   const { user, logout } = useAuth();
+
+  const isStaff = user?.role === "staff";
+  const isAdmin = user?.role === "admin";
+  
+  const filteredMainMenuItems = mainMenuItems.filter(item => isAdmin || item.staffAccess);
+  const filteredHomepageMenuItems = homepageMenuItems.filter(item => isAdmin || item.staffAccess);
+  const filteredSiteMenuItems = siteMenuItems.filter(item => isAdmin || item.staffAccess);
 
   const style = {
     "--sidebar-width": "16rem",
@@ -95,7 +102,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
               <SidebarGroupLabel>Management</SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
-                  {mainMenuItems.map((item) => (
+                  {filteredMainMenuItems.map((item) => (
                     <SidebarMenuItem key={item.href}>
                       <SidebarMenuButton
                         asChild
@@ -112,47 +119,51 @@ export function AdminLayout({ children }: AdminLayoutProps) {
               </SidebarGroupContent>
             </SidebarGroup>
 
-            <SidebarGroup>
-              <SidebarGroupLabel>Homepage</SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  {homepageMenuItems.map((item) => (
-                    <SidebarMenuItem key={item.href}>
-                      <SidebarMenuButton
-                        asChild
-                        isActive={location === item.href}
-                      >
-                        <Link href={item.href}>
-                          <item.icon className="h-4 w-4" />
-                          <span>{item.title}</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
+            {filteredHomepageMenuItems.length > 0 && (
+              <SidebarGroup>
+                <SidebarGroupLabel>Homepage</SidebarGroupLabel>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    {filteredHomepageMenuItems.map((item) => (
+                      <SidebarMenuItem key={item.href}>
+                        <SidebarMenuButton
+                          asChild
+                          isActive={location === item.href}
+                        >
+                          <Link href={item.href}>
+                            <item.icon className="h-4 w-4" />
+                            <span>{item.title}</span>
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    ))}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            )}
 
-            <SidebarGroup>
-              <SidebarGroupLabel>Site</SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  {siteMenuItems.map((item) => (
-                    <SidebarMenuItem key={item.href}>
-                      <SidebarMenuButton
-                        asChild
-                        isActive={location === item.href}
-                      >
-                        <Link href={item.href}>
-                          <item.icon className="h-4 w-4" />
-                          <span>{item.title}</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
+            {filteredSiteMenuItems.length > 0 && (
+              <SidebarGroup>
+                <SidebarGroupLabel>Site</SidebarGroupLabel>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    {filteredSiteMenuItems.map((item) => (
+                      <SidebarMenuItem key={item.href}>
+                        <SidebarMenuButton
+                          asChild
+                          isActive={location === item.href}
+                        >
+                          <Link href={item.href}>
+                            <item.icon className="h-4 w-4" />
+                            <span>{item.title}</span>
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    ))}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            )}
           </SidebarContent>
 
           <SidebarFooter className="border-t p-4">

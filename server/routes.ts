@@ -76,6 +76,18 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     next();
   };
 
+  const requireStaffOrAdmin = async (req: any, res: any, next: any) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== "admin" && user.role !== "staff")) {
+      return res.status(403).json({ message: "Staff or admin access required" });
+    }
+    req.user = user;
+    next();
+  };
+
   // ==================== OBJECT STORAGE - SERVE UPLOADED IMAGES ====================
   app.get("/objects/*", async (req, res) => {
     const objectStorageService = new ObjectStorageService();
@@ -648,8 +660,8 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     }
   });
 
-  // Admin - Products
-  app.post("/api/admin/products", requireAdmin, async (req, res) => {
+  // Admin - Products (staff and admin can access)
+  app.post("/api/admin/products", requireStaffOrAdmin, async (req, res) => {
     try {
       const data = insertProductSchema.parse(req.body);
       const product = await storage.createProduct(data);
@@ -663,7 +675,7 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     }
   });
 
-  app.patch("/api/admin/products/:id", requireAdmin, async (req, res) => {
+  app.patch("/api/admin/products/:id", requireStaffOrAdmin, async (req, res) => {
     try {
       const product = await storage.updateProduct(Number(req.params.id), req.body);
       if (!product) {
@@ -676,7 +688,7 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     }
   });
 
-  app.delete("/api/admin/products/:id", requireAdmin, async (req, res) => {
+  app.delete("/api/admin/products/:id", requireStaffOrAdmin, async (req, res) => {
     try {
       await storage.deleteProduct(Number(req.params.id));
       res.json({ message: "Product deleted" });
@@ -686,8 +698,8 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     }
   });
 
-  // Admin - CSV Import
-  app.post("/api/admin/products/import", requireAdmin, async (req, res) => {
+  // Admin - CSV Import (staff and admin can access)
+  app.post("/api/admin/products/import", requireStaffOrAdmin, async (req, res) => {
     try {
       const { products: productData } = req.body;
       
@@ -770,8 +782,8 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     }
   });
 
-  // Admin - Brands
-  app.get("/api/admin/brands", requireAdmin, async (req, res) => {
+  // Admin - Brands (staff and admin can access)
+  app.get("/api/admin/brands", requireStaffOrAdmin, async (req, res) => {
     try {
       const brandList = await storage.getAllBrands();
       res.json(brandList);
@@ -780,7 +792,7 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     }
   });
 
-  app.post("/api/admin/brands", requireAdmin, async (req, res) => {
+  app.post("/api/admin/brands", requireStaffOrAdmin, async (req, res) => {
     try {
       const brand = await storage.createBrand(req.body);
       res.status(201).json(brand);
@@ -789,7 +801,7 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     }
   });
 
-  app.patch("/api/admin/brands/:id", requireAdmin, async (req, res) => {
+  app.patch("/api/admin/brands/:id", requireStaffOrAdmin, async (req, res) => {
     try {
       const brand = await storage.updateBrand(Number(req.params.id), req.body);
       res.json(brand);
@@ -798,7 +810,7 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     }
   });
 
-  app.delete("/api/admin/brands/:id", requireAdmin, async (req, res) => {
+  app.delete("/api/admin/brands/:id", requireStaffOrAdmin, async (req, res) => {
     try {
       await storage.deleteBrand(Number(req.params.id));
       res.json({ message: "Brand deleted" });
@@ -807,8 +819,8 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     }
   });
 
-  // Admin - Categories
-  app.get("/api/admin/categories", requireAdmin, async (req, res) => {
+  // Admin - Categories (staff and admin can access)
+  app.get("/api/admin/categories", requireStaffOrAdmin, async (req, res) => {
     try {
       const categoryList = await storage.getAllCategories();
       res.json(categoryList);
@@ -817,7 +829,7 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     }
   });
 
-  app.post("/api/admin/categories", requireAdmin, async (req, res) => {
+  app.post("/api/admin/categories", requireStaffOrAdmin, async (req, res) => {
     try {
       const category = await storage.createCategory(req.body);
       res.status(201).json(category);
@@ -826,7 +838,7 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     }
   });
 
-  app.patch("/api/admin/categories/:id", requireAdmin, async (req, res) => {
+  app.patch("/api/admin/categories/:id", requireStaffOrAdmin, async (req, res) => {
     try {
       const category = await storage.updateCategory(Number(req.params.id), req.body);
       res.json(category);
@@ -835,7 +847,7 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     }
   });
 
-  app.delete("/api/admin/categories/:id", requireAdmin, async (req, res) => {
+  app.delete("/api/admin/categories/:id", requireStaffOrAdmin, async (req, res) => {
     try {
       await storage.deleteCategory(Number(req.params.id));
       res.json({ message: "Category deleted" });
