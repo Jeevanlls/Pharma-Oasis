@@ -276,6 +276,29 @@ export default function AdminUsersPage() {
                 </div>
               )}
 
+              <div className="border-t pt-4">
+                <h4 className="font-medium mb-3">Role Management</h4>
+                <div className="flex items-center gap-4">
+                  <Select
+                    value={selectedUser.role}
+                    onValueChange={(value) => {
+                      updateUserMutation.mutate({ id: selectedUser.id, updates: { role: value } });
+                    }}
+                  >
+                    <SelectTrigger className="w-40" data-testid="select-user-role">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="customer">Customer</SelectItem>
+                      <SelectItem value="admin">Admin</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-sm text-muted-foreground">
+                    {selectedUser.role === "admin" ? "Full admin access" : "Customer account"}
+                  </p>
+                </div>
+              </div>
+
               <div className="border-t pt-4 text-xs text-muted-foreground">
                 Registered: {format(new Date(selectedUser.createdAt), "PPpp")}
               </div>
