@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { users, brands, categories, products, siteSettings, cmsBlocks, heroSlides, companyLocations, homeStats, homeFeatures, homeCategories, homeProcessSteps, homeSections } from "@shared/schema";
+import { users, brands, categories, products, siteSettings, cmsBlocks, heroSlides, companyLocations, homeStats, homeFeatures, homeCategories, homeProcessSteps, homeSections, footerSections } from "@shared/schema";
 import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 
@@ -760,6 +760,227 @@ export async function seed() {
   for (const section of homeSectionsData) {
     await db.insert(homeSections).values(section);
     console.log(`Home section created: ${section.sectionKey}`);
+  }
+
+  // ============================================
+  // FOOTER SECTIONS (Privacy Policy, Terms, etc.)
+  // ============================================
+  const footerSectionsData = [
+    {
+      sectionKey: "privacy_policy",
+      title: "Privacy Policy",
+      content: `## Privacy Policy
+
+**Last Updated: December 2024**
+
+### 1. Introduction
+Pharma Oasis Limited ("we", "our", "us") is committed to protecting your privacy. This policy explains how we collect, use, and safeguard your personal information when you use our B2B wholesale platform.
+
+### 2. Information We Collect
+We collect information you provide directly:
+- Business registration details (company name, registration number, VAT number)
+- Contact information (name, email, phone, address)
+- MHRA licence and GPhC registration numbers
+- Order history and quote requests
+- Payment and billing information
+
+### 3. How We Use Your Information
+We use your information to:
+- Process and fulfil your orders
+- Verify your business credentials and regulatory compliance
+- Communicate about your account and orders
+- Improve our services and platform
+- Comply with legal and regulatory requirements
+
+### 4. Data Security
+We implement industry-standard security measures including:
+- SSL encryption for all data transmission
+- Secure server infrastructure
+- Access controls and authentication
+- Regular security audits
+
+### 5. Your Rights
+Under GDPR, you have the right to:
+- Access your personal data
+- Correct inaccurate data
+- Request deletion of your data
+- Object to processing
+- Data portability
+
+### 6. Contact Us
+For privacy enquiries, contact our Data Protection Officer:
+Email: dpo@pharmaoasis.com
+Phone: +44 (0) 333 123 4567`,
+      isActive: true,
+    },
+    {
+      sectionKey: "terms",
+      title: "Terms of Service",
+      content: `## Terms and Conditions
+
+**Last Updated: December 2024**
+
+### 1. Acceptance of Terms
+By accessing and using the Pharma Oasis B2B platform, you agree to be bound by these Terms and Conditions.
+
+### 2. Eligibility
+Our services are available only to:
+- Registered pharmacies with valid GPhC registration
+- Licensed wholesalers with appropriate MHRA authorisation
+- Authorised healthcare retailers
+
+### 3. Account Registration
+You must provide accurate and complete business information during registration. We reserve the right to verify all credentials before account approval.
+
+### 4. Orders and Pricing
+- All prices are wholesale prices exclusive of VAT
+- Prices are subject to change without notice
+- Minimum order quantities apply to certain products
+- Orders are subject to stock availability
+
+### 5. Payment Terms
+- Standard payment terms: 30 days from invoice date
+- Credit accounts subject to approval
+- Late payments may incur interest charges
+
+### 6. Delivery
+- UK mainland delivery typically within 1-3 working days
+- Temperature-controlled delivery for cold chain products
+- Delivery to registered business premises only
+
+### 7. Returns
+- Returns accepted within 14 days for unopened products
+- Damaged or incorrect items must be reported within 48 hours
+- Cold chain products cannot be returned
+
+### 8. Limitation of Liability
+Pharma Oasis liability is limited to the value of goods supplied. We are not liable for consequential losses.
+
+### 9. Governing Law
+These terms are governed by English law.`,
+      isActive: true,
+    },
+    {
+      sectionKey: "cookie_policy",
+      title: "Cookie Policy",
+      content: `## Cookie Policy
+
+**Last Updated: December 2024**
+
+### What Are Cookies?
+Cookies are small text files stored on your device when you visit our website. They help us provide you with a better experience.
+
+### Cookies We Use
+
+**Essential Cookies**
+These are necessary for the website to function:
+- Session management
+- Authentication
+- Security features
+
+**Analytics Cookies**
+Help us understand how visitors use our site:
+- Page views and navigation patterns
+- Time spent on pages
+- Error tracking
+
+**Functionality Cookies**
+Remember your preferences:
+- Language settings
+- Theme preferences
+- Saved basket items
+
+### Managing Cookies
+You can control cookies through your browser settings. Note that disabling essential cookies may affect website functionality.
+
+### Third-Party Cookies
+We may use third-party services that set their own cookies:
+- Google Analytics (anonymised)
+- Payment processors
+
+### Contact
+For questions about our cookie policy, email: info@pharmaoasis.com`,
+      isActive: true,
+    },
+    {
+      sectionKey: "global_presence",
+      title: "Global Presence",
+      content: `## Our Global Presence
+
+Pharma Oasis operates an international pharmaceutical distribution network, serving customers across the United Kingdom and Europe.
+
+### United Kingdom
+**Headquarters - London**
+Our main office and distribution hub, serving pharmacies and wholesalers throughout England, Scotland, Wales, and Northern Ireland.
+
+**Midlands Distribution Centre**
+Strategic location for rapid UK-wide delivery with next-day service to most postcodes.
+
+### Europe
+**Netherlands - Amsterdam**
+European logistics hub providing access to EU markets and international pharmaceutical supply chains.
+
+### Asia
+**India - Mumbai**
+Sourcing office working with licensed manufacturers and quality-assured suppliers.
+
+### Distribution Network
+- 3,000+ active pharmacy customers
+- 500+ online retailer partnerships
+- Temperature-controlled logistics
+- Same-day dispatch for orders before 2pm`,
+      isActive: true,
+    },
+    {
+      sectionKey: "head_office",
+      title: "Head Office",
+      content: `## Head Office
+
+**Pharma Oasis Limited**
+
+### Address
+Pharma Oasis House
+123 Healthcare Way
+London
+EC1A 1BB
+United Kingdom
+
+### Contact Details
+**General Enquiries**
+Phone: +44 (0) 333 123 4567
+Email: info@pharmaoasis.com
+
+**Sales Team**
+Phone: +44 (0) 333 123 4568
+Email: sales@pharmaoasis.com
+
+**Customer Support**
+Phone: +44 (0) 333 123 4569
+Email: support@pharmaoasis.com
+
+**Accounts Department**
+Phone: +44 (0) 333 123 4570
+Email: accounts@pharmaoasis.com
+
+### Business Hours
+Monday - Friday: 8:00 AM - 6:00 PM
+Saturday: 9:00 AM - 1:00 PM
+Sunday: Closed
+
+### Company Information
+- Company Registration: 12345678
+- VAT Number: GB 123 4567 89
+- MHRA Licence: WDA(H) 12345`,
+      isActive: true,
+    },
+  ];
+
+  await db.delete(footerSections);
+  console.log("Cleared existing footer sections");
+
+  for (const section of footerSectionsData) {
+    await db.insert(footerSections).values(section);
+    console.log(`Footer section created: ${section.sectionKey}`);
   }
 
   console.log("Database seed completed!");
