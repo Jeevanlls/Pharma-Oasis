@@ -24,6 +24,7 @@ import DashboardPage from "@/pages/dashboard";
 import PrivacyPolicyPage from "@/pages/privacy";
 import TermsOfServicePage from "@/pages/terms";
 import CookiePolicyPage from "@/pages/cookies";
+import DistributionNetworkPage from "@/pages/distribution-network";
 
 import AdminDashboard from "@/pages/admin/index";
 import AdminUsersPage from "@/pages/admin/users";
@@ -75,6 +76,7 @@ function Router() {
       <Route path="/register" component={RegisterPage} />
       <Route path="/products" component={ProductsPage} />
       <Route path="/brands" component={BrandsPage} />
+      <Route path="/distribution-network" component={DistributionNetworkPage} />
       <Route path="/contact" component={ContactPage} />
       <Route path="/how-to-order" component={HowToOrderPage} />
       <Route path="/quote" component={QuotePage} />

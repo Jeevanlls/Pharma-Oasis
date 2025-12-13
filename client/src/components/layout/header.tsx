@@ -17,6 +17,7 @@ import {
   Building2,
   HelpCircle,
   Phone,
+  Network,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -29,6 +30,7 @@ import {
 const publicNavItems = [
   { href: "/products", label: "Products", icon: Package },
   { href: "/brands", label: "Brands", icon: Building2 },
+  { href: "/distribution-network", label: "Distribution Network", icon: Network },
   { href: "/how-to-order", label: "How to Order", icon: HelpCircle },
   { href: "/contact", label: "Contact", icon: Phone },
 ];
