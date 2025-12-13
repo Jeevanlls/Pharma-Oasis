@@ -107,21 +107,21 @@ function BrandCard({ brand, isPartner }: { brand: Brand; isPartner?: boolean }) 
         className="group cursor-pointer h-full hover-elevate"
         data-testid={`card-brand-${brand.id}`}
       >
-        <CardContent className="flex h-full flex-col p-6">
-          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-lg bg-muted">
+        <CardContent className="flex h-full flex-col p-4">
+          <div className="mb-4 flex h-24 w-full items-center justify-center rounded-lg bg-white dark:bg-muted/50 border border-border/50">
             {brand.logoUrl ? (
               <img
                 src={brand.logoUrl}
                 alt={brand.name}
-                className="h-12 w-12 object-contain"
+                className="max-h-16 max-w-[140px] w-auto object-contain"
               />
             ) : (
-              <Building2 className="h-8 w-8 text-muted-foreground" />
+              <Building2 className="h-12 w-12 text-muted-foreground" />
             )}
           </div>
           
-          <div className="flex items-start justify-between gap-2">
-            <h3 className="font-semibold">{brand.name}</h3>
+          <div className="flex items-start justify-between gap-2 flex-wrap">
+            <h3 className="font-semibold text-base">{brand.name}</h3>
             {isPartner && (
               <Badge variant="default" className="shrink-0">
                 Direct Partner
