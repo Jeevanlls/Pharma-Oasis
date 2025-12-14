@@ -660,6 +660,112 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     }
   });
 
+  // ==================== ADMIN - STAFF MANAGEMENT ====================
+  
+  const createStaffSchema = z.object({
+    email: z.string().email(),
+    password: z.string().min(8),
+    primaryContactName: z.string().min(1),
+  });
+
+  // Get all staff members
+  app.get("/api/admin/staff", requireAdmin, async (req, res) => {
+    try {
+      const userList = await storage.getAllUsers();
+      const staffList = userList.filter(u => u.role === "staff" || u.role === "admin");
+      res.json(staffList.map(u => {
+        const { passwordHash, ...safe } = u;
+        return safe;
+      }));
+    } catch (error) {
+      console.error("Error fetching staff:", error);
+      res.status(500).json({ message: "Failed to fetch staff" });
+    }
+  });
+
+  // Create new staff member
+  app.post("/api/admin/staff", requireAdmin, async (req, res) => {
+    try {
+      const data = createStaffSchema.parse(req.body);
+      
+      const existingUser = await storage.getUserByEmail(data.email);
+      if (existingUser) {
+        return res.status(400).json({ message: "An account with this email already exists" });
+      }
+
+      const passwordHash = await bcrypt.hash(data.password, 10);
+      
+      const user = await storage.createUser({
+        email: data.email.toLowerCase(),
+        passwordHash,
+        role: "staff",
+        status: "active",
+        primaryContactName: data.primaryContactName,
+      });
+
+      const { passwordHash: _, ...safeUser } = user;
+      res.status(201).json(safeUser);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Error creating staff:", error);
+      res.status(500).json({ message: "Failed to create staff member" });
+    }
+  });
+
+  // Update staff member (role, status)
+  app.patch("/api/admin/staff/:id", requireAdmin, async (req: any, res) => {
+    try {
+      const targetId = Number(req.params.id);
+      const { status, role } = req.body;
+      
+      // Prevent admin from demoting themselves
+      if (req.user.id === targetId && role && role !== "admin") {
+        return res.status(400).json({ message: "You cannot demote yourself" });
+      }
+      
+      const updates: any = {};
+      if (status) updates.status = status;
+      if (role) updates.role = role;
+
+      const user = await storage.updateUser(targetId, updates);
+      if (!user) {
+        return res.status(404).json({ message: "Staff member not found" });
+      }
+
+      const { passwordHash, ...safeUser } = user;
+      res.json(safeUser);
+    } catch (error) {
+      console.error("Error updating staff:", error);
+      res.status(500).json({ message: "Failed to update staff member" });
+    }
+  });
+
+  // Delete staff member (soft delete by setting status to suspended)
+  app.delete("/api/admin/staff/:id", requireAdmin, async (req: any, res) => {
+    try {
+      const targetId = Number(req.params.id);
+      
+      // Prevent admin from deleting themselves
+      if (req.user.id === targetId) {
+        return res.status(400).json({ message: "You cannot delete your own account" });
+      }
+      
+      const user = await storage.getUser(targetId);
+      if (!user) {
+        return res.status(404).json({ message: "Staff member not found" });
+      }
+      
+      // Soft delete by setting status to suspended
+      await storage.updateUser(targetId, { status: "suspended", role: "customer" });
+      res.json({ message: "Staff member removed" });
+    } catch (error) {
+      console.error("Error deleting staff:", error);
+      res.status(500).json({ message: "Failed to delete staff member" });
+    }
+  });
+
   // Admin - Products (staff and admin can access)
   app.post("/api/admin/products", requireStaffOrAdmin, async (req, res) => {
     try {
