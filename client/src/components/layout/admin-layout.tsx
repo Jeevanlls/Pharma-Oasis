@@ -34,6 +34,7 @@ import {
   ScrollText,
   Bot,
   MapPin,
+  BarChart3,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 
@@ -43,6 +44,7 @@ interface AdminLayoutProps {
 
 const mainMenuItems = [
   { title: "Dashboard", href: "/admin", icon: LayoutDashboard, staffAccess: true },
+  { title: "Analytics", href: "/admin/analytics", icon: BarChart3, staffAccess: false },
   { title: "Users", href: "/admin/users", icon: Users, staffAccess: false },
   { title: "Staff", href: "/admin/staff", icon: UserCog, staffAccess: false },
   { title: "Products", href: "/admin/products", icon: Package, staffAccess: true },

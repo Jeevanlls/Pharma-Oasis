@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
+import { PageTracker } from "@/hooks/use-page-tracking";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Link } from "wouter";
 import { PublicLayout } from "@/components/layout/public-layout";
@@ -103,6 +104,7 @@ export default function ContactPage() {
 
   return (
     <PublicLayout>
+      <PageTracker title="Contact" />
       <div className="py-8 sm:py-12">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mb-12 text-center">

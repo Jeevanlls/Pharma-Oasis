@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
+import { PageTracker } from "@/hooks/use-page-tracking";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
@@ -203,6 +204,7 @@ export default function RegisterPage() {
 
   return (
     <PublicLayout>
+      <PageTracker title="Register" />
       <div className="py-12 px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-3xl">
           <div className="text-center mb-8">

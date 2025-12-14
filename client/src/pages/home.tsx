@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Link } from "wouter";
+import { PageTracker } from "@/hooks/use-page-tracking";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -802,6 +803,7 @@ function CTASection() {
 export default function HomePage() {
   return (
     <PublicLayout>
+      <PageTracker title="Home" />
       <style>{`
         @keyframes marquee {
           0% { transform: translateX(0); }
