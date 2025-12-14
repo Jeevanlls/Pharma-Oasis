@@ -40,6 +40,7 @@ import {
   Cross,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { OrganizationJsonLd, WebsiteJsonLd } from "@/components/seo/product-json-ld";
 
 const iconMap: Record<string, LucideIcon> = {
   Package,
@@ -804,6 +805,8 @@ export default function HomePage() {
   return (
     <PublicLayout>
       <PageTracker title="Home" />
+      <OrganizationJsonLd />
+      <WebsiteJsonLd />
       <style>{`
         @keyframes marquee {
           0% { transform: translateX(0); }

@@ -24,6 +24,7 @@ import {
   Loader2,
 } from "lucide-react";
 import placeholderImage from "@assets/generated_images/product_placeholder_coming_soon.png";
+import { ProductListJsonLd } from "@/components/seo/product-json-ld";
 
 export default function ProductsPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -108,6 +109,9 @@ export default function ProductsPage() {
   return (
     <PublicLayout>
       <PageTracker title="Products" />
+      {products && products.length > 0 && (
+        <ProductListJsonLd products={products} brands={brands} />
+      )}
       <div className="py-8 sm:py-12">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mb-8">

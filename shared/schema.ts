@@ -70,6 +70,9 @@ export const brands = pgTable("brands", {
   isActive: boolean("is_active").default(true),
   isHomeFeatured: boolean("is_home_featured").default(false),
   homePosition: integer("home_position"),
+  slug: varchar("slug", { length: 255 }),
+  metaTitle: varchar("meta_title", { length: 255 }),
+  metaDescription: text("meta_description"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -83,6 +86,9 @@ export const categories = pgTable("categories", {
   parentId: integer("parent_id"),
   description: text("description"),
   isActive: boolean("is_active").default(true),
+  slug: varchar("slug", { length: 255 }),
+  metaTitle: varchar("meta_title", { length: 255 }),
+  metaDescription: text("meta_description"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -114,6 +120,9 @@ export const products = pgTable("products", {
   productType: varchar("product_type", { length: 100 }),
   storageConditions: text("storage_conditions"),
   notesInternal: text("notes_internal"),
+  slug: varchar("slug", { length: 255 }),
+  metaTitle: varchar("meta_title", { length: 255 }),
+  metaDescription: text("meta_description"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

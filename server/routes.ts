@@ -25,6 +25,7 @@ import {
   sendRegistrationConfirmationToUser,
 } from "./email";
 import { sessionMiddleware } from "./session-store";
+import feedsRouter from "./feeds";
 
 declare module "express-session" {
   interface SessionData {
@@ -40,6 +41,9 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
 
   // Session middleware with PostgreSQL store
   app.use(sessionMiddleware);
+
+  // SEO Feeds (sitemap, Google Shopping, robots.txt)
+  app.use("/feeds", feedsRouter);
 
   // Auth middleware
   const requireAuth = (req: any, res: any, next: any) => {
@@ -866,6 +870,61 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     } catch (error) {
       console.error("Error deleting product:", error);
       res.status(500).json({ message: "Failed to delete product" });
+    }
+  });
+
+  // Admin - SEO update endpoints
+  app.patch("/api/admin/products/:id/seo", requireStaffOrAdmin, async (req, res) => {
+    try {
+      const { slug, metaTitle, metaDescription } = req.body;
+      const product = await storage.updateProduct(Number(req.params.id), {
+        slug: slug || null,
+        metaTitle: metaTitle || null,
+        metaDescription: metaDescription || null,
+      });
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+      res.json(product);
+    } catch (error) {
+      console.error("Error updating product SEO:", error);
+      res.status(500).json({ message: "Failed to update product SEO" });
+    }
+  });
+
+  app.patch("/api/admin/brands/:id/seo", requireStaffOrAdmin, async (req, res) => {
+    try {
+      const { slug, metaTitle, metaDescription } = req.body;
+      const brand = await storage.updateBrand(Number(req.params.id), {
+        slug: slug || null,
+        metaTitle: metaTitle || null,
+        metaDescription: metaDescription || null,
+      });
+      if (!brand) {
+        return res.status(404).json({ message: "Brand not found" });
+      }
+      res.json(brand);
+    } catch (error) {
+      console.error("Error updating brand SEO:", error);
+      res.status(500).json({ message: "Failed to update brand SEO" });
+    }
+  });
+
+  app.patch("/api/admin/categories/:id/seo", requireStaffOrAdmin, async (req, res) => {
+    try {
+      const { slug, metaTitle, metaDescription } = req.body;
+      const category = await storage.updateCategory(Number(req.params.id), {
+        slug: slug || null,
+        metaTitle: metaTitle || null,
+        metaDescription: metaDescription || null,
+      });
+      if (!category) {
+        return res.status(404).json({ message: "Category not found" });
+      }
+      res.json(category);
+    } catch (error) {
+      console.error("Error updating category SEO:", error);
+      res.status(500).json({ message: "Failed to update category SEO" });
     }
   });
 
