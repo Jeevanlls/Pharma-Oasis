@@ -18,6 +18,7 @@ import {
 import {
   LayoutDashboard,
   Users,
+  UserCog,
   Package,
   Building2,
   Tag,
@@ -43,6 +44,7 @@ interface AdminLayoutProps {
 const mainMenuItems = [
   { title: "Dashboard", href: "/admin", icon: LayoutDashboard, staffAccess: true },
   { title: "Users", href: "/admin/users", icon: Users, staffAccess: false },
+  { title: "Staff", href: "/admin/staff", icon: UserCog, staffAccess: false },
   { title: "Products", href: "/admin/products", icon: Package, staffAccess: true },
   { title: "Brands", href: "/admin/brands", icon: Building2, staffAccess: true },
   { title: "Categories", href: "/admin/categories", icon: Tag, staffAccess: true },
