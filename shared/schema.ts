@@ -720,6 +720,34 @@ export type InsertChatLead = z.infer<typeof insertChatLeadSchema>;
 export type ChatLead = typeof chatLeads.$inferSelect;
 
 // ============================================
+// PAGE VIEWS (ANALYTICS) TABLE
+// ============================================
+export const pageViews = pgTable("page_views", {
+  id: serial("id").primaryKey(),
+  pagePath: varchar("page_path", { length: 500 }).notNull(),
+  pageTitle: varchar("page_title", { length: 255 }),
+  sessionId: varchar("session_id", { length: 100 }),
+  userId: integer("user_id"),
+  referrer: text("referrer"),
+  userAgent: text("user_agent"),
+  ipAddress: varchar("ip_address", { length: 50 }),
+  country: varchar("country", { length: 100 }),
+  city: varchar("city", { length: 100 }),
+  deviceType: varchar("device_type", { length: 50 }),
+  browser: varchar("browser", { length: 100 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Page views schemas
+export const insertPageViewSchema = createInsertSchema(pageViews).omit({
+  id: true,
+  createdAt: true,
+});
+export const selectPageViewSchema = createSelectSchema(pageViews);
+export type InsertPageView = z.infer<typeof insertPageViewSchema>;
+export type PageView = typeof pageViews.$inferSelect;
+
+// ============================================
 // FORM VALIDATION SCHEMAS
 // ============================================
 

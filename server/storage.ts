@@ -2,7 +2,7 @@ import {
   users, brands, categories, products, quotes, quoteItems, 
   supplierLeads, cmsBlocks, siteSettings, contactMessages, heroSlides, companyLocations,
   homeStats, homeFeatures, homeCategories, homeProcessSteps, homeSections,
-  footerSections, mediaAssets, chatSessions, chatMessages, chatLeads,
+  footerSections, mediaAssets, chatSessions, chatMessages, chatLeads, pageViews,
   type User, type InsertUser,
   type Brand, type InsertBrand,
   type Category, type InsertCategory,
@@ -25,6 +25,7 @@ import {
   type ChatSession, type InsertChatSession,
   type ChatMessage, type InsertChatMessage,
   type ChatLead, type InsertChatLead,
+  type PageView, type InsertPageView,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, ilike, desc, asc, sql, isNull, inArray } from "drizzle-orm";
@@ -158,6 +159,19 @@ export interface IStorage {
   createChatLead(lead: InsertChatLead): Promise<ChatLead>;
   getAllChatLeads(): Promise<ChatLead[]>;
   updateChatLead(id: number, updates: Partial<InsertChatLead>): Promise<ChatLead | undefined>;
+
+  // Page Views (Analytics)
+  createPageView(pageView: InsertPageView): Promise<PageView>;
+  getAnalytics(daysAgo: number): Promise<{
+    totalPageViews: number;
+    uniqueVisitors: number;
+    topPages: { pagePath: string; views: number }[];
+    deviceBreakdown: { deviceType: string; count: number }[];
+    browserBreakdown: { browser: string; count: number }[];
+    dailyViews: { date: string; views: number }[];
+    recentRegistrations: number;
+    recentQuotes: number;
+  }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1029,6 +1043,108 @@ export class DatabaseStorage implements IStorage {
       .where(eq(chatLeads.id, id))
       .returning();
     return updated;
+  }
+
+  // ==================== PAGE VIEWS (ANALYTICS) ====================
+  async createPageView(pageView: InsertPageView): Promise<PageView> {
+    const [created] = await db.insert(pageViews).values(pageView).returning();
+    return created;
+  }
+
+  async getAnalytics(daysAgo: number): Promise<{
+    totalPageViews: number;
+    uniqueVisitors: number;
+    topPages: { pagePath: string; views: number }[];
+    deviceBreakdown: { deviceType: string; count: number }[];
+    browserBreakdown: { browser: string; count: number }[];
+    dailyViews: { date: string; views: number }[];
+    recentRegistrations: number;
+    recentQuotes: number;
+  }> {
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - daysAgo);
+    startDate.setHours(0, 0, 0, 0);
+
+    // Total page views in period
+    const totalResult = await db.select({ count: sql<number>`count(*)` })
+      .from(pageViews)
+      .where(sql`${pageViews.createdAt} >= ${startDate}`);
+    const totalPageViews = Number(totalResult[0]?.count || 0);
+
+    // Unique visitors (by session or IP)
+    const uniqueResult = await db.select({ count: sql<number>`count(distinct coalesce(${pageViews.sessionId}, ${pageViews.ipAddress}))` })
+      .from(pageViews)
+      .where(sql`${pageViews.createdAt} >= ${startDate}`);
+    const uniqueVisitors = Number(uniqueResult[0]?.count || 0);
+
+    // Top pages
+    const topPagesResult = await db.select({ 
+      pagePath: pageViews.pagePath, 
+      views: sql<number>`count(*)` 
+    })
+      .from(pageViews)
+      .where(sql`${pageViews.createdAt} >= ${startDate}`)
+      .groupBy(pageViews.pagePath)
+      .orderBy(sql`count(*) desc`)
+      .limit(10);
+    const topPages = topPagesResult.map(r => ({ pagePath: r.pagePath, views: Number(r.views) }));
+
+    // Device breakdown
+    const deviceResult = await db.select({ 
+      deviceType: pageViews.deviceType, 
+      count: sql<number>`count(*)` 
+    })
+      .from(pageViews)
+      .where(sql`${pageViews.createdAt} >= ${startDate}`)
+      .groupBy(pageViews.deviceType);
+    const deviceBreakdown = deviceResult.map(r => ({ deviceType: r.deviceType || 'unknown', count: Number(r.count) }));
+
+    // Browser breakdown
+    const browserResult = await db.select({ 
+      browser: pageViews.browser, 
+      count: sql<number>`count(*)` 
+    })
+      .from(pageViews)
+      .where(sql`${pageViews.createdAt} >= ${startDate}`)
+      .groupBy(pageViews.browser);
+    const browserBreakdown = browserResult.map(r => ({ browser: r.browser || 'unknown', count: Number(r.count) }));
+
+    // Daily views
+    const dailyResult = await db.select({ 
+      date: sql<string>`date(${pageViews.createdAt})`, 
+      views: sql<number>`count(*)` 
+    })
+      .from(pageViews)
+      .where(sql`${pageViews.createdAt} >= ${startDate}`)
+      .groupBy(sql`date(${pageViews.createdAt})`)
+      .orderBy(sql`date(${pageViews.createdAt})`);
+    const dailyViews = dailyResult.map(r => ({ date: String(r.date), views: Number(r.views) }));
+
+    // Recent registrations (customers in period)
+    const regResult = await db.select({ count: sql<number>`count(*)` })
+      .from(users)
+      .where(and(
+        sql`${users.createdAt} >= ${startDate}`,
+        eq(users.role, 'customer')
+      ));
+    const recentRegistrations = Number(regResult[0]?.count || 0);
+
+    // Recent quotes in period
+    const quotesResult = await db.select({ count: sql<number>`count(*)` })
+      .from(quotes)
+      .where(sql`${quotes.createdAt} >= ${startDate}`);
+    const recentQuotes = Number(quotesResult[0]?.count || 0);
+
+    return {
+      totalPageViews,
+      uniqueVisitors,
+      topPages,
+      deviceBreakdown,
+      browserBreakdown,
+      dailyViews,
+      recentRegistrations,
+      recentQuotes,
+    };
   }
 }
 

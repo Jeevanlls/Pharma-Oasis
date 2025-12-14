@@ -766,6 +766,71 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     }
   });
 
+  // ============================================
+  // ANALYTICS ENDPOINTS
+  // ============================================
+  
+  // Track page view (public endpoint)
+  app.post("/api/analytics/pageview", async (req: any, res) => {
+    try {
+      const { pagePath, pageTitle, sessionId, referrer } = req.body;
+      
+      if (!pagePath) {
+        return res.status(400).json({ message: "pagePath is required" });
+      }
+      
+      const userAgent = req.headers["user-agent"] || "";
+      const ipAddress = req.headers["x-forwarded-for"]?.split(",")[0] || req.ip || "";
+      
+      // Simple device type detection
+      let deviceType = "desktop";
+      if (/mobile/i.test(userAgent)) deviceType = "mobile";
+      else if (/tablet|ipad/i.test(userAgent)) deviceType = "tablet";
+      
+      // Simple browser detection
+      let browser = "Unknown";
+      if (/chrome/i.test(userAgent) && !/edge|edg/i.test(userAgent)) browser = "Chrome";
+      else if (/firefox/i.test(userAgent)) browser = "Firefox";
+      else if (/safari/i.test(userAgent) && !/chrome/i.test(userAgent)) browser = "Safari";
+      else if (/edge|edg/i.test(userAgent)) browser = "Edge";
+      
+      await storage.createPageView({
+        pagePath,
+        pageTitle: pageTitle || null,
+        sessionId: sessionId || null,
+        userId: req.user?.id || null,
+        referrer: referrer || null,
+        userAgent,
+        ipAddress,
+        deviceType,
+        browser,
+      });
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error tracking page view:", error);
+      res.status(500).json({ message: "Failed to track page view" });
+    }
+  });
+  
+  // Get analytics data (admin only)
+  app.get("/api/admin/analytics", requireAdmin, async (req, res) => {
+    try {
+      const { period = "7d" } = req.query;
+      
+      let daysAgo = 7;
+      if (period === "30d") daysAgo = 30;
+      else if (period === "90d") daysAgo = 90;
+      else if (period === "today") daysAgo = 0;
+      
+      const analytics = await storage.getAnalytics(daysAgo);
+      res.json(analytics);
+    } catch (error) {
+      console.error("Error fetching analytics:", error);
+      res.status(500).json({ message: "Failed to fetch analytics" });
+    }
+  });
+
   // Admin - Products (staff and admin can access)
   app.post("/api/admin/products", requireStaffOrAdmin, async (req, res) => {
     try {
