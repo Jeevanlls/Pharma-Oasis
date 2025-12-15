@@ -22,6 +22,7 @@ import {
   Loader2,
   Award,
   EyeOff,
+  Sparkles,
 } from "lucide-react";
 import { ImageUpload } from "@/components/admin/ImageUpload";
 
@@ -29,6 +30,7 @@ export default function AdminBrandsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingBrand, setEditingBrand] = useState<Brand | null>(null);
+  const [isGeneratingDescription, setIsGeneratingDescription] = useState(false);
   const { toast } = useToast();
 
   const { data: brands, isLoading } = useQuery<Brand[]>({
@@ -277,7 +279,43 @@ export default function AdminBrandsPage() {
                 name="description"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Description</FormLabel>
+                    <div className="flex items-center justify-between gap-2">
+                      <FormLabel>Description</FormLabel>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={isGeneratingDescription || !form.watch("name")}
+                        onClick={async () => {
+                          const brandName = form.getValues("name");
+                          if (!brandName) {
+                            toast({ title: "Please enter a brand name first", variant: "destructive" });
+                            return;
+                          }
+                          setIsGeneratingDescription(true);
+                          try {
+                            const response = await apiRequest("POST", "/api/admin/ai/generate-brand-description", { brandName });
+                            const data = await response.json();
+                            if (data.description) {
+                              field.onChange(data.description);
+                              toast({ title: "Description generated" });
+                            }
+                          } catch {
+                            toast({ title: "Failed to generate description", variant: "destructive" });
+                          } finally {
+                            setIsGeneratingDescription(false);
+                          }
+                        }}
+                        data-testid="button-ai-generate-description"
+                      >
+                        {isGeneratingDescription ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                        ) : (
+                          <Sparkles className="h-4 w-4 mr-1" />
+                        )}
+                        AI Generate
+                      </Button>
+                    </div>
                     <FormControl>
                       <Textarea placeholder="Brand description..." {...field} value={field.value || ""} />
                     </FormControl>

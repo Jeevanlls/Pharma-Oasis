@@ -1049,6 +1049,44 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     }
   });
 
+  // AI Description Generation for Brands
+  app.post("/api/admin/ai/generate-brand-description", requireStaffOrAdmin, async (req, res) => {
+    try {
+      const { brandName } = req.body;
+      if (!brandName) {
+        return res.status(400).json({ message: "Brand name is required" });
+      }
+
+      const OpenAI = (await import("openai")).default;
+      const openai = new OpenAI({
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+      });
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: "You are a professional copywriter for a B2B pharmaceutical wholesale company. Generate concise, professional brand descriptions for healthcare and pharmaceutical brands. Keep descriptions to exactly 2 sentences. Focus on the brand's reputation, product range, and quality. Do not use marketing fluff."
+          },
+          {
+            role: "user",
+            content: `Write a 2-sentence description for the brand "${brandName}" for use on a pharmaceutical wholesale website.`
+          }
+        ],
+        max_tokens: 100,
+        temperature: 0.7,
+      });
+
+      const description = response.choices[0]?.message?.content?.trim() || "";
+      res.json({ description });
+    } catch (error) {
+      console.error("AI description generation error:", error);
+      res.status(500).json({ message: "Failed to generate description" });
+    }
+  });
+
   // Admin - Categories (staff and admin can access)
   app.get("/api/admin/categories", requireStaffOrAdmin, async (req, res) => {
     try {
