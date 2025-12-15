@@ -1068,14 +1068,14 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
         messages: [
           {
             role: "system",
-            content: "You are a professional copywriter for a B2B pharmaceutical wholesale company. Generate concise, professional brand descriptions for healthcare and pharmaceutical brands. Keep descriptions to exactly 2 sentences. Focus on the brand's reputation, product range, and quality. Do not use marketing fluff."
+            content: "You are a copywriter for a B2B pharmaceutical wholesaler. Write ONE short sentence (15-20 words max) describing the brand. Be direct and factual. No marketing fluff."
           },
           {
             role: "user",
-            content: `Write a 2-sentence description for the brand "${brandName}" for use on a pharmaceutical wholesale website.`
+            content: `Write ONE short sentence about "${brandName}" for a wholesale catalogue.`
           }
         ],
-        max_tokens: 100,
+        max_tokens: 50,
         temperature: 0.7,
       });
 
