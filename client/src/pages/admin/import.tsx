@@ -23,7 +23,7 @@ interface ImportResult {
 }
 
 const requiredColumns = [
-  "sku", "productName", "brand", "category"
+  "sku", "productname", "brand", "category"
 ];
 
 const optionalColumns = [
