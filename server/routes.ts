@@ -868,14 +868,16 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
 
   app.patch("/api/admin/products/:id", requireStaffOrAdmin, async (req, res) => {
     try {
+      console.log(`[PRODUCT UPDATE] ID: ${req.params.id}, Body:`, JSON.stringify(req.body, null, 2));
       const product = await storage.updateProduct(Number(req.params.id), req.body);
       if (!product) {
         return res.status(404).json({ message: "Product not found" });
       }
       res.json(product);
-    } catch (error) {
-      console.error("Error updating product:", error);
-      res.status(500).json({ message: "Failed to update product" });
+    } catch (error: any) {
+      console.error("Error updating product:", error?.message || error);
+      console.error("Error details:", error);
+      res.status(500).json({ message: "Failed to update product", error: error?.message });
     }
   });
 
