@@ -26,6 +26,7 @@ import {
   Star,
   Eye,
   EyeOff,
+  Sparkles,
 } from "lucide-react";
 import { ImageUpload } from "@/components/admin/ImageUpload";
 
@@ -33,6 +34,7 @@ export default function AdminProductsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [isGeneratingDescription, setIsGeneratingDescription] = useState(false);
   const { toast } = useToast();
 
   const { data: products, isLoading } = useQuery<Product[]>({
@@ -109,6 +111,40 @@ export default function AdminProductsPage() {
       toast({ title: "Failed to delete product", variant: "destructive" });
     },
   });
+
+  const generateDescription = async () => {
+    const productName = form.getValues("productName");
+    if (!productName) {
+      toast({ title: "Please enter a product name first", variant: "destructive" });
+      return;
+    }
+
+    const brandId = form.getValues("brandId");
+    const categoryId = form.getValues("categoryId");
+    const packSize = form.getValues("packSize");
+    
+    const brand = brands?.find(b => b.id === brandId);
+    const category = categories?.find(c => c.id === categoryId);
+
+    setIsGeneratingDescription(true);
+    try {
+      const res = await apiRequest("POST", "/api/admin/ai/generate-product-description", {
+        productName,
+        brand: brand?.name,
+        category: category?.name,
+        packSize,
+      });
+      const data = await res.json();
+      if (data.description) {
+        form.setValue("shortDescription", data.description);
+        toast({ title: "Description generated" });
+      }
+    } catch (error) {
+      toast({ title: "Failed to generate description", variant: "destructive" });
+    } finally {
+      setIsGeneratingDescription(false);
+    }
+  };
 
   const filteredProducts = products?.filter(product =>
     product.productName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -502,9 +538,27 @@ export default function AdminProductsPage() {
                 name="shortDescription"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Description</FormLabel>
+                    <div className="flex items-center justify-between">
+                      <FormLabel>Description</FormLabel>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={generateDescription}
+                        disabled={isGeneratingDescription}
+                        className="gap-1 h-7 text-xs"
+                        data-testid="button-ai-description"
+                      >
+                        {isGeneratingDescription ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Sparkles className="h-3 w-3" />
+                        )}
+                        AI Generate
+                      </Button>
+                    </div>
                     <FormControl>
-                      <Textarea placeholder="Product description..." {...field} value={field.value || ""} />
+                      <Textarea placeholder="Product description (max 2 lines)..." {...field} value={field.value || ""} rows={2} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

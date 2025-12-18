@@ -1125,6 +1125,50 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     }
   });
 
+  // AI Product Description Generation
+  app.post("/api/admin/ai/generate-product-description", requireStaffOrAdmin, async (req, res) => {
+    try {
+      const { productName, ean, brand, category, packSize } = req.body;
+      if (!productName) {
+        return res.status(400).json({ message: "Product name is required" });
+      }
+
+      const OpenAI = (await import("openai")).default;
+      const openai = new OpenAI({
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+      });
+
+      let prompt = `Product: "${productName}"`;
+      if (ean) prompt += `\nEAN: ${ean}`;
+      if (brand) prompt += `\nBrand: ${brand}`;
+      if (category) prompt += `\nCategory: ${category}`;
+      if (packSize) prompt += `\nPack Size: ${packSize}`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: "You are a product copywriter for a B2B pharmaceutical wholesaler. Write a SHORT product description (maximum 2 lines, under 30 words). Be factual and concise. Focus on key benefits or uses. No marketing fluff or promotional language."
+          },
+          {
+            role: "user",
+            content: `Write a short 2-line product description for:\n${prompt}`
+          }
+        ],
+        max_tokens: 60,
+        temperature: 0.7,
+      });
+
+      const description = response.choices[0]?.message?.content?.trim() || "";
+      res.json({ description });
+    } catch (error) {
+      console.error("AI product description generation error:", error);
+      res.status(500).json({ message: "Failed to generate description" });
+    }
+  });
+
   // Admin - Categories (staff and admin can access)
   app.get("/api/admin/categories", requireStaffOrAdmin, async (req, res) => {
     try {
