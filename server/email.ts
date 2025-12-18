@@ -393,6 +393,65 @@ export async function sendQuoteConfirmationToCustomer(data: {
   return sendEmail(data.email, subject, html);
 }
 
+export async function sendContactFormConfirmation(data: {
+  email: string;
+  name: string;
+  subject: string;
+}): Promise<EmailResult> {
+  const emailSubject = `We've Received Your Message - Pharma Oasis`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background: #1e40af; color: white; padding: 20px; text-align: center;">
+        <h1 style="margin: 0;">Message Received</h1>
+      </div>
+      <div style="padding: 20px; background: #f8fafc;">
+        <p style="font-size: 16px;">Dear ${data.name},</p>
+        <p>Thank you for contacting Pharma Oasis. We have received your enquiry regarding:</p>
+        <div style="padding: 15px; background: white; border: 1px solid #e2e8f0; border-radius: 8px; margin: 20px 0;">
+          <p style="margin: 0; font-weight: bold;">${data.subject}</p>
+        </div>
+        <p>Our team will review your message and get back to you within <strong>48 business hours</strong>.</p>
+        <p style="color: #6b7280;">For urgent enquiries, please call us at +44 (0)20 1234 5678.</p>
+      </div>
+      <div style="padding: 15px; background: #e2e8f0; text-align: center; font-size: 12px; color: #64748b;">
+        Pharma Oasis - Your Trusted Wholesale Partner
+      </div>
+    </div>
+  `;
+
+  return sendEmail(data.email, emailSubject, html);
+}
+
+export async function sendSupplierConfirmation(data: {
+  email: string;
+  contactName: string;
+  companyName: string;
+}): Promise<EmailResult> {
+  const subject = `Supplier Application Received - Pharma Oasis`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background: #059669; color: white; padding: 20px; text-align: center;">
+        <h1 style="margin: 0;">Application Received</h1>
+      </div>
+      <div style="padding: 20px; background: #f8fafc;">
+        <p style="font-size: 16px;">Dear ${data.contactName},</p>
+        <p>Thank you for your interest in becoming a supplier partner with Pharma Oasis.</p>
+        <p>We have received your application for <strong>${data.companyName}</strong> and our procurement team will review it carefully.</p>
+        <div style="padding: 15px; background: #d1fae5; border-radius: 8px; margin: 20px 0;">
+          <p style="margin: 0; color: #065f46;"><strong>What happens next?</strong></p>
+          <p style="margin: 10px 0 0 0; color: #065f46;">Our team will contact you within 5 business days to discuss potential partnership opportunities.</p>
+        </div>
+        <p style="color: #6b7280;">If you have any questions, please contact us at trade@pharmaoasis.com</p>
+      </div>
+      <div style="padding: 15px; background: #e2e8f0; text-align: center; font-size: 12px; color: #64748b;">
+        Pharma Oasis - Your Trusted Wholesale Partner
+      </div>
+    </div>
+  `;
+
+  return sendEmail(data.email, subject, html);
+}
+
 export async function sendChatLeadNotification(data: {
   name?: string;
   email?: string;

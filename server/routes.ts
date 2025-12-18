@@ -23,6 +23,8 @@ import {
   sendAccountApprovalEmail,
   sendAccountRejectionEmail,
   sendRegistrationConfirmationToUser,
+  sendContactFormConfirmation,
+  sendSupplierConfirmation,
 } from "./email";
 import { sessionMiddleware } from "./session-store";
 import feedsRouter from "./feeds";
@@ -391,6 +393,13 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
         phone: data.phoneNumber,
         productCategories: data.productCategoriesSupply,
       });
+
+      // Send confirmation to the supplier
+      await sendSupplierConfirmation({
+        email: data.email,
+        contactName: data.contactName,
+        companyName: data.companyName,
+      });
       
       res.status(201).json({ message: "Supplier application submitted successfully" });
     } catch (error) {
@@ -421,6 +430,13 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
         subject: "Contact Form Submission",
         message: data.message,
         phone: data.phone,
+      });
+
+      // Send confirmation to the user
+      await sendContactFormConfirmation({
+        email: data.email,
+        name: data.name,
+        subject: "Contact Form Submission",
       });
       
       res.status(201).json({ message: "Message sent successfully" });
