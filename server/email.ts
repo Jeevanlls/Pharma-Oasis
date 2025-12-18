@@ -1,9 +1,20 @@
-import { Resend } from 'resend';
+import nodemailer from 'nodemailer';
 
-const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+// Zoho India SMTP configuration
+const ZOHO_EMAIL = process.env.ZOHO_EMAIL || 'jeevan@pharmaoasis.com';
+const ZOHO_PASSWORD = process.env.ZOHO_EMAIL_PASSWORD;
+const NOTIFICATION_EMAIL = process.env.NOTIFICATION_EMAIL || 'jeevan@pharmaoasis.com';
 
-const FROM_EMAIL = process.env.FROM_EMAIL || 'Pharma Oasis <onboarding@resend.dev>';
-const NOTIFICATION_EMAIL = process.env.NOTIFICATION_EMAIL || 'admin@pharmaoasis.com';
+// Create transporter for Zoho India
+const transporter = ZOHO_PASSWORD ? nodemailer.createTransport({
+  host: 'smtp.zoho.in', // Zoho India
+  port: 465,
+  secure: true, // SSL
+  auth: {
+    user: ZOHO_EMAIL,
+    pass: ZOHO_PASSWORD,
+  },
+}) : null;
 
 interface EmailResult {
   success: boolean;
@@ -11,15 +22,16 @@ interface EmailResult {
 }
 
 async function sendEmail(to: string, subject: string, html: string): Promise<EmailResult> {
-  if (!resend) {
+  if (!transporter) {
+    console.log(`[EMAIL - DEV MODE] Zoho password not configured`);
     console.log(`[EMAIL - DEV MODE] To: ${to}, Subject: ${subject}`);
     console.log(`[EMAIL - DEV MODE] Body preview: ${html.substring(0, 200)}...`);
     return { success: true };
   }
 
   try {
-    await resend.emails.send({
-      from: FROM_EMAIL,
+    await transporter.sendMail({
+      from: `Pharma Oasis <${ZOHO_EMAIL}>`,
       to,
       subject,
       html,
