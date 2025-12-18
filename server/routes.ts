@@ -869,7 +869,30 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
   app.patch("/api/admin/products/:id", requireStaffOrAdmin, async (req, res) => {
     try {
       console.log(`[PRODUCT UPDATE] ID: ${req.params.id}, Body:`, JSON.stringify(req.body, null, 2));
-      const product = await storage.updateProduct(Number(req.params.id), req.body);
+      
+      // Sanitize data: convert empty strings to null for decimal/numeric fields
+      const sanitizedData = { ...req.body };
+      const decimalFields = ['wholesalePrice', 'rrp', 'vatRate', 'weight', 'length', 'width', 'height'];
+      const integerFields = ['moq', 'stockLevel', 'brandId', 'categoryId', 'subcategoryId'];
+      
+      for (const field of decimalFields) {
+        if (sanitizedData[field] === '' || sanitizedData[field] === undefined) {
+          sanitizedData[field] = null;
+        }
+      }
+      
+      for (const field of integerFields) {
+        if (sanitizedData[field] === '' || sanitizedData[field] === undefined) {
+          sanitizedData[field] = null;
+        } else if (sanitizedData[field] !== null && typeof sanitizedData[field] === 'string') {
+          const parsed = parseInt(sanitizedData[field], 10);
+          sanitizedData[field] = isNaN(parsed) ? null : parsed;
+        }
+      }
+      
+      console.log(`[PRODUCT UPDATE] Sanitized data:`, JSON.stringify(sanitizedData, null, 2));
+      
+      const product = await storage.updateProduct(Number(req.params.id), sanitizedData);
       if (!product) {
         return res.status(404).json({ message: "Product not found" });
       }
