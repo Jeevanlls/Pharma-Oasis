@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { 
@@ -14,12 +15,23 @@ import {
   Loader2,
   Download,
   Info,
+  XCircle,
+  FileWarning,
 } from "lucide-react";
+
+interface FailedRow {
+  rowNumber: number;
+  data: Record<string, any>;
+  error: string;
+}
 
 interface ImportResult {
   created: number;
   updated: number;
+  failed: number;
+  total: number;
   errors: string[];
+  failedRows: FailedRow[];
 }
 
 const requiredColumns = [
@@ -39,6 +51,7 @@ SKU-002,Pain Relief Gel,PharmaCare Plus,OTC Medicines,Pain Relief,100ml,24,true,
 export default function AdminImportPage() {
   const [file, setFile] = useState<File | null>(null);
   const [parsedData, setParsedData] = useState<any[] | null>(null);
+  const [originalHeaders, setOriginalHeaders] = useState<string[]>([]);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const { toast } = useToast();
 
@@ -51,10 +64,19 @@ export default function AdminImportPage() {
       setImportResult(result);
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
-      toast({ 
-        title: "Import completed",
-        description: `${result.created} created, ${result.updated} updated`
-      });
+      
+      if (result.failed > 0) {
+        toast({ 
+          title: "Import completed with errors",
+          description: `${result.created + result.updated} succeeded, ${result.failed} failed`,
+          variant: "destructive"
+        });
+      } else {
+        toast({ 
+          title: "Import completed successfully",
+          description: `${result.created} created, ${result.updated} updated`
+        });
+      }
     },
     onError: (error: any) => {
       toast({ 
@@ -88,6 +110,7 @@ export default function AdminImportPage() {
       }
 
       const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+      setOriginalHeaders(lines[0].split(',').map(h => h.trim()));
       
       const missingRequired = requiredColumns.filter(col => !headers.includes(col));
       if (missingRequired.length > 0) {
@@ -100,8 +123,8 @@ export default function AdminImportPage() {
       }
 
       const products = lines.slice(1).map((line, index) => {
-        const values = line.split(',').map(v => v.trim());
-        const product: any = {};
+        const values = parseCSVLine(line);
+        const product: any = { _originalLine: line, _rowIndex: index };
         
         headers.forEach((header, i) => {
           let value = values[i] || '';
@@ -121,6 +144,8 @@ export default function AdminImportPage() {
             product.longDescription = value;
           } else if (header === 'packsize') {
             product.packSize = value;
+          } else if (header === 'casesize') {
+            product.caseSize = value;
           } else if (header === 'vatrate') {
             product.vatRate = value;
           } else if (header === 'imageurl') {
@@ -145,6 +170,28 @@ export default function AdminImportPage() {
     reader.readAsText(selectedFile);
   };
 
+  const parseCSVLine = (line: string): string[] => {
+    const result: string[] = [];
+    let current = '';
+    let inQuotes = false;
+    
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      
+      if (char === '"') {
+        inQuotes = !inQuotes;
+      } else if (char === ',' && !inQuotes) {
+        result.push(current.trim());
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    result.push(current.trim());
+    
+    return result;
+  };
+
   const handleImport = () => {
     if (!parsedData || parsedData.length === 0) return;
     importMutation.mutate(parsedData);
@@ -159,6 +206,40 @@ export default function AdminImportPage() {
     a.click();
     window.URL.revokeObjectURL(url);
   };
+
+  const downloadFailedRows = () => {
+    if (!importResult || importResult.failedRows.length === 0) return;
+    
+    const headers = originalHeaders.length > 0 ? originalHeaders : Object.keys(importResult.failedRows[0].data);
+    const headerLine = [...headers, 'error_message'].join(',');
+    
+    const dataLines = importResult.failedRows.map(row => {
+      const values = headers.map(h => {
+        const key = h.toLowerCase();
+        let value = row.data[key] || row.data[h] || '';
+        if (typeof value === 'string' && (value.includes(',') || value.includes('"'))) {
+          value = `"${value.replace(/"/g, '""')}"`;
+        }
+        return value;
+      });
+      values.push(`"${row.error.replace(/"/g, '""')}"`);
+      return values.join(',');
+    });
+    
+    const csvContent = [headerLine, ...dataLines].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `failed-imports-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  const successCount = importResult ? importResult.created + importResult.updated : 0;
+  const successRate = importResult && importResult.total > 0 
+    ? Math.round((successCount / importResult.total) * 100) 
+    : 0;
 
   return (
     <div className="space-y-8">
@@ -192,7 +273,7 @@ export default function AdminImportPage() {
                       <p className="mb-1 text-sm text-muted-foreground">
                         <span className="font-semibold">Click to upload</span> or drag and drop
                       </p>
-                      <p className="text-xs text-muted-foreground">CSV files only</p>
+                      <p className="text-xs text-muted-foreground">CSV files only (up to 50MB)</p>
                     </div>
                     <input 
                       type="file" 
@@ -237,7 +318,7 @@ export default function AdminImportPage() {
                               <td className="p-2 truncate max-w-[200px]">{product.productName}</td>
                               <td className="p-2">{product.brand}</td>
                               <td className="p-2">{product.category}</td>
-                              <td className="p-2">£{product.wholesalePrice}</td>
+                              <td className="p-2">{product.wholesalePrice ? `£${product.wholesalePrice}` : '-'}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -269,31 +350,94 @@ export default function AdminImportPage() {
           </Card>
 
           {importResult && (
-            <Alert variant={importResult.errors.length > 0 ? "destructive" : "default"}>
-              {importResult.errors.length > 0 ? (
-                <AlertCircle className="h-4 w-4" />
-              ) : (
-                <CheckCircle2 className="h-4 w-4" />
-              )}
-              <AlertTitle>Import Complete</AlertTitle>
-              <AlertDescription>
-                <p>Created: {importResult.created} products</p>
-                <p>Updated: {importResult.updated} products</p>
-                {importResult.errors.length > 0 && (
-                  <div className="mt-2">
-                    <p className="font-medium">Errors:</p>
-                    <ul className="list-disc pl-4 text-sm">
-                      {importResult.errors.slice(0, 10).map((error, i) => (
-                        <li key={i}>{error}</li>
-                      ))}
-                      {importResult.errors.length > 10 && (
-                        <li>...and {importResult.errors.length - 10} more</li>
-                      )}
-                    </ul>
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  {importResult.failed > 0 ? (
+                    <FileWarning className="h-5 w-5 text-amber-500" />
+                  ) : (
+                    <CheckCircle2 className="h-5 w-5 text-green-500" />
+                  )}
+                  Import Summary
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Success Rate</span>
+                    <span className="font-medium">{successRate}%</span>
                   </div>
+                  <Progress value={successRate} className="h-2" />
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="text-center p-4 bg-muted rounded-lg">
+                    <div className="text-2xl font-bold text-foreground">{importResult.total}</div>
+                    <div className="text-xs text-muted-foreground">Total Rows</div>
+                  </div>
+                  <div className="text-center p-4 bg-green-500/10 rounded-lg">
+                    <div className="text-2xl font-bold text-green-600">{importResult.created}</div>
+                    <div className="text-xs text-muted-foreground">Created</div>
+                  </div>
+                  <div className="text-center p-4 bg-blue-500/10 rounded-lg">
+                    <div className="text-2xl font-bold text-blue-600">{importResult.updated}</div>
+                    <div className="text-xs text-muted-foreground">Updated</div>
+                  </div>
+                  <div className="text-center p-4 bg-red-500/10 rounded-lg">
+                    <div className="text-2xl font-bold text-red-600">{importResult.failed}</div>
+                    <div className="text-xs text-muted-foreground">Failed</div>
+                  </div>
+                </div>
+
+                {importResult.failed > 0 && (
+                  <>
+                    <Alert variant="destructive">
+                      <XCircle className="h-4 w-4" />
+                      <AlertTitle>{importResult.failed} rows failed to import</AlertTitle>
+                      <AlertDescription>
+                        Download the failed rows to fix the errors and re-upload them.
+                      </AlertDescription>
+                    </Alert>
+
+                    <Button 
+                      variant="outline" 
+                      className="w-full gap-2"
+                      onClick={downloadFailedRows}
+                      data-testid="button-download-failed"
+                    >
+                      <Download className="h-4 w-4" />
+                      Download Failed Rows ({importResult.failed})
+                    </Button>
+
+                    <div className="space-y-2">
+                      <h4 className="text-sm font-medium">Error Details (first 10)</h4>
+                      <div className="max-h-48 overflow-y-auto space-y-1">
+                        {importResult.errors.slice(0, 10).map((error, i) => (
+                          <div key={i} className="text-xs p-2 bg-red-500/5 rounded text-red-700 dark:text-red-400">
+                            {error}
+                          </div>
+                        ))}
+                        {importResult.errors.length > 10 && (
+                          <div className="text-xs text-muted-foreground p-2">
+                            ...and {importResult.errors.length - 10} more errors
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </>
                 )}
-              </AlertDescription>
-            </Alert>
+
+                {importResult.failed === 0 && (
+                  <Alert>
+                    <CheckCircle2 className="h-4 w-4" />
+                    <AlertTitle>All products imported successfully</AlertTitle>
+                    <AlertDescription>
+                      {importResult.created} new products created and {importResult.updated} existing products updated.
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </CardContent>
+            </Card>
           )}
         </div>
 
@@ -345,6 +489,7 @@ export default function AdminImportPage() {
               <p>New brands and categories will be created automatically.</p>
               <p>Boolean fields accept: true/false or 1/0</p>
               <p>Prices should be in GBP without currency symbol.</p>
+              <p>Maximum file size: 50MB</p>
             </CardContent>
           </Card>
         </div>

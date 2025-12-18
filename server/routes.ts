@@ -953,10 +953,25 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
         return res.status(400).json({ message: "No products to import" });
       }
 
-      const results = { created: 0, updated: 0, errors: [] as string[] };
+      const results = { 
+        created: 0, 
+        updated: 0, 
+        failed: 0,
+        total: productData.length,
+        errors: [] as string[],
+        failedRows: [] as { rowNumber: number; data: any; error: string }[]
+      };
 
-      for (const row of productData) {
+      for (let i = 0; i < productData.length; i++) {
+        const row = productData[i];
+        const rowNumber = i + 2; // +2 because row 1 is headers, and we're 0-indexed
+        
         try {
+          // Validate required fields
+          if (!row.sku || !row.productName || !row.brand || !row.category) {
+            throw new Error("Missing required fields (sku, productName, brand, or category)");
+          }
+
           // Find or create brand
           let brand = await storage.getBrandByName(row.brand);
           if (!brand) {
@@ -1017,7 +1032,14 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
             results.created++;
           }
         } catch (err: any) {
-          results.errors.push(`Row ${row.sku}: ${err.message}`);
+          results.failed++;
+          const errorMessage = err.message || "Unknown error";
+          results.errors.push(`Row ${rowNumber} (${row.sku || 'no SKU'}): ${errorMessage}`);
+          results.failedRows.push({
+            rowNumber,
+            data: row,
+            error: errorMessage
+          });
         }
       }
 
