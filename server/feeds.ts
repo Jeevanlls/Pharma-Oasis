@@ -116,15 +116,24 @@ router.get("/google-shopping.xml", async (req, res) => {
 `;
 
     for (const product of allProducts) {
-      const priceValue = product.wholesalePrice || product.rrp;
+      // Use googleFeedPrice for Google Shopping (not displayed on website)
+      // Fall back to wholesalePrice or rrp if no googleFeedPrice set
+      const priceValue = (product as any).googleFeedPrice || product.wholesalePrice || product.rrp;
       const priceFormatted = priceValue ? `${parseFloat(priceValue).toFixed(2)} GBP` : null;
+      
+      // Skip products without a price - Google requires price
+      if (!priceFormatted) continue;
+      
       const availability = product.isActive ? "in_stock" : "out_of_stock";
       const condition = "new";
       const imageUrl = product.imageUrl?.startsWith("http") 
         ? product.imageUrl 
         : product.imageUrl 
           ? `${SITE_URL}${product.imageUrl}`
-          : `${SITE_URL}/placeholder-product.png`;
+          : null;
+      
+      // Skip products without images - Google requires images
+      if (!imageUrl) continue;
       
       const categoryPath = [
         product.category?.name,
@@ -132,7 +141,10 @@ router.get("/google-shopping.xml", async (req, res) => {
       ].filter(Boolean).join(" > ");
 
       const productIdentifier = (product as any).slug || product.id;
-      const hasValidGtin = product.ean && product.ean.length >= 8;
+      
+      // SKU is the EAN/GTIN for this business
+      const gtin = product.sku;
+      const hasValidGtin = gtin && gtin.length >= 8 && /^\d+$/.test(gtin);
 
       xml += `  <item>
     <g:id>${product.sku}</g:id>
@@ -141,10 +153,10 @@ router.get("/google-shopping.xml", async (req, res) => {
     <g:link>${SITE_URL}/products/${productIdentifier}</g:link>
     <g:image_link>${imageUrl}</g:image_link>
     <g:availability>${availability}</g:availability>
-    ${priceFormatted ? `<g:price>${priceFormatted}</g:price>` : ""}
+    <g:price>${priceFormatted}</g:price>
     <g:brand><![CDATA[${product.brand?.name || "Pharma Oasis"}]]></g:brand>
     <g:condition>${condition}</g:condition>
-    ${hasValidGtin ? `<g:gtin>${product.ean}</g:gtin>` : ""}
+    ${hasValidGtin ? `<g:gtin>${gtin}</g:gtin>` : ""}
     <g:mpn>${product.sku}</g:mpn>
     <g:google_product_category>Health &amp; Beauty &gt; Health Care</g:google_product_category>
     <g:product_type><![CDATA[${categoryPath || "Health Care"}]]></g:product_type>

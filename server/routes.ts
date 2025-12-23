@@ -872,7 +872,7 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
       
       // Sanitize data: convert empty strings to null for decimal/numeric fields
       const sanitizedData = { ...req.body };
-      const decimalFields = ['wholesalePrice', 'rrp', 'vatRate', 'weight', 'length', 'width', 'height'];
+      const decimalFields = ['wholesalePrice', 'rrp', 'vatRate', 'weight', 'length', 'width', 'height', 'googleFeedPrice'];
       const integerFields = ['moq', 'stockLevel', 'brandId', 'categoryId', 'subcategoryId'];
       
       for (const field of decimalFields) {

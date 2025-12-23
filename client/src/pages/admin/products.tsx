@@ -58,6 +58,7 @@ export default function AdminProductsPage() {
       categoryId: 0,
       wholesalePrice: "",
       rrp: "",
+      googleFeedPrice: "",
       packSize: "",
       caseSize: "",
       moq: 1,
@@ -161,6 +162,7 @@ export default function AdminProductsPage() {
       subcategoryId: product.subcategoryId || undefined,
       wholesalePrice: product.wholesalePrice,
       rrp: product.rrp || "",
+      googleFeedPrice: (product as any).googleFeedPrice || "",
       packSize: product.packSize || "",
       caseSize: product.caseSize || "",
       moq: product.moq || 1,
@@ -181,6 +183,7 @@ export default function AdminProductsPage() {
       categoryId: 0,
       wholesalePrice: "",
       rrp: "",
+      googleFeedPrice: "",
       packSize: "",
       caseSize: "",
       moq: 1,
@@ -462,13 +465,13 @@ export default function AdminProductsPage() {
                 />
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <FormField
                   control={form.control}
                   name="wholesalePrice"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Wholesale Price</FormLabel>
+                      <FormLabel>Wholesale Price (internal)</FormLabel>
                       <FormControl>
                         <Input type="number" step="0.01" placeholder="0.00" {...field} value={field.value || ""} />
                       </FormControl>
@@ -481,10 +484,27 @@ export default function AdminProductsPage() {
                   name="rrp"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>RRP</FormLabel>
+                      <FormLabel>RRP (internal)</FormLabel>
                       <FormControl>
                         <Input type="number" step="0.01" placeholder="0.00" {...field} value={field.value || ""} />
                       </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              <div className="grid gap-4 sm:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="googleFeedPrice"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Google Shopping Price</FormLabel>
+                      <FormControl>
+                        <Input type="number" step="0.01" placeholder="0.00" {...field} value={field.value || ""} />
+                      </FormControl>
+                      <p className="text-xs text-muted-foreground">Only used in Google Shopping feed (not shown on website)</p>
                       <FormMessage />
                     </FormItem>
                   )}

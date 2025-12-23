@@ -123,6 +123,7 @@ export const products = pgTable("products", {
   slug: varchar("slug", { length: 255 }),
   metaTitle: varchar("meta_title", { length: 255 }),
   metaDescription: text("meta_description"),
+  googleFeedPrice: decimal("google_feed_price", { precision: 10, scale: 2 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
