@@ -1,9 +1,18 @@
-import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { 
@@ -13,16 +22,12 @@ import {
   AlertCircle,
   Loader2,
   FileSpreadsheet,
-  DollarSign,
+  Clock,
+  XCircle,
+  RotateCw,
+  FileDown,
 } from "lucide-react";
-
-interface UploadResult {
-  updated: number;
-  skipped: number;
-  notFound: number;
-  total: number;
-  errors: string[];
-}
+import type { UploadJob } from "@shared/schema";
 
 interface PricingStatus {
   total: number;
@@ -33,39 +38,50 @@ interface PricingStatus {
 
 export default function AdminGooglePricingPage() {
   const [file, setFile] = useState<File | null>(null);
-  const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const { toast } = useToast();
 
   const { data: status, isLoading: statusLoading } = useQuery<PricingStatus>({
     queryKey: ["/api/admin/pricing/status"],
   });
 
-  const uploadMutation = useMutation({
-    mutationFn: async (rows: any[]): Promise<UploadResult> => {
-      const res = await apiRequest("POST", "/api/admin/pricing/upload", { rows });
+  const { data: uploadJobs, refetch: refetchJobs } = useQuery<UploadJob[]>({
+    queryKey: ["/api/admin/upload-jobs", "google_price_import"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/upload-jobs?jobType=google_price_import");
       return res.json();
-    },
-    onSuccess: (result) => {
-      setUploadResult(result);
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/pricing/status"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
-      toast({ 
-        title: "Upload Complete",
-        description: `Updated ${result.updated} products`,
-      });
-    },
-    onError: () => {
-      toast({ title: "Upload failed", variant: "destructive" });
     },
   });
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (selectedFile) {
-      setFile(selectedFile);
-      setUploadResult(null);
+  const hasActiveJobs = uploadJobs?.some(j => j.status === "pending" || j.status === "processing");
+
+  useEffect(() => {
+    if (hasActiveJobs) {
+      const interval = setInterval(() => {
+        refetchJobs();
+      }, 5000);
+      return () => clearInterval(interval);
     }
-  };
+  }, [hasActiveJobs, refetchJobs]);
+
+  useEffect(() => {
+    if (uploadJobs) {
+      const completedJobs = uploadJobs.filter(j => j.status === "completed" || j.status === "failed");
+      const latestCompleted = completedJobs[0];
+      
+      if (latestCompleted && latestCompleted.finishedAt) {
+        const finishedAt = new Date(latestCompleted.finishedAt);
+        const now = new Date();
+        const diff = now.getTime() - finishedAt.getTime();
+        
+        if (diff < 10000 && diff > 0) {
+          if (latestCompleted.status === "completed") {
+            queryClient.invalidateQueries({ queryKey: ["/api/admin/pricing/status"] });
+          }
+        }
+      }
+    }
+  }, [uploadJobs]);
 
   const parseCSV = (text: string): any[] => {
     const lines = text.split(/\r?\n/).filter(line => line.trim());
@@ -101,18 +117,45 @@ export default function AdminGooglePricingPage() {
     return rows;
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (selectedFile) {
+      setFile(selectedFile);
+    }
+  };
+
   const handleUpload = async () => {
     if (!file) return;
+    setIsUploading(true);
 
-    const text = await file.text();
-    const rows = parseCSV(text);
+    try {
+      const text = await file.text();
+      const rows = parseCSV(text);
 
-    if (rows.length === 0) {
-      toast({ title: "No valid data found in CSV", variant: "destructive" });
-      return;
+      if (rows.length === 0) {
+        toast({ title: "No valid data found in CSV", variant: "destructive" });
+        setIsUploading(false);
+        return;
+      }
+
+      const res = await apiRequest("POST", "/api/admin/google-pricing/upload", { 
+        rows, 
+        fileName: file.name 
+      });
+      const data = await res.json();
+
+      toast({ 
+        title: "Upload Queued",
+        description: `Processing ${data.totalRows} rows in the background. You can leave this page.`,
+      });
+
+      setFile(null);
+      refetchJobs();
+    } catch (error) {
+      toast({ title: "Upload failed", variant: "destructive" });
+    } finally {
+      setIsUploading(false);
     }
-
-    uploadMutation.mutate(rows);
   };
 
   const handleDownloadMissing = () => {
@@ -121,6 +164,36 @@ export default function AdminGooglePricingPage() {
 
   const handleDownloadAll = () => {
     window.open("/api/admin/pricing/download-all", "_blank");
+  };
+
+  const handleDownloadErrors = (jobId: number) => {
+    window.open(`/api/admin/upload-jobs/${jobId}/errors`, "_blank");
+  };
+
+  const formatDate = (date: Date | string | null) => {
+    if (!date) return "-";
+    return new Date(date).toLocaleString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "pending":
+        return <Badge variant="secondary" className="gap-1"><Clock className="h-3 w-3" />Pending</Badge>;
+      case "processing":
+        return <Badge variant="default" className="gap-1"><Loader2 className="h-3 w-3 animate-spin" />Processing</Badge>;
+      case "completed":
+        return <Badge variant="outline" className="gap-1 text-green-600 border-green-600"><CheckCircle2 className="h-3 w-3" />Completed</Badge>;
+      case "failed":
+        return <Badge variant="destructive" className="gap-1"><XCircle className="h-3 w-3" />Failed</Badge>;
+      default:
+        return <Badge variant="secondary">{status}</Badge>;
+    }
   };
 
   return (
@@ -249,14 +322,14 @@ export default function AdminGooglePricingPage() {
 
             <Button
               onClick={handleUpload}
-              disabled={!file || uploadMutation.isPending}
+              disabled={!file || isUploading}
               className="w-full gap-2"
               data-testid="button-upload-prices"
             >
-              {uploadMutation.isPending ? (
+              {isUploading ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Uploading...
+                  Queueing...
                 </>
               ) : (
                 <>
@@ -265,34 +338,104 @@ export default function AdminGooglePricingPage() {
                 </>
               )}
             </Button>
+
+            <Alert>
+              <Clock className="h-4 w-4" />
+              <AlertTitle>Background Processing</AlertTitle>
+              <AlertDescription className="text-sm">
+                Uploads are processed in the background. You can close this page and check back later.
+              </AlertDescription>
+            </Alert>
           </CardContent>
         </Card>
       </div>
 
-      {uploadResult && (
-        <Alert variant={uploadResult.updated > 0 ? "default" : "destructive"}>
-          <CheckCircle2 className="h-4 w-4" />
-          <AlertTitle>Upload Complete</AlertTitle>
-          <AlertDescription>
-            <div className="mt-2 space-y-1">
-              <p><strong>{uploadResult.updated}</strong> products updated with new prices</p>
-              <p><strong>{uploadResult.skipped}</strong> rows skipped (no valid price)</p>
-              <p><strong>{uploadResult.notFound}</strong> SKUs not found in database</p>
-              <p className="text-muted-foreground">Total rows processed: {uploadResult.total}</p>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between gap-2">
+          <div>
+            <CardTitle>Upload History</CardTitle>
+            <CardDescription>Recent Google price uploads and their status</CardDescription>
+          </div>
+          <Button variant="ghost" size="icon" onClick={() => refetchJobs()} data-testid="button-refresh-jobs">
+            <RotateCw className="h-4 w-4" />
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {uploadJobs && uploadJobs.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>File</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Progress</TableHead>
+                  <TableHead>Results</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {uploadJobs.map((job) => (
+                  <TableRow key={job.id} data-testid={`row-job-${job.id}`}>
+                    <TableCell className="font-medium">{job.fileName}</TableCell>
+                    <TableCell>{getStatusBadge(job.status)}</TableCell>
+                    <TableCell>
+                      {job.status === "processing" ? (
+                        <div className="w-24">
+                          <Progress value={(job.processedRows || 0) / (job.totalRows || 1) * 100} className="h-2" />
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {job.processedRows}/{job.totalRows}
+                          </p>
+                        </div>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">{job.totalRows} rows</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {job.status === "completed" && (
+                        <div className="text-xs space-y-0.5">
+                          <p className="text-green-600">{job.successCount} updated</p>
+                          {(job.skippedCount || 0) > 0 && (
+                            <p className="text-muted-foreground">{job.skippedCount} skipped</p>
+                          )}
+                          {(job.failureCount || 0) > 0 && (
+                            <p className="text-destructive">{job.failureCount} errors</p>
+                          )}
+                        </div>
+                      )}
+                      {job.status === "failed" && (
+                        <span className="text-xs text-destructive">{job.summaryMessage?.slice(0, 50)}</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {formatDate(job.queuedAt)}
+                    </TableCell>
+                    <TableCell>
+                      {job.status === "completed" && (job.failureCount || 0) > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDownloadErrors(job.id)}
+                          className="gap-1"
+                          data-testid={`button-download-errors-${job.id}`}
+                        >
+                          <FileDown className="h-3 w-3" />
+                          Errors
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              <FileSpreadsheet className="mx-auto h-10 w-10 mb-3 opacity-50" />
+              <p>No uploads yet</p>
+              <p className="text-sm">Upload a CSV file to see it here</p>
             </div>
-            {uploadResult.errors.length > 0 && (
-              <div className="mt-3">
-                <p className="font-medium text-destructive">Errors:</p>
-                <ul className="text-sm list-disc list-inside">
-                  {uploadResult.errors.map((err, i) => (
-                    <li key={i}>{err}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </AlertDescription>
-        </Alert>
-      )}
+          )}
+        </CardContent>
+      </Card>
 
       <Card className="bg-muted/30">
         <CardHeader>
@@ -309,11 +452,11 @@ export default function AdminGooglePricingPage() {
           </div>
           <div className="flex gap-3">
             <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">3</span>
-            <p>Save as CSV and upload here - prices will be matched by SKU</p>
+            <p>Save as CSV and upload here - the file will be processed in the background</p>
           </div>
           <div className="flex gap-3">
             <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">4</span>
-            <p>Products with matching SKUs will be updated, others will be ignored</p>
+            <p>Check the Upload History table to see progress and results</p>
           </div>
         </CardContent>
       </Card>
