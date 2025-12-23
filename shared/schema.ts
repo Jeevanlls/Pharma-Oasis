@@ -859,6 +859,88 @@ export type InsertAiCategoryAgentStatus = z.infer<typeof insertAiCategoryAgentSt
 export type AiCategoryAgentStatus = typeof aiCategoryAgentStatus.$inferSelect;
 
 // ============================================
+// SEO AGENT STATUS TABLE (Tracks SEO optimization agent state)
+// ============================================
+export const seoAgentStatus = pgTable("seo_agent_status", {
+  id: serial("id").primaryKey(),
+  isRunning: boolean("is_running").default(false),
+  lastRunAt: timestamp("last_run_at"),
+  nextScheduledRun: timestamp("next_scheduled_run"),
+  totalProductsOptimized: integer("total_products_optimized").default(0),
+  totalBrandsOptimized: integer("total_brands_optimized").default(0),
+  totalCategoriesOptimized: integer("total_categories_optimized").default(0),
+  totalPagesOptimized: integer("total_pages_optimized").default(0),
+  currentTask: text("current_task"),
+  errorCount: integer("error_count").default(0),
+  lastError: text("last_error"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// SEO agent status schemas
+export const insertSeoAgentStatusSchema = createInsertSchema(seoAgentStatus).omit({
+  id: true,
+  updatedAt: true,
+});
+export const selectSeoAgentStatusSchema = createSelectSchema(seoAgentStatus);
+export type InsertSeoAgentStatus = z.infer<typeof insertSeoAgentStatusSchema>;
+export type SeoAgentStatus = typeof seoAgentStatus.$inferSelect;
+
+// ============================================
+// SEO AGENT ACTIONS LOG TABLE (Tracks all SEO optimizations performed)
+// ============================================
+export const seoAgentActions = pgTable("seo_agent_actions", {
+  id: serial("id").primaryKey(),
+  actionType: varchar("action_type", { length: 50 }).notNull(), // 'product_seo', 'brand_seo', 'category_seo', 'page_seo', 'schema_markup', 'keyword_optimization'
+  entityType: varchar("entity_type", { length: 50 }).notNull(), // 'product', 'brand', 'category', 'page'
+  entityId: integer("entity_id"),
+  entityName: varchar("entity_name", { length: 500 }),
+  previousValue: text("previous_value"), // JSON of previous SEO values
+  newValue: text("new_value"), // JSON of new SEO values
+  aiReasoning: text("ai_reasoning"), // Why the AI made this change
+  confidenceScore: decimal("confidence_score", { precision: 3, scale: 2 }),
+  status: varchar("status", { length: 20 }).default("completed"), // 'pending', 'completed', 'failed', 'skipped'
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// SEO agent actions schemas
+export const insertSeoAgentActionSchema = createInsertSchema(seoAgentActions).omit({
+  id: true,
+  createdAt: true,
+});
+export const selectSeoAgentActionSchema = createSelectSchema(seoAgentActions);
+export type InsertSeoAgentAction = z.infer<typeof insertSeoAgentActionSchema>;
+export type SeoAgentAction = typeof seoAgentActions.$inferSelect;
+
+// ============================================
+// SEO RECOMMENDATIONS TABLE (AI-generated improvement suggestions)
+// ============================================
+export const seoRecommendations = pgTable("seo_recommendations", {
+  id: serial("id").primaryKey(),
+  entityType: varchar("entity_type", { length: 50 }).notNull(), // 'product', 'brand', 'category', 'page', 'site'
+  entityId: integer("entity_id"),
+  entityName: varchar("entity_name", { length: 500 }),
+  recommendationType: varchar("recommendation_type", { length: 100 }).notNull(), // 'missing_meta', 'short_description', 'keyword_opportunity', 'internal_linking', 'duplicate_content'
+  priority: varchar("priority", { length: 20 }).default("medium"), // 'high', 'medium', 'low'
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description").notNull(),
+  suggestedAction: text("suggested_action"),
+  potentialImpact: varchar("potential_impact", { length: 100 }), // 'high_traffic', 'medium_traffic', 'low_traffic'
+  status: varchar("status", { length: 20 }).default("pending"), // 'pending', 'applied', 'dismissed', 'in_progress'
+  appliedAt: timestamp("applied_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// SEO recommendations schemas
+export const insertSeoRecommendationSchema = createInsertSchema(seoRecommendations).omit({
+  id: true,
+  createdAt: true,
+});
+export const selectSeoRecommendationSchema = createSelectSchema(seoRecommendations);
+export type InsertSeoRecommendation = z.infer<typeof insertSeoRecommendationSchema>;
+export type SeoRecommendation = typeof seoRecommendations.$inferSelect;
+
+// ============================================
 // FORM VALIDATION SCHEMAS
 // ============================================
 
