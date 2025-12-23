@@ -141,14 +141,38 @@ Return JSON only:
   };
 }
 
-async function findCategoryByName(name: string, isSubcategory: boolean): Promise<number | null> {
-  const cat = await db.query.categories.findFirst({
-    where: and(
-      eq(categories.name, name),
-      isSubcategory ? sql`${categories.parentId} IS NOT NULL` : isNull(categories.parentId)
-    ),
-  });
-  return cat?.id || null;
+function normalizeText(text: string): string {
+  return text.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+async function findCategoryByName(
+  name: string, 
+  isSubcategory: boolean,
+  allCategories: CategoryInfo[],
+  aliasMap: Map<string, number>
+): Promise<number | null> {
+  const normalizedName = normalizeText(name);
+  
+  const aliasId = aliasMap.get(name.toLowerCase());
+  if (aliasId) {
+    return aliasId;
+  }
+  
+  const exactMatch = allCategories.find(
+    c => c.name === name && c.isSubcategory === isSubcategory
+  );
+  if (exactMatch) {
+    return exactMatch.id;
+  }
+  
+  const fuzzyMatch = allCategories.find(
+    c => normalizeText(c.name) === normalizedName && c.isSubcategory === isSubcategory
+  );
+  if (fuzzyMatch) {
+    return fuzzyMatch.id;
+  }
+  
+  return null;
 }
 
 async function recordAlias(aliasName: string, canonicalId: number, isSubcategory: boolean): Promise<void> {
@@ -251,8 +275,10 @@ export async function processCategoryBatch(): Promise<{
         let newSubcategoryId = product.subcategoryId;
         let changesMade = false;
 
+        const allCats = [...mainCategories, ...subcategories];
+        
         if (result.categoryName !== currentCategoryName && result.confidence >= 0.7) {
-          const foundCatId = await findCategoryByName(result.categoryName, false);
+          const foundCatId = await findCategoryByName(result.categoryName, false, allCats, aliasMap);
           if (foundCatId) {
             newCategoryId = foundCatId;
             changesMade = true;
@@ -260,17 +286,25 @@ export async function processCategoryBatch(): Promise<{
             if (result.suggestedMerge && !result.suggestedMerge.isSubcategory) {
               await recordAlias(result.suggestedMerge.fromName, foundCatId, false);
             }
+            
+            if (currentCategoryName !== result.categoryName && currentCategoryName !== "Unknown") {
+              await recordAlias(currentCategoryName, foundCatId, false);
+            }
           }
         }
 
         if (result.subcategoryName && result.subcategoryName !== currentSubcategoryName && result.confidence >= 0.7) {
-          const foundSubId = await findCategoryByName(result.subcategoryName, true);
+          const foundSubId = await findCategoryByName(result.subcategoryName, true, allCats, aliasMap);
           if (foundSubId) {
             newSubcategoryId = foundSubId;
             changesMade = true;
 
             if (result.suggestedMerge && result.suggestedMerge.isSubcategory) {
               await recordAlias(result.suggestedMerge.fromName, foundSubId, true);
+            }
+            
+            if (currentSubcategoryName && currentSubcategoryName !== result.subcategoryName) {
+              await recordAlias(currentSubcategoryName, foundSubId, true);
             }
           }
         }

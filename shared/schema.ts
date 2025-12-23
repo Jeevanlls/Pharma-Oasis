@@ -818,7 +818,7 @@ export type AiCategoryReview = typeof aiCategoryReviews.$inferSelect;
 // ============================================
 export const categoryAliases = pgTable("category_aliases", {
   id: serial("id").primaryKey(),
-  aliasName: varchar("alias_name", { length: 255 }).notNull(), // e.g., "Skin Care"
+  aliasName: varchar("alias_name", { length: 255 }).notNull().unique(), // e.g., "Skin Care" - unique to prevent duplicates
   canonicalCategoryId: integer("canonical_category_id").notNull(), // e.g., ID of "Skincare"
   isSubcategory: boolean("is_subcategory").default(false),
   discoveredBy: varchar("discovered_by", { length: 50 }).default("ai"), // 'ai' | 'admin'
