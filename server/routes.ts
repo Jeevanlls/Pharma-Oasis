@@ -1391,6 +1391,62 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     }
   });
 
+  // ============================================
+  // AI CATEGORY PROCESSOR ROUTES
+  // ============================================
+  
+  // Get AI category agent status and statistics
+  app.get("/api/admin/ai-categories/status", requireAdmin, async (req, res) => {
+    try {
+      const { getAiCategoryStats } = await import("./ai-category-processor");
+      const stats = await getAiCategoryStats();
+      res.json(stats);
+    } catch (error) {
+      console.error("Error getting AI category stats:", error);
+      res.status(500).json({ message: "Failed to get AI category stats" });
+    }
+  });
+
+  // Start the AI category background processor
+  app.post("/api/admin/ai-categories/start", requireAdmin, async (req, res) => {
+    try {
+      const { startAiCategoryProcessor } = await import("./ai-category-processor");
+      const intervalMinutes = req.body.intervalMinutes || 30;
+      startAiCategoryProcessor(intervalMinutes);
+      res.json({ message: `AI category processor started (every ${intervalMinutes} minutes)` });
+    } catch (error) {
+      console.error("Error starting AI category processor:", error);
+      res.status(500).json({ message: "Failed to start AI category processor" });
+    }
+  });
+
+  // Stop the AI category background processor
+  app.post("/api/admin/ai-categories/stop", requireAdmin, async (req, res) => {
+    try {
+      const { stopAiCategoryProcessor } = await import("./ai-category-processor");
+      stopAiCategoryProcessor();
+      res.json({ message: "AI category processor stopped" });
+    } catch (error) {
+      console.error("Error stopping AI category processor:", error);
+      res.status(500).json({ message: "Failed to stop AI category processor" });
+    }
+  });
+
+  // Run a single batch manually
+  app.post("/api/admin/ai-categories/run-batch", requireAdmin, async (req, res) => {
+    try {
+      const { runCategoryBatchManually } = await import("./ai-category-processor");
+      const result = await runCategoryBatchManually();
+      res.json({
+        message: `Processed ${result.processed} products, made ${result.changes} changes. ${result.remaining} remaining.`,
+        ...result,
+      });
+    } catch (error) {
+      console.error("Error running AI category batch:", error);
+      res.status(500).json({ message: "Failed to run AI category batch" });
+    }
+  });
+
   // Get SEO status (how many products need SEO)
   app.get("/api/admin/seo/status", requireAdmin, async (req, res) => {
     try {
