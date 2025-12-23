@@ -36,7 +36,7 @@ export default function DistributionNetworkPage() {
                   UK Pharmaceutical Licensing Notice
                 </h4>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  <strong>Pharmaceutical products</strong> (licensed medicines and medicinal goods) are supplied <strong>within the United Kingdom only</strong> to MHRA-approved wholesalers, hospitals, and registered pharmacies. Our MHRA WDA(H) licence permits pharmaceutical distribution exclusively within the UK. Health, wellness, beauty, and non-pharmaceutical products are available for distribution to all customer types and export markets.
+                  <strong>Pharmaceutical products</strong> (licensed medicines and medicinal goods) are supplied <strong>within the United Kingdom only</strong> to MHRA-approved wholesalers, hospitals, and registered pharmacies. Our MHRA WDA(H) licence permits pharmaceutical distribution exclusively within the UK. Health, wellness, beauty, and non-pharmaceutical products are available for distribution to all customer types and export markets. In addition, we supply UK pharmaceutical products to international markets in full compliance with local regulatory requirements and MHRA guidelines.
                 </p>
               </div>
             </div>
