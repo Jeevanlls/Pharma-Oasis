@@ -175,3 +175,42 @@ Admin panel includes product import from CSV with field mapping for:
 - Environment-based configuration for sensitive data
 - MHRA and GPhC regulatory field validation
 - GDP compliance documentation requirements in registration forms
+
+### AI Agents
+
+**AI Category Agent** (`server/ai-category-processor.ts`):
+- Automatically reviews and corrects product categorizations
+- Uses GPT-4o-mini for intelligent category matching
+- Processes 10 products every 5 minutes (~120/hour)
+- Tracks changes in `ai_category_reviews` table
+- Records category aliases for variant matching in `category_aliases` table
+- Admin control: `/admin/ai-categories`
+
+**SEO AI Agent** (`server/seo-ai-agent.ts`):
+- Automated SEO optimization for products, brands, and categories
+- Generates meta titles and descriptions using GPT-4o-mini
+- Runs on 24-hour schedule (configurable)
+- Processes 15 items per batch with 1.5s delay between items
+- Features:
+  - Site-wide SEO analysis
+  - B2B pharmaceutical keyword optimization
+  - Slug uniqueness validation
+  - Action logging with AI reasoning
+  - Recommendation generation
+- Database tables:
+  - `seo_agent_status` - Agent state and scheduling
+  - `seo_agent_actions` - Change history with AI reasoning
+  - `seo_recommendations` - Improvement suggestions
+- Admin control: `/admin/seo-agent`
+- API endpoints:
+  - GET `/api/admin/seo-agent/status` - Agent status and site analysis
+  - POST `/api/admin/seo-agent/start` - Start daily schedule
+  - POST `/api/admin/seo-agent/stop` - Stop schedule
+  - POST `/api/admin/seo-agent/run-now` - Manual trigger
+  - GET `/api/admin/seo-agent/actions` - Action history (paginated)
+
+**Important Notes for AI Agents:**
+- Both agents use in-memory scheduling (intervals cleared on server restart)
+- Agents must be manually restarted after deployment
+- Database lock prevents concurrent runs across multiple instances
+- All AI calls use GPT-4o-mini for cost efficiency

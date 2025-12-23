@@ -1469,6 +1469,64 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     }
   });
 
+  // SEO AI Agent endpoints
+  app.get("/api/admin/seo-agent/status", requireAdmin, async (req, res) => {
+    try {
+      const { getSeoAgentStatus } = await import("./seo-ai-agent");
+      const status = await getSeoAgentStatus();
+      res.json(status);
+    } catch (error) {
+      console.error("Error getting SEO agent status:", error);
+      res.status(500).json({ message: "Failed to get SEO agent status" });
+    }
+  });
+
+  app.post("/api/admin/seo-agent/start", requireAdmin, async (req, res) => {
+    try {
+      const { startSeoAgent } = await import("./seo-ai-agent");
+      await startSeoAgent();
+      res.json({ message: "SEO Agent started - will run daily optimization" });
+    } catch (error) {
+      console.error("Error starting SEO agent:", error);
+      res.status(500).json({ message: "Failed to start SEO agent" });
+    }
+  });
+
+  app.post("/api/admin/seo-agent/stop", requireAdmin, async (req, res) => {
+    try {
+      const { stopSeoAgent } = await import("./seo-ai-agent");
+      await stopSeoAgent();
+      res.json({ message: "SEO Agent stopped" });
+    } catch (error) {
+      console.error("Error stopping SEO agent:", error);
+      res.status(500).json({ message: "Failed to stop SEO agent" });
+    }
+  });
+
+  app.post("/api/admin/seo-agent/run-now", requireAdmin, async (req, res) => {
+    try {
+      const { runManualOptimization } = await import("./seo-ai-agent");
+      const result = await runManualOptimization();
+      res.json(result);
+    } catch (error) {
+      console.error("Error running SEO optimization:", error);
+      res.status(500).json({ message: "Failed to run SEO optimization" });
+    }
+  });
+
+  app.get("/api/admin/seo-agent/actions", requireAdmin, async (req, res) => {
+    try {
+      const { getActionHistory } = await import("./seo-ai-agent");
+      const limit = Number(req.query.limit) || 100;
+      const offset = Number(req.query.offset) || 0;
+      const history = await getActionHistory(limit, offset);
+      res.json(history);
+    } catch (error) {
+      console.error("Error getting SEO agent actions:", error);
+      res.status(500).json({ message: "Failed to get SEO agent actions" });
+    }
+  });
+
   // Admin - Categories (staff and admin can access)
   app.get("/api/admin/categories", requireStaffOrAdmin, async (req, res) => {
     try {

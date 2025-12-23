@@ -64,6 +64,7 @@ const homepageMenuItems = [
 
 const siteMenuItems = [
   { title: "SEO Management", href: "/admin/seo", icon: Globe, staffAccess: false },
+  { title: "SEO AI Agent", href: "/admin/seo-agent", icon: Bot, staffAccess: false },
   { title: "Google Pricing", href: "/admin/google-pricing", icon: Tag, staffAccess: false },
   { title: "AI Categories", href: "/admin/ai-categories", icon: Bot, staffAccess: false },
   { title: "CMS", href: "/admin/cms", icon: LayoutDashboard, staffAccess: false },
