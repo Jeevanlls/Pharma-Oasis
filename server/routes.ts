@@ -1210,6 +1210,48 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     }
   });
 
+  // Google Feed Price Processor - Manual trigger
+  app.post("/api/admin/pricing/process-batch", requireAdmin, async (req, res) => {
+    try {
+      const { processGooglePriceBatch } = await import("./price-processor");
+      const result = await processGooglePriceBatch();
+      res.json({
+        message: `Processed ${result.processed} products. ${result.remaining} remaining.`,
+        ...result,
+      });
+    } catch (error) {
+      console.error("Price batch processing error:", error);
+      res.status(500).json({ message: "Failed to process price batch" });
+    }
+  });
+
+  // Process ALL Google Feed prices at once
+  app.post("/api/admin/pricing/process-all", requireAdmin, async (req, res) => {
+    try {
+      const { forceRegenerate } = req.body;
+      const { processAllGooglePrices } = await import("./price-processor");
+      const result = await processAllGooglePrices({ forceRegenerate });
+      res.json({
+        message: `Processed ${result.totalProcessed} products.`,
+        ...result,
+      });
+    } catch (error) {
+      console.error("Price processing error:", error);
+      res.status(500).json({ message: "Failed to process prices" });
+    }
+  });
+
+  // Get Google Feed Price status
+  app.get("/api/admin/pricing/status", requireAdmin, async (req, res) => {
+    try {
+      const { getGooglePriceStatus } = await import("./price-processor");
+      const status = await getGooglePriceStatus();
+      res.json(status);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get pricing status" });
+    }
+  });
+
   // Get SEO status (how many products need SEO)
   app.get("/api/admin/seo/status", requireAdmin, async (req, res) => {
     try {
