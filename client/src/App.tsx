@@ -46,6 +46,7 @@ import AdminCompanyLocationsPage from "@/pages/admin/company-locations";
 import AdminStaffPage from "@/pages/admin/staff";
 import AdminAnalyticsPage from "@/pages/admin/analytics";
 import AdminSeoPage from "@/pages/admin/seo";
+import AdminGooglePricingPage from "@/pages/admin/google-pricing";
 
 function AdminRoute({ component: Component }: { component: React.ComponentType }) {
   const { isAdmin, isLoading } = useAuth();
@@ -111,6 +112,7 @@ function Router() {
       <Route path="/admin/footer-content">{() => <AdminRoute component={AdminFooterContentPage} />}</Route>
       <Route path="/admin/company-locations">{() => <AdminRoute component={AdminCompanyLocationsPage} />}</Route>
       <Route path="/admin/seo">{() => <AdminRoute component={AdminSeoPage} />}</Route>
+      <Route path="/admin/google-pricing">{() => <AdminRoute component={AdminGooglePricingPage} />}</Route>
       
       <Route component={NotFound} />
     </Switch>

@@ -1252,6 +1252,143 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     }
   });
 
+  // Download CSV of products WITHOUT Google Price (for filling in)
+  app.get("/api/admin/pricing/download-missing", requireAdmin, async (req, res) => {
+    try {
+      const { products } = await import("@shared/schema");
+      const { isNull, or, eq, sql } = await import("drizzle-orm");
+      
+      const productsWithoutPrice = await db.query.products.findMany({
+        where: or(
+          isNull(products.googleFeedPrice),
+          eq(sql`CAST(${products.googleFeedPrice} AS TEXT)`, ""),
+          eq(sql`CAST(${products.googleFeedPrice} AS TEXT)`, "0")
+        ),
+        with: {
+          brand: true,
+          category: true,
+        },
+        orderBy: (products, { asc }) => [asc(products.sku)],
+      });
+
+      let csv = "sku,productName,brand,category,googleFeedPrice\n";
+      
+      for (const p of productsWithoutPrice) {
+        const sku = (p.sku || "").replace(/"/g, '""');
+        const name = (p.productName || "").replace(/"/g, '""');
+        const brand = (p.brand?.name || "").replace(/"/g, '""');
+        const category = (p.category?.name || "").replace(/"/g, '""');
+        csv += `"${sku}","${name}","${brand}","${category}",""\n`;
+      }
+
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", "attachment; filename=products-missing-google-price.csv");
+      res.send(csv);
+    } catch (error) {
+      console.error("Error downloading missing prices CSV:", error);
+      res.status(500).json({ message: "Failed to download CSV" });
+    }
+  });
+
+  // Download ALL products with current Google Price (for reference/update)
+  app.get("/api/admin/pricing/download-all", requireAdmin, async (req, res) => {
+    try {
+      const allProducts = await db.query.products.findMany({
+        with: {
+          brand: true,
+          category: true,
+        },
+        orderBy: (products, { asc }) => [asc(products.sku)],
+      });
+
+      let csv = "sku,productName,brand,category,googleFeedPrice\n";
+      
+      for (const p of allProducts) {
+        const sku = (p.sku || "").replace(/"/g, '""');
+        const name = (p.productName || "").replace(/"/g, '""');
+        const brand = (p.brand?.name || "").replace(/"/g, '""');
+        const category = (p.category?.name || "").replace(/"/g, '""');
+        const price = p.googleFeedPrice || "";
+        csv += `"${sku}","${name}","${brand}","${category}","${price}"\n`;
+      }
+
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", "attachment; filename=all-products-google-price.csv");
+      res.send(csv);
+    } catch (error) {
+      console.error("Error downloading all prices CSV:", error);
+      res.status(500).json({ message: "Failed to download CSV" });
+    }
+  });
+
+  // Upload CSV with SKU + Google Price (bulk update)
+  app.post("/api/admin/pricing/upload", requireAdmin, async (req, res) => {
+    try {
+      const { rows } = req.body;
+      
+      if (!Array.isArray(rows) || rows.length === 0) {
+        return res.status(400).json({ message: "No data provided" });
+      }
+
+      const { products } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+
+      let updated = 0;
+      let skipped = 0;
+      let notFound = 0;
+      const errors: string[] = [];
+
+      for (const row of rows) {
+        const sku = row.sku?.toString().trim();
+        const priceStr = row.googleFeedPrice?.toString().trim() || row.price?.toString().trim() || row.googlePrice?.toString().trim();
+        
+        if (!sku) {
+          skipped++;
+          continue;
+        }
+
+        const price = parseFloat(priceStr);
+        if (isNaN(price) || price <= 0) {
+          skipped++;
+          continue;
+        }
+
+        try {
+          const existingProduct = await db.query.products.findFirst({
+            where: eq(products.sku, sku),
+          });
+
+          if (existingProduct) {
+            await db
+              .update(products)
+              .set({
+                googleFeedPrice: price.toFixed(2),
+                updatedAt: new Date(),
+              })
+              .where(eq(products.sku, sku));
+            updated++;
+          } else {
+            notFound++;
+          }
+        } catch (err: any) {
+          errors.push(`SKU ${sku}: ${err.message}`);
+        }
+      }
+
+      res.json({
+        message: `Updated ${updated} products`,
+        updated,
+        skipped,
+        notFound,
+        total: rows.length,
+        errors: errors.slice(0, 10),
+      });
+    } catch (error: any) {
+      console.error("Error uploading prices CSV:", error);
+      res.status(500).json({ message: "Failed to upload prices", error: error.message });
+    }
+  });
+
   // Get SEO status (how many products need SEO)
   app.get("/api/admin/seo/status", requireAdmin, async (req, res) => {
     try {
