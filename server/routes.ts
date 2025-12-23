@@ -2,6 +2,7 @@ import type { Express } from "express";
 import type { Server } from "http";
 import multer from "multer";
 import { storage } from "./storage";
+import { db } from "./db";
 import { 
   loginSchema, 
   customerRegistrationSchema, 
@@ -1191,6 +1192,43 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     } catch (error) {
       console.error("AI product description generation error:", error);
       res.status(500).json({ message: "Failed to generate description" });
+    }
+  });
+
+  // SEO Background Processor - Manual trigger
+  app.post("/api/admin/seo/process-batch", requireAdmin, async (req, res) => {
+    try {
+      const { processSeoBackgroundBatch } = await import("./seo-processor");
+      const result = await processSeoBackgroundBatch();
+      res.json({
+        message: `Processed ${result.processed} products. ${result.remaining} remaining.`,
+        ...result,
+      });
+    } catch (error) {
+      console.error("SEO batch processing error:", error);
+      res.status(500).json({ message: "Failed to process SEO batch" });
+    }
+  });
+
+  // Get SEO status (how many products need SEO)
+  app.get("/api/admin/seo/status", requireAdmin, async (req, res) => {
+    try {
+      const allProducts = await db.query.products.findMany({
+        columns: { id: true, slug: true, metaTitle: true, metaDescription: true },
+      });
+
+      const total = allProducts.length;
+      const withSeo = allProducts.filter(p => p.slug && p.metaTitle && p.metaDescription).length;
+      const needingSeo = total - withSeo;
+
+      res.json({
+        total,
+        withSeo,
+        needingSeo,
+        percentComplete: total > 0 ? Math.round((withSeo / total) * 100) : 0,
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get SEO status" });
     }
   });
 
