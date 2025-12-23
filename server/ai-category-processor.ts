@@ -8,9 +8,9 @@ const openai = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
 });
 
-const BATCH_SIZE = 3;
-const DELAY_BETWEEN_PRODUCTS = 3000;
-const RUN_INTERVAL_MINUTES = 30;
+const BATCH_SIZE = 10;
+const DELAY_BETWEEN_PRODUCTS = 2000;
+const RUN_INTERVAL_MINUTES = 5;
 
 interface CategoryInfo {
   id: number;
