@@ -10,7 +10,9 @@ import {
   contactFormSchema,
   insertProductSchema,
   profileUpdateSchema,
+  uploadJobs,
 } from "@shared/schema";
+import { eq, desc } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { processImage, deleteImageFile, validateImageFile, getImageCategories, isValidImageCategory } from "./imageProcessor";
@@ -2539,6 +2541,143 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
       res.json(session);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch session" });
+    }
+  });
+
+  // ==================== UPLOAD JOBS (Background Processing) ====================
+  
+  // List all upload jobs with filtering
+  app.get("/api/admin/upload-jobs", requireAdmin, async (req, res) => {
+    try {
+      const jobType = req.query.jobType as string | undefined;
+      const jobs = await db.select()
+        .from(uploadJobs)
+        .orderBy(desc(uploadJobs.queuedAt))
+        .limit(50);
+      
+      const filteredJobs = jobType 
+        ? jobs.filter(j => j.jobType === jobType)
+        : jobs;
+      
+      res.json(filteredJobs);
+    } catch (error) {
+      console.error("Failed to fetch upload jobs:", error);
+      res.status(500).json({ message: "Failed to fetch upload jobs" });
+    }
+  });
+
+  // Get single upload job status
+  app.get("/api/admin/upload-jobs/:id", requireAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const [job] = await db.select().from(uploadJobs).where(eq(uploadJobs.id, id));
+      
+      if (!job) {
+        return res.status(404).json({ message: "Job not found" });
+      }
+      
+      res.json(job);
+    } catch (error) {
+      console.error("Failed to fetch upload job:", error);
+      res.status(500).json({ message: "Failed to fetch upload job" });
+    }
+  });
+
+  // Queue a Google price import job
+  app.post("/api/admin/google-pricing/upload", requireAdmin, async (req, res) => {
+    try {
+      const { rows, fileName } = req.body;
+      
+      if (!Array.isArray(rows) || rows.length === 0) {
+        return res.status(400).json({ message: "No data to import" });
+      }
+
+      const userId = req.session.userId!;
+      
+      const [job] = await db.insert(uploadJobs).values({
+        jobType: "google_price_import",
+        fileName: fileName || "google_pricing.csv",
+        uploadedByUserId: userId,
+        status: "pending",
+        totalRows: rows.length,
+        errorDetails: JSON.stringify(rows),
+      }).returning();
+
+      const { queueUploadJob } = await import("./upload-processor");
+      queueUploadJob(job.id);
+
+      res.json({ 
+        message: "Upload queued for processing",
+        jobId: job.id,
+        totalRows: rows.length
+      });
+    } catch (error) {
+      console.error("Failed to queue upload:", error);
+      res.status(500).json({ message: "Failed to queue upload" });
+    }
+  });
+
+  // Queue a product import job
+  app.post("/api/admin/products/import-async", requireStaffOrAdmin, async (req, res) => {
+    try {
+      const { products: productData, fileName } = req.body;
+      
+      if (!Array.isArray(productData) || productData.length === 0) {
+        return res.status(400).json({ message: "No products to import" });
+      }
+
+      const userId = req.session.userId!;
+      
+      const [job] = await db.insert(uploadJobs).values({
+        jobType: "product_import",
+        fileName: fileName || "products.csv",
+        uploadedByUserId: userId,
+        status: "pending",
+        totalRows: productData.length,
+        errorDetails: JSON.stringify(productData),
+      }).returning();
+
+      const { queueUploadJob } = await import("./upload-processor");
+      queueUploadJob(job.id);
+
+      res.json({ 
+        message: "Import queued for processing",
+        jobId: job.id,
+        totalRows: productData.length
+      });
+    } catch (error) {
+      console.error("Failed to queue product import:", error);
+      res.status(500).json({ message: "Failed to queue import" });
+    }
+  });
+
+  // Download errors for a specific job
+  app.get("/api/admin/upload-jobs/:id/errors", requireAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const [job] = await db.select().from(uploadJobs).where(eq(uploadJobs.id, id));
+      
+      if (!job) {
+        return res.status(404).json({ message: "Job not found" });
+      }
+
+      if (!job.errorDetails) {
+        return res.status(404).json({ message: "No errors found for this job" });
+      }
+
+      const errors = JSON.parse(job.errorDetails);
+      
+      let csv = "row,sku,error\n";
+      for (const err of errors) {
+        csv += `${err.row},"${err.sku || ""}","${(err.error || "").replace(/"/g, '""')}"\n`;
+      }
+
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", `attachment; filename="job_${id}_errors.csv"`);
+      res.send(csv);
+    } catch (error) {
+      console.error("Failed to download errors:", error);
+      res.status(500).json({ message: "Failed to download errors" });
     }
   });
 
