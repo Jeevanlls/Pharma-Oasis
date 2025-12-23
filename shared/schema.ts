@@ -758,6 +758,36 @@ export type InsertPageView = z.infer<typeof insertPageViewSchema>;
 export type PageView = typeof pageViews.$inferSelect;
 
 // ============================================
+// UPLOAD JOBS TABLE (Background Processing)
+// ============================================
+export const uploadJobs = pgTable("upload_jobs", {
+  id: serial("id").primaryKey(),
+  jobType: varchar("job_type", { length: 50 }).notNull(), // 'product_import' | 'google_price_import'
+  fileName: varchar("file_name", { length: 255 }).notNull(),
+  uploadedByUserId: integer("uploaded_by_user_id").notNull(),
+  status: varchar("status", { length: 20 }).notNull().default("pending"), // 'pending' | 'processing' | 'completed' | 'failed'
+  totalRows: integer("total_rows").default(0),
+  processedRows: integer("processed_rows").default(0),
+  successCount: integer("success_count").default(0),
+  failureCount: integer("failure_count").default(0),
+  skippedCount: integer("skipped_count").default(0),
+  summaryMessage: text("summary_message"),
+  errorDetails: text("error_details"), // JSON string of failed rows for download
+  queuedAt: timestamp("queued_at").defaultNow().notNull(),
+  startedAt: timestamp("started_at"),
+  finishedAt: timestamp("finished_at"),
+});
+
+// Upload jobs schemas
+export const insertUploadJobSchema = createInsertSchema(uploadJobs).omit({
+  id: true,
+  queuedAt: true,
+});
+export const selectUploadJobSchema = createSelectSchema(uploadJobs);
+export type InsertUploadJob = z.infer<typeof insertUploadJobSchema>;
+export type UploadJob = typeof uploadJobs.$inferSelect;
+
+// ============================================
 // FORM VALIDATION SCHEMAS
 // ============================================
 
