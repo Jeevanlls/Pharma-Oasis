@@ -788,6 +788,77 @@ export type InsertUploadJob = z.infer<typeof insertUploadJobSchema>;
 export type UploadJob = typeof uploadJobs.$inferSelect;
 
 // ============================================
+// AI CATEGORY REVIEW TABLE (Tracks AI-reviewed products)
+// ============================================
+export const aiCategoryReviews = pgTable("ai_category_reviews", {
+  id: serial("id").primaryKey(),
+  productId: integer("product_id").notNull(),
+  previousCategoryId: integer("previous_category_id"),
+  previousSubcategoryId: integer("previous_subcategory_id"),
+  newCategoryId: integer("new_category_id"),
+  newSubcategoryId: integer("new_subcategory_id"),
+  confidence: decimal("confidence", { precision: 3, scale: 2 }), // 0.00 to 1.00
+  aiReasoning: text("ai_reasoning"),
+  changesMade: boolean("changes_made").default(false),
+  status: varchar("status", { length: 20 }).notNull().default("completed"), // 'completed' | 'skipped' | 'error'
+  reviewedAt: timestamp("reviewed_at").defaultNow().notNull(),
+});
+
+// AI category reviews schemas
+export const insertAiCategoryReviewSchema = createInsertSchema(aiCategoryReviews).omit({
+  id: true,
+  reviewedAt: true,
+});
+export const selectAiCategoryReviewSchema = createSelectSchema(aiCategoryReviews);
+export type InsertAiCategoryReview = z.infer<typeof insertAiCategoryReviewSchema>;
+export type AiCategoryReview = typeof aiCategoryReviews.$inferSelect;
+
+// ============================================
+// CATEGORY ALIASES TABLE (Maps variant names to canonical categories)
+// ============================================
+export const categoryAliases = pgTable("category_aliases", {
+  id: serial("id").primaryKey(),
+  aliasName: varchar("alias_name", { length: 255 }).notNull(), // e.g., "Skin Care"
+  canonicalCategoryId: integer("canonical_category_id").notNull(), // e.g., ID of "Skincare"
+  isSubcategory: boolean("is_subcategory").default(false),
+  discoveredBy: varchar("discovered_by", { length: 50 }).default("ai"), // 'ai' | 'admin'
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Category aliases schemas
+export const insertCategoryAliasSchema = createInsertSchema(categoryAliases).omit({
+  id: true,
+  createdAt: true,
+});
+export const selectCategoryAliasSchema = createSelectSchema(categoryAliases);
+export type InsertCategoryAlias = z.infer<typeof insertCategoryAliasSchema>;
+export type CategoryAlias = typeof categoryAliases.$inferSelect;
+
+// ============================================
+// AI CATEGORY AGENT STATUS TABLE (Tracks background agent state)
+// ============================================
+export const aiCategoryAgentStatus = pgTable("ai_category_agent_status", {
+  id: serial("id").primaryKey(),
+  isRunning: boolean("is_running").default(false),
+  lastRunAt: timestamp("last_run_at"),
+  totalProductsProcessed: integer("total_products_processed").default(0),
+  totalChanges: integer("total_changes").default(0),
+  lastProductId: integer("last_product_id").default(0), // For resuming from where we left off
+  errorCount: integer("error_count").default(0),
+  lastError: text("last_error"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// AI category agent status schemas
+export const insertAiCategoryAgentStatusSchema = createInsertSchema(aiCategoryAgentStatus).omit({
+  id: true,
+  updatedAt: true,
+});
+export const selectAiCategoryAgentStatusSchema = createSelectSchema(aiCategoryAgentStatus);
+export type InsertAiCategoryAgentStatus = z.infer<typeof insertAiCategoryAgentStatusSchema>;
+export type AiCategoryAgentStatus = typeof aiCategoryAgentStatus.$inferSelect;
+
+// ============================================
 // FORM VALIDATION SCHEMAS
 // ============================================
 
