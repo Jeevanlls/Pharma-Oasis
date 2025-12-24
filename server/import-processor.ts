@@ -1,7 +1,7 @@
 import { db, pool } from "./db";
 import { importJobs, importJobLines, products, brands, categories } from "@shared/schema";
 import { eq, and, sql } from "drizzle-orm";
-import { storage } from "./storage";
+import { storage } from "./storage"; // Used for brand/category creation
 
 const BATCH_SIZE = 50;
 const PROCESS_INTERVAL = 2000; // 2 seconds between batches
@@ -107,9 +107,7 @@ async function processLine(
       }
     }
     
-    // Check if product exists
-    const existingProduct = await storage.getProductBySku(row.sku);
-    
+    // Use true UPSERT to avoid N+1 lookups
     const productPayload = {
       sku: row.sku,
       ean: row.ean || null,
@@ -132,18 +130,41 @@ async function processLine(
       countryOfOrigin: row.countryOfOrigin || null,
       productType: row.productType || null,
       storageConditions: row.storageConditions || null,
+      slug: row.sku.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
     };
     
-    let productId: number;
-    if (existingProduct) {
-      await storage.updateProduct(existingProduct.id, productPayload);
-      productId = existingProduct.id;
-    } else {
-      const newProduct = await storage.createProduct(productPayload);
-      productId = newProduct.id;
-    }
+    // INSERT ... ON CONFLICT(sku) DO UPDATE - single query, no prior lookup
+    const [result] = await db
+      .insert(products)
+      .values(productPayload)
+      .onConflictDoUpdate({
+        target: products.sku,
+        set: {
+          ean: productPayload.ean,
+          brandId: productPayload.brandId,
+          productName: productPayload.productName,
+          shortDescription: productPayload.shortDescription,
+          longDescription: productPayload.longDescription,
+          categoryId: productPayload.categoryId,
+          subcategoryId: productPayload.subcategoryId,
+          packSize: productPayload.packSize,
+          caseSize: productPayload.caseSize,
+          uom: productPayload.uom,
+          rrp: productPayload.rrp,
+          wholesalePrice: productPayload.wholesalePrice,
+          moq: productPayload.moq,
+          vatRate: productPayload.vatRate,
+          isActive: productPayload.isActive,
+          isFeatured: productPayload.isFeatured,
+          imageUrl: productPayload.imageUrl,
+          countryOfOrigin: productPayload.countryOfOrigin,
+          productType: productPayload.productType,
+          storageConditions: productPayload.storageConditions,
+        }
+      })
+      .returning({ id: products.id });
     
-    return { success: true, productId };
+    return { success: true, productId: result.id };
   } catch (err: any) {
     return { success: false, error: err.message || "Unknown error" };
   }

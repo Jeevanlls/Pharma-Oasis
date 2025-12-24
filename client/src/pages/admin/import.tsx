@@ -63,11 +63,18 @@ export default function AdminImportPage() {
   // Fetch import history
   const { data: importJobs, refetch: refetchJobs } = useQuery<ImportJob[]>({
     queryKey: ["/api/admin/import-jobs"],
-    refetchInterval: activeJobId ? 2000 : false, // Poll every 2s if there's an active job
+    refetchInterval: (query) => {
+      // Poll every 2s if any job is processing or queued
+      const jobs = query.state.data as ImportJob[] | undefined;
+      const hasActiveJob = jobs?.some(j => j.status === "queued" || j.status === "processing");
+      return hasActiveJob ? 2000 : false;
+    },
   });
 
-  // Get the active job details
-  const activeJob = importJobs?.find(j => j.id === activeJobId);
+  // Derive active job from history (first processing/queued job, or the one we just started)
+  const activeJob = importJobs?.find(j => 
+    j.id === activeJobId || j.status === "queued" || j.status === "processing"
+  );
   
   // Auto-clear active job when completed
   useEffect(() => {
