@@ -1,12 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "./routes";
-import { serveStatic } from "./static";
 import { createServer } from "http";
 import path from "path";
-import { db } from "./db";
-import { users } from "@shared/schema";
-import { eq } from "drizzle-orm";
-import { setupChatWebSocket } from "./chat-websocket";
 import compression from "compression";
 import helmet from "helmet";
 
@@ -19,20 +13,22 @@ declare module "http" {
   }
 }
 
-// CRITICAL: Health check endpoints FIRST - before ANY middleware
-// Must respond instantly for deployment health checks
+// CRITICAL: Health check endpoints FIRST - before ANY imports that touch the database
+// These must respond instantly for deployment health checks
+let appReady = false;
+
 app.get("/health", (_, res) => {
   res.status(200).send("OK");
 });
 
-// Root endpoint serves health check for non-browser clients, SPA for browsers
+// Root endpoint - return OK for health checks until app is fully ready
+// Once ready, this middleware is bypassed and Vite/static serves the SPA
 app.get("/", (req, res, next) => {
-  const accept = req.get("Accept") || "";
-  // Health check probes typically don't send Accept: text/html
-  if (!accept.includes("text/html")) {
+  if (!appReady) {
+    // App still initializing - respond OK for health checks
     return res.status(200).type("text/plain").send("OK");
   }
-  // Let Vite/static serve the SPA for browsers
+  // App ready - let Vite/static handle the request
   next();
 });
 
@@ -89,7 +85,7 @@ export function log(message: string, source = "express") {
 
 app.use((req, res, next) => {
   const start = Date.now();
-  const path = req.path;
+  const reqPath = req.path;
   let capturedJsonResponse: Record<string, any> | undefined = undefined;
 
   const originalResJson = res.json;
@@ -100,8 +96,8 @@ app.use((req, res, next) => {
 
   res.on("finish", () => {
     const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
+    if (reqPath.startsWith("/api")) {
+      let logLine = `${req.method} ${reqPath} ${res.statusCode} in ${duration}ms`;
       if (capturedJsonResponse) {
         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       }
@@ -113,9 +109,88 @@ app.use((req, res, next) => {
   next();
 });
 
-// Ensure chat tables exist (creates them if missing)
-async function ensureChatTables() {
+// START SERVER IMMEDIATELY for health checks
+const port = parseInt(process.env.PORT || "5000", 10);
+
+httpServer.listen(
+  {
+    port,
+    host: "0.0.0.0",
+    reusePort: true,
+  },
+  () => {
+    log(`serving on port ${port}`);
+    
+    // AFTER server is listening, initialize the rest asynchronously
+    initializeApp();
+  },
+);
+
+// Async initialization - runs AFTER server is already accepting health checks
+async function initializeApp() {
   try {
+    // Dynamic imports to avoid blocking startup with database connections
+    const { db } = await import("./db");
+    const { users } = await import("@shared/schema");
+    const { eq } = await import("drizzle-orm");
+    const { setupChatWebSocket } = await import("./chat-websocket");
+    const { registerRoutes } = await import("./routes");
+    const { serveStatic } = await import("./static");
+
+    // Setup WebSocket for chat
+    setupChatWebSocket(httpServer);
+
+    // Register all routes
+    await registerRoutes(httpServer, app);
+
+    // Error handler
+    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+      const status = err.status || err.statusCode || 500;
+      const message = err.message || "Internal Server Error";
+      res.status(status).json({ message });
+      throw err;
+    });
+
+    // Serve static assets from public folder
+    const publicPath = path.resolve(process.cwd(), "public");
+    app.use(express.static(publicPath, {
+      maxAge: "7d",
+      etag: true,
+    }));
+
+    // Serve attached assets with long-term caching
+    const attachedAssetsPath = path.resolve(process.cwd(), "attached_assets");
+    app.use("/attached_assets", express.static(attachedAssetsPath, {
+      maxAge: "30d",
+      etag: true,
+      immutable: true,
+    }));
+
+    // Setup Vite in development or static serving in production
+    if (process.env.NODE_ENV === "production") {
+      serveStatic(app);
+    } else {
+      const { setupVite } = await import("./vite");
+      await setupVite(httpServer, app);
+    }
+
+    log("Routes and static serving ready");
+    
+    // Mark app as ready - "/" will now serve the SPA instead of health check
+    appReady = true;
+
+    // Background tasks - don't block main initialization
+    runBackgroundTasks(db, users, eq);
+
+  } catch (error: any) {
+    log(`Initialization error: ${error.message}`);
+  }
+}
+
+// Background tasks that can run after routes are ready
+async function runBackgroundTasks(db: any, users: any, eq: any) {
+  try {
+    // Ensure chat tables exist
     await db.execute(`
       CREATE TABLE IF NOT EXISTS chat_sessions (
         id SERIAL PRIMARY KEY,
@@ -156,39 +231,9 @@ async function ensureChatTables() {
       );
     `);
     log("Chat tables verified/created");
-  } catch (error: any) {
-    log(`Warning: Could not verify chat tables: ${error.message}`);
-  }
-}
 
-// Auto-seed database if empty (for production first-time setup)
-// Reduced retries for faster startup - fails quickly if DB not ready
-async function autoSeedIfEmpty(retries = 3, delayMs = 1000) {
-  for (let attempt = 1; attempt <= retries; attempt++) {
+    // Auto-seed if database is empty (quick check, no retries)
     try {
-      // First check if the users table exists
-      const tableCheck = await db.execute(`
-        SELECT EXISTS (
-          SELECT FROM information_schema.tables 
-          WHERE table_schema = 'public' 
-          AND table_name = 'users'
-        );
-      `);
-      
-      const tableExists = tableCheck.rows[0]?.exists === true;
-      
-      if (!tableExists) {
-        if (attempt < retries) {
-          log(`Attempt ${attempt}/${retries}: Database tables not ready, waiting ${delayMs}ms...`);
-          await new Promise(resolve => setTimeout(resolve, delayMs));
-          continue;
-        } else {
-          log("Database tables not found after all retries. Please run migrations.");
-          return;
-        }
-      }
-      
-      // Tables exist, check for admin user
       const adminUser = await db.select().from(users).where(eq(users.email, "admin@pharmaoasis.com"));
       if (adminUser.length === 0) {
         log("Database appears empty, auto-seeding demo data...");
@@ -198,87 +243,17 @@ async function autoSeedIfEmpty(retries = 3, delayMs = 1000) {
       } else {
         log("Database already has data, skipping auto-seed");
       }
-      return; // Success, exit the retry loop
-      
-    } catch (error: any) {
-      if (attempt < retries) {
-        log(`Attempt ${attempt}/${retries}: Database not ready (${error.message}), waiting ${delayMs}ms...`);
-        await new Promise(resolve => setTimeout(resolve, delayMs));
-      } else {
-        log(`Auto-seed failed after ${retries} attempts: ${error.message}`);
-      }
+    } catch (seedError: any) {
+      log(`Auto-seed check skipped: ${seedError.message}`);
     }
+
+    // Start background import processor
+    const { startImportProcessor } = await import("./import-processor");
+    startImportProcessor();
+
+    log("Application fully initialized");
+
+  } catch (error: any) {
+    log(`Background task warning: ${error.message}`);
   }
 }
-
-// START SERVER IMMEDIATELY for health checks, then initialize async
-const port = parseInt(process.env.PORT || "5000", 10);
-
-setupChatWebSocket(httpServer);
-
-httpServer.listen(
-  {
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  },
-  () => {
-    log(`serving on port ${port}`);
-  },
-);
-
-// Async initialization AFTER server is listening
-(async () => {
-  // CRITICAL: Register routes and static serving FIRST for fast health checks
-  await registerRoutes(httpServer, app);
-
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-
-    res.status(status).json({ message });
-    throw err;
-  });
-
-  // Serve static assets from public folder with caching (for banner images, etc.)
-  const publicPath = path.resolve(process.cwd(), "public");
-  app.use(express.static(publicPath, {
-    maxAge: "7d",
-    etag: true,
-  }));
-
-  // Serve attached assets with long-term caching (product images, stock images, etc.)
-  const attachedAssetsPath = path.resolve(process.cwd(), "attached_assets");
-  app.use("/attached_assets", express.static(attachedAssetsPath, {
-    maxAge: "30d",
-    etag: true,
-    immutable: true,
-  }));
-
-  // Setup Vite/static serving for SPA
-  if (process.env.NODE_ENV === "production") {
-    serveStatic(app);
-  } else {
-    const { setupVite } = await import("./vite");
-    await setupVite(httpServer, app);
-  }
-  
-  log("Routes and static serving ready");
-
-  // DEFERRED: Database operations run AFTER routes are ready
-  // These don't block health checks or page serving
-  setImmediate(async () => {
-    try {
-      await ensureChatTables();
-      await autoSeedIfEmpty();
-      
-      // Start background import processor
-      const { startImportProcessor } = await import("./import-processor");
-      startImportProcessor();
-      
-      log("Application fully initialized");
-    } catch (error: any) {
-      log(`Background initialization warning: ${error.message}`);
-    }
-  });
-})();
