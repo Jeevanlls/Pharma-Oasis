@@ -25,18 +25,11 @@ app.get("/health", (_, res) => {
   res.status(200).send("OK");
 });
 
-// Root endpoint - always responds immediately (no next() call)
-// Health checks get plain OK, browsers get redirect to load SPA
-app.get("/", (req, res) => {
-  const accept = req.headers.accept || "";
-  if (accept.includes("text/html")) {
-    // Browser request - serve minimal HTML that loads the SPA
-    return res.status(200).send(`<!DOCTYPE html>
-<html><head><meta http-equiv="refresh" content="0;url=/home"></head>
-<body></body></html>`);
-  }
-  // Health check - plain OK
-  res.status(200).send("OK");
+// Root endpoint - unconditional OK response for Replit health checks
+// No header inspection, no redirects - just plain text OK
+// SPA is served via catch-all route for actual page paths like /home, /products
+app.get("/", (_, res) => {
+  res.status(200).type("text/plain").send("OK");
 });
 
 // Enable gzip/brotli compression for all responses
