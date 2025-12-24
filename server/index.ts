@@ -132,8 +132,13 @@ httpServer.listen(
   () => {
     log(`serving on port ${port}`);
     
-    // AFTER server is listening, initialize the rest asynchronously
-    initializeApp();
+    // CRITICAL: Use setImmediate to defer initialization to NEXT event loop tick
+    // This allows health check requests to be processed BEFORE any blocking code runs
+    setImmediate(() => {
+      initializeApp().catch((err) => {
+        log(`Initialization failed: ${err.message}`);
+      });
+    });
   },
 );
 
@@ -187,8 +192,10 @@ async function initializeApp() {
 
     log("Routes and static serving ready");
 
-    // Background tasks - don't block main initialization
-    runBackgroundTasks(db, users, eq);
+    // Background tasks - defer to next tick to keep event loop responsive
+    setImmediate(() => {
+      runBackgroundTasks(db, users, eq);
+    });
 
   } catch (error: any) {
     log(`Initialization error: ${error.message}`);
