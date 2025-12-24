@@ -162,8 +162,8 @@ async function ensureChatTables() {
 }
 
 // Auto-seed database if empty (for production first-time setup)
-// This includes retry logic to wait for tables to exist after migrations
-async function autoSeedIfEmpty(retries = 10, delayMs = 2000) {
+// Reduced retries for faster startup - fails quickly if DB not ready
+async function autoSeedIfEmpty(retries = 3, delayMs = 1000) {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       // First check if the users table exists
@@ -229,17 +229,8 @@ httpServer.listen(
 
 // Async initialization AFTER server is listening
 (async () => {
-  // Ensure chat tables exist
-  await ensureChatTables();
-  
-  // Auto-seed on startup if database is empty
-  await autoSeedIfEmpty();
-  
+  // CRITICAL: Register routes and static serving FIRST for fast health checks
   await registerRoutes(httpServer, app);
-  
-  // Start background import processor
-  const { startImportProcessor } = await import("./import-processor");
-  startImportProcessor();
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
@@ -264,9 +255,7 @@ httpServer.listen(
     immutable: true,
   }));
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
+  // Setup Vite/static serving for SPA
   if (process.env.NODE_ENV === "production") {
     serveStatic(app);
   } else {
@@ -274,5 +263,22 @@ httpServer.listen(
     await setupVite(httpServer, app);
   }
   
-  log("Application fully initialized");
+  log("Routes and static serving ready");
+
+  // DEFERRED: Database operations run AFTER routes are ready
+  // These don't block health checks or page serving
+  setImmediate(async () => {
+    try {
+      await ensureChatTables();
+      await autoSeedIfEmpty();
+      
+      // Start background import processor
+      const { startImportProcessor } = await import("./import-processor");
+      startImportProcessor();
+      
+      log("Application fully initialized");
+    } catch (error: any) {
+      log(`Background initialization warning: ${error.message}`);
+    }
+  });
 })();
