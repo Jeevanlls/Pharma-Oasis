@@ -19,20 +19,21 @@ declare module "http" {
   }
 }
 
-// Fast health check endpoints - MUST be before all middleware for quick response
-// Deployment health checks go to / by default
+// CRITICAL: Health check endpoints FIRST - before ANY middleware
+// Must respond instantly for deployment health checks
 app.get("/health", (_, res) => {
-  res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
+  res.status(200).send("OK");
 });
 
-// Root health check for deployment platform (responds to / without Accept: text/html)
+// Root health check - always respond OK immediately for deployment platform
+// SPA will be served by static file middleware registered later
+let appReady = false;
 app.get("/", (req, res, next) => {
+  // Always respond OK for health checks (non-browser requests)
   const acceptHeader = req.headers.accept || "";
-  // If it's a health check (no HTML expected), respond immediately
-  if (!acceptHeader.includes("text/html")) {
+  if (!acceptHeader.includes("text/html") || !appReady) {
     return res.status(200).send("OK");
   }
-  // Otherwise, continue to serve the React SPA
   next();
 });
 
@@ -270,5 +271,7 @@ httpServer.listen(
     await setupVite(httpServer, app);
   }
   
+  // Mark app as ready for full SPA serving
+  appReady = true;
   log("Application fully initialized");
 })();
