@@ -5,7 +5,7 @@ import { eq, and } from "drizzle-orm";
 
 const router = Router();
 
-const SITE_URL = process.env.SITE_URL || "https://pharmaoasis.com";
+const SITE_URL = process.env.SITE_URL || "https://pharmaoasis.co.uk";
 
 router.get("/sitemap.xml", async (req, res) => {
   try {
@@ -180,9 +180,13 @@ router.get("/robots.txt", (req, res) => {
   const robots = `User-agent: *
 Allow: /
 
-Sitemap: ${SITE_URL}/feeds/sitemap.xml
+Disallow: /admin/
+Disallow: /api/
+
+Sitemap: ${SITE_URL}/sitemap.xml
 `;
   res.set("Content-Type", "text/plain");
+  res.set("Cache-Control", "public, max-age=86400");
   res.send(robots);
 });
 

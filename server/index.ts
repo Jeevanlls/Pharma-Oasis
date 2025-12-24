@@ -7,6 +7,8 @@ import { db } from "./db";
 import { users } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { setupChatWebSocket } from "./chat-websocket";
+import compression from "compression";
+import helmet from "helmet";
 
 const app = express();
 const httpServer = createServer(app);
@@ -16,6 +18,40 @@ declare module "http" {
     rawBody: unknown;
   }
 }
+
+// Enable gzip/brotli compression for all responses
+app.use(compression());
+
+// Security headers with Helmet
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "https:", "blob:"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      connectSrc: ["'self'", "wss:", "ws:"],
+      frameSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      upgradeInsecureRequests: [],
+    },
+  },
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true,
+  },
+  frameguard: { action: "deny" },
+  referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+  xssFilter: true,
+  noSniff: true,
+}));
+
+// Health check endpoint for uptime monitoring
+app.get("/health", (_, res) => {
+  res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
+});
 
 app.use(
   express.json({
@@ -180,13 +216,20 @@ async function autoSeedIfEmpty(retries = 10, delayMs = 2000) {
     throw err;
   });
 
-  // Serve static assets from public folder (for banner images, etc.)
+  // Serve static assets from public folder with caching (for banner images, etc.)
   const publicPath = path.resolve(process.cwd(), "public");
-  app.use(express.static(publicPath));
+  app.use(express.static(publicPath, {
+    maxAge: "7d",
+    etag: true,
+  }));
 
-  // Serve attached assets (product images, stock images, etc.)
+  // Serve attached assets with long-term caching (product images, stock images, etc.)
   const attachedAssetsPath = path.resolve(process.cwd(), "attached_assets");
-  app.use("/attached_assets", express.static(attachedAssetsPath));
+  app.use("/attached_assets", express.static(attachedAssetsPath, {
+    maxAge: "30d",
+    etag: true,
+    immutable: true,
+  }));
 
   // importantly only setup vite in development and after
   // setting up all the other routes so the catch-all route

@@ -1,0 +1,125 @@
+1️⃣ Deployment Configuration (High Priority)
+
+Upgrade deployment to Reserved VM to eliminate cold starts and ensure consistent Googlebot crawling.
+
+Update .replit as follows:
+
+[deployment]
+deploymentTarget = "reserved-vm"
+
+2️⃣ Enable Compression & Asset Caching (High Priority)
+
+Add gzip/brotli compression middleware.
+
+Configure long-term caching headers for static assets (hashed CSS/JS/images).
+
+Implementation:
+
+import compression from 'compression';
+app.use(compression());
+
+app.use('/assets', express.static('dist/assets', {
+  maxAge: '1y',
+  immutable: true
+}));
+
+3️⃣ Add Security & SEO Headers (High Priority)
+
+Implement helmet middleware with:
+
+CSP
+
+HSTS (1 year)
+
+X-Frame-Options (deny)
+
+Referrer-Policy
+
+Implementation:
+
+import helmet from 'helmet';
+
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "https:"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+    },
+  },
+  hsts: { maxAge: 31536000, includeSubDomains: true },
+  frameguard: { action: 'deny' },
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+}));
+
+4️⃣ robots.txt & sitemap.xml (Medium Priority)
+
+Serve robots.txt at the root path (/robots.txt).
+
+Reference the existing sitemap correctly:
+
+Sitemap: https://pharmaoasis.co.uk/sitemap.xml
+
+
+Keep the dynamic sitemap logic unchanged.
+
+5️⃣ Health Check Endpoint (Medium Priority)
+
+Add a public /health endpoint returning HTTP 200 for uptime monitoring and Googlebot stability.
+
+Example:
+
+app.get('/health', (_, res) => res.status(200).send('OK'));
+
+6️⃣ Cloudflare Configuration (Explicit Instruction)
+
+Keep Cloudflare in DNS-only mode (no orange-cloud proxy).
+
+Do not use Cloudflare Workers or proxy mode.
+
+All security headers must be handled inside Express.
+
+7️⃣ Verification Checklist
+
+Please confirm once complete:
+
+No cold starts occur
+
+Compression is active
+
+Security headers are visible in response headers
+
+robots.txt is reachable at /robots.txt
+
+Sitemap is accessible and indexed
+
+WebSockets, AI agents, sessions, and uploads remain unaffected
+
+Goal:
+Achieve consistent SEO crawlability, improved Core Web Vitals, and production-grade security suitable for a regulated pharmaceutical B2B website.
+
+🧠 Why this prompt works
+
+It’s action-oriented
+
+It avoids debate
+
+It respects Replit’s architecture
+
+It aligns with Google SEO + MHRA optics
+
+It’s impossible to misinterpret
+
+Next (optional but recommended)
+
+After they confirm implementation, I can:
+
+🔍 Audit your site against Google PageSpeed Insights
+
+📈 Guide you through Google Search Console indexing
+
+🧾 Review pharma compliance wording for SEO trust
+
+Just say the word 👍

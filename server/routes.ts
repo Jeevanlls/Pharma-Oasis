@@ -47,6 +47,16 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
   // Session middleware with PostgreSQL store
   app.use(sessionMiddleware);
 
+  // Root-level SEO routes (for Googlebot compliance)
+  app.get("/robots.txt", (req, res, next) => {
+    req.url = "/feeds/robots.txt";
+    next();
+  });
+  app.get("/sitemap.xml", (req, res, next) => {
+    req.url = "/feeds/sitemap.xml";
+    next();
+  });
+
   // SEO Feeds (sitemap, Google Shopping, robots.txt)
   app.use("/feeds", feedsRouter);
 
