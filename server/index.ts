@@ -232,6 +232,10 @@ httpServer.listen(
   await autoSeedIfEmpty();
   
   await registerRoutes(httpServer, app);
+  
+  // Start background import processor
+  const { startImportProcessor } = await import("./import-processor");
+  startImportProcessor();
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;

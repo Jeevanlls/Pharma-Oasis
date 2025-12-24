@@ -941,6 +941,56 @@ export type InsertSeoRecommendation = z.infer<typeof insertSeoRecommendationSche
 export type SeoRecommendation = typeof seoRecommendations.$inferSelect;
 
 // ============================================
+// IMPORT JOBS TABLE (for background CSV processing)
+// ============================================
+export const importJobs = pgTable("import_jobs", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  filename: varchar("filename", { length: 500 }).notNull(),
+  totalRows: integer("total_rows").notNull().default(0),
+  processedRows: integer("processed_rows").notNull().default(0),
+  successCount: integer("success_count").notNull().default(0),
+  errorCount: integer("error_count").notNull().default(0),
+  status: varchar("status", { length: 20 }).notNull().default("queued"), // 'queued', 'processing', 'completed', 'failed', 'cancelled'
+  errorSummary: text("error_summary"),
+  startedAt: timestamp("started_at"),
+  finishedAt: timestamp("finished_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertImportJobSchema = createInsertSchema(importJobs).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const selectImportJobSchema = createSelectSchema(importJobs);
+export type InsertImportJob = z.infer<typeof insertImportJobSchema>;
+export type ImportJob = typeof importJobs.$inferSelect;
+
+// ============================================
+// IMPORT JOB LINES TABLE (per-row tracking)
+// ============================================
+export const importJobLines = pgTable("import_job_lines", {
+  id: serial("id").primaryKey(),
+  jobId: integer("job_id").notNull(),
+  rowNumber: integer("row_number").notNull(),
+  payload: text("payload").notNull(), // JSON of original CSV row
+  status: varchar("status", { length: 20 }).notNull().default("pending"), // 'pending', 'success', 'error', 'skipped'
+  errorMessage: text("error_message"),
+  productId: integer("product_id"), // ID of created/updated product if successful
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertImportJobLineSchema = createInsertSchema(importJobLines).omit({
+  id: true,
+  createdAt: true,
+});
+export const selectImportJobLineSchema = createSelectSchema(importJobLines);
+export type InsertImportJobLine = z.infer<typeof insertImportJobLineSchema>;
+export type ImportJobLine = typeof importJobLines.$inferSelect;
+
+// ============================================
 // FORM VALIDATION SCHEMAS
 // ============================================
 

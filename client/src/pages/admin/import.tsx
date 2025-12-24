@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,21 +17,26 @@ import {
   Info,
   XCircle,
   FileWarning,
+  RefreshCw,
+  History,
+  Clock,
+  RotateCcw,
 } from "lucide-react";
 
-interface FailedRow {
-  rowNumber: number;
-  data: Record<string, any>;
-  error: string;
-}
-
-interface ImportResult {
-  created: number;
-  updated: number;
-  failed: number;
-  total: number;
-  errors: string[];
-  failedRows: FailedRow[];
+interface ImportJob {
+  id: number;
+  userId: number;
+  filename: string;
+  totalRows: number;
+  processedRows: number;
+  successCount: number;
+  errorCount: number;
+  status: "queued" | "processing" | "completed" | "failed" | "cancelled";
+  errorSummary: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 const requiredColumns = [
@@ -52,35 +57,81 @@ export default function AdminImportPage() {
   const [file, setFile] = useState<File | null>(null);
   const [parsedData, setParsedData] = useState<any[] | null>(null);
   const [originalHeaders, setOriginalHeaders] = useState<string[]>([]);
-  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [activeJobId, setActiveJobId] = useState<number | null>(null);
   const { toast } = useToast();
 
-  const importMutation = useMutation({
-    mutationFn: async (products: any[]): Promise<ImportResult> => {
-      const res = await apiRequest("POST", "/api/admin/products/import", { products });
-      return res.json();
-    },
-    onSuccess: (result: ImportResult) => {
-      setImportResult(result);
+  // Fetch import history
+  const { data: importJobs, refetch: refetchJobs } = useQuery<ImportJob[]>({
+    queryKey: ["/api/admin/import-jobs"],
+    refetchInterval: activeJobId ? 2000 : false, // Poll every 2s if there's an active job
+  });
+
+  // Get the active job details
+  const activeJob = importJobs?.find(j => j.id === activeJobId);
+  
+  // Auto-clear active job when completed
+  useEffect(() => {
+    if (activeJob && (activeJob.status === "completed" || activeJob.status === "failed")) {
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
       
-      if (result.failed > 0) {
-        toast({ 
-          title: "Import completed with errors",
-          description: `${result.created + result.updated} succeeded, ${result.failed} failed`,
-          variant: "destructive"
-        });
-      } else {
+      if (activeJob.status === "completed" && activeJob.errorCount === 0) {
         toast({ 
           title: "Import completed successfully",
-          description: `${result.created} created, ${result.updated} updated`
+          description: `${activeJob.successCount} products imported`
+        });
+      } else if (activeJob.errorCount > 0) {
+        toast({ 
+          title: "Import completed with errors",
+          description: `${activeJob.successCount} succeeded, ${activeJob.errorCount} failed`,
+          variant: "destructive"
         });
       }
+    }
+  }, [activeJob?.status, activeJob?.errorCount, toast]);
+
+  // Create background import job
+  const importMutation = useMutation({
+    mutationFn: async ({ products, filename }: { products: any[]; filename: string }) => {
+      const res = await apiRequest("POST", "/api/admin/import-jobs", { products, filename });
+      return res.json();
+    },
+    onSuccess: (result: { jobId: number; totalRows: number }) => {
+      setActiveJobId(result.jobId);
+      setFile(null);
+      setParsedData(null);
+      refetchJobs();
+      toast({ 
+        title: "Import started",
+        description: `Processing ${result.totalRows} products in background`
+      });
     },
     onError: (error: any) => {
       toast({ 
-        title: "Import failed", 
+        title: "Failed to start import", 
+        description: error.message,
+        variant: "destructive" 
+      });
+    },
+  });
+
+  // Retry failed rows
+  const retryMutation = useMutation({
+    mutationFn: async (jobId: number) => {
+      const res = await apiRequest("POST", `/api/admin/import-jobs/${jobId}/retry`, {});
+      return res.json();
+    },
+    onSuccess: (result, jobId) => {
+      setActiveJobId(jobId);
+      refetchJobs();
+      toast({ 
+        title: "Retry started",
+        description: `Retrying ${result.retriedCount} failed rows`
+      });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Retry failed", 
         description: error.message,
         variant: "destructive" 
       });
@@ -97,7 +148,6 @@ export default function AdminImportPage() {
     }
 
     setFile(selectedFile);
-    setImportResult(null);
     
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -193,8 +243,8 @@ export default function AdminImportPage() {
   };
 
   const handleImport = () => {
-    if (!parsedData || parsedData.length === 0) return;
-    importMutation.mutate(parsedData);
+    if (!parsedData || parsedData.length === 0 || !file) return;
+    importMutation.mutate({ products: parsedData, filename: file.name });
   };
 
   const downloadSampleCsv = () => {
@@ -207,39 +257,36 @@ export default function AdminImportPage() {
     window.URL.revokeObjectURL(url);
   };
 
-  const downloadFailedRows = () => {
-    if (!importResult || importResult.failedRows.length === 0) return;
-    
-    const headers = originalHeaders.length > 0 ? originalHeaders : Object.keys(importResult.failedRows[0].data);
-    const headerLine = [...headers, 'error_message'].join(',');
-    
-    const dataLines = importResult.failedRows.map(row => {
-      const values = headers.map(h => {
-        const key = h.toLowerCase();
-        let value = row.data[key] || row.data[h] || '';
-        if (typeof value === 'string' && (value.includes(',') || value.includes('"'))) {
-          value = `"${value.replace(/"/g, '""')}"`;
-        }
-        return value;
-      });
-      values.push(`"${row.error.replace(/"/g, '""')}"`);
-      return values.join(',');
-    });
-    
-    const csvContent = [headerLine, ...dataLines].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `failed-imports-${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    window.URL.revokeObjectURL(url);
+  const downloadErrorsCsv = (jobId: number) => {
+    window.open(`/api/admin/import-jobs/${jobId}/errors.csv`, '_blank');
   };
 
-  const successCount = importResult ? importResult.created + importResult.updated : 0;
-  const successRate = importResult && importResult.total > 0 
-    ? Math.round((successCount / importResult.total) * 100) 
-    : 0;
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleString('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "queued":
+        return <Badge variant="secondary"><Clock className="w-3 h-3 mr-1" />Queued</Badge>;
+      case "processing":
+        return <Badge variant="default"><Loader2 className="w-3 h-3 mr-1 animate-spin" />Processing</Badge>;
+      case "completed":
+        return <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-200"><CheckCircle2 className="w-3 h-3 mr-1" />Completed</Badge>;
+      case "failed":
+        return <Badge variant="destructive"><XCircle className="w-3 h-3 mr-1" />Failed</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+
+  // Check if there's any job in progress
+  const hasActiveJob = importJobs?.some(j => j.status === "queued" || j.status === "processing");
 
   return (
     <div className="space-y-8">
@@ -261,7 +308,7 @@ export default function AdminImportPage() {
                 Upload CSV File
               </CardTitle>
               <CardDescription>
-                Select a CSV file containing your product data
+                Select a CSV file containing your product data. Import runs in background - you can leave this page.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -329,14 +376,19 @@ export default function AdminImportPage() {
 
                 <Button
                   onClick={handleImport}
-                  disabled={!parsedData || parsedData.length === 0 || importMutation.isPending}
+                  disabled={!parsedData || parsedData.length === 0 || importMutation.isPending || hasActiveJob}
                   className="w-full"
                   data-testid="button-import-products"
                 >
                   {importMutation.isPending ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Importing...
+                      Starting Import...
+                    </>
+                  ) : hasActiveJob ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Import in Progress...
                     </>
                   ) : (
                     <>
@@ -349,96 +401,131 @@ export default function AdminImportPage() {
             </CardContent>
           </Card>
 
-          {importResult && (
+          {/* Active Job Progress */}
+          {activeJob && (activeJob.status === "queued" || activeJob.status === "processing") && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  {importResult.failed > 0 ? (
-                    <FileWarning className="h-5 w-5 text-amber-500" />
-                  ) : (
-                    <CheckCircle2 className="h-5 w-5 text-green-500" />
-                  )}
-                  Import Summary
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  Import in Progress
                 </CardTitle>
+                <CardDescription>{activeJob.filename}</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span>Success Rate</span>
-                    <span className="font-medium">{successRate}%</span>
+                    <span>Progress</span>
+                    <span className="font-medium">
+                      {activeJob.processedRows} / {activeJob.totalRows} rows
+                    </span>
                   </div>
-                  <Progress value={successRate} className="h-2" />
+                  <Progress 
+                    value={activeJob.totalRows > 0 ? (activeJob.processedRows / activeJob.totalRows) * 100 : 0} 
+                    className="h-2" 
+                  />
                 </div>
-
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="text-center p-4 bg-muted rounded-lg">
-                    <div className="text-2xl font-bold text-foreground">{importResult.total}</div>
-                    <div className="text-xs text-muted-foreground">Total Rows</div>
+                <div className="grid grid-cols-3 gap-4 text-center">
+                  <div className="p-3 bg-green-500/10 rounded-lg">
+                    <div className="text-xl font-bold text-green-600">{activeJob.successCount}</div>
+                    <div className="text-xs text-muted-foreground">Success</div>
                   </div>
-                  <div className="text-center p-4 bg-green-500/10 rounded-lg">
-                    <div className="text-2xl font-bold text-green-600">{importResult.created}</div>
-                    <div className="text-xs text-muted-foreground">Created</div>
+                  <div className="p-3 bg-red-500/10 rounded-lg">
+                    <div className="text-xl font-bold text-red-600">{activeJob.errorCount}</div>
+                    <div className="text-xs text-muted-foreground">Errors</div>
                   </div>
-                  <div className="text-center p-4 bg-blue-500/10 rounded-lg">
-                    <div className="text-2xl font-bold text-blue-600">{importResult.updated}</div>
-                    <div className="text-xs text-muted-foreground">Updated</div>
-                  </div>
-                  <div className="text-center p-4 bg-red-500/10 rounded-lg">
-                    <div className="text-2xl font-bold text-red-600">{importResult.failed}</div>
-                    <div className="text-xs text-muted-foreground">Failed</div>
+                  <div className="p-3 bg-muted rounded-lg">
+                    <div className="text-xl font-bold">{activeJob.totalRows - activeJob.processedRows}</div>
+                    <div className="text-xs text-muted-foreground">Remaining</div>
                   </div>
                 </div>
-
-                {importResult.failed > 0 && (
-                  <>
-                    <Alert variant="destructive">
-                      <XCircle className="h-4 w-4" />
-                      <AlertTitle>{importResult.failed} rows failed to import</AlertTitle>
-                      <AlertDescription>
-                        Download the failed rows to fix the errors and re-upload them.
-                      </AlertDescription>
-                    </Alert>
-
-                    <Button 
-                      variant="outline" 
-                      className="w-full gap-2"
-                      onClick={downloadFailedRows}
-                      data-testid="button-download-failed"
-                    >
-                      <Download className="h-4 w-4" />
-                      Download Failed Rows ({importResult.failed})
-                    </Button>
-
-                    <div className="space-y-2">
-                      <h4 className="text-sm font-medium">Error Details (first 10)</h4>
-                      <div className="max-h-48 overflow-y-auto space-y-1">
-                        {importResult.errors.slice(0, 10).map((error, i) => (
-                          <div key={i} className="text-xs p-2 bg-red-500/5 rounded text-red-700 dark:text-red-400">
-                            {error}
-                          </div>
-                        ))}
-                        {importResult.errors.length > 10 && (
-                          <div className="text-xs text-muted-foreground p-2">
-                            ...and {importResult.errors.length - 10} more errors
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                {importResult.failed === 0 && (
-                  <Alert>
-                    <CheckCircle2 className="h-4 w-4" />
-                    <AlertTitle>All products imported successfully</AlertTitle>
-                    <AlertDescription>
-                      {importResult.created} new products created and {importResult.updated} existing products updated.
-                    </AlertDescription>
-                  </Alert>
-                )}
+                <Alert>
+                  <Info className="h-4 w-4" />
+                  <AlertDescription>
+                    You can leave this page - import continues in background. Check back for results.
+                  </AlertDescription>
+                </Alert>
               </CardContent>
             </Card>
           )}
+
+          {/* Import History */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <History className="h-5 w-5" />
+                  Import History
+                </span>
+                <Button variant="ghost" size="icon" onClick={() => refetchJobs()}>
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {!importJobs || importJobs.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">No import history yet</p>
+              ) : (
+                <div className="space-y-3">
+                  {importJobs.slice(0, 10).map((job) => (
+                    <div 
+                      key={job.id} 
+                      className={`p-4 rounded-lg border ${activeJobId === job.id ? 'border-primary bg-primary/5' : 'bg-muted/30'}`}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-sm truncate max-w-[200px]">{job.filename}</span>
+                          {getStatusBadge(job.status)}
+                        </div>
+                        <span className="text-xs text-muted-foreground">{formatDate(job.createdAt)}</span>
+                      </div>
+                      
+                      {job.status === "completed" || job.status === "failed" ? (
+                        <div className="flex items-center justify-between">
+                          <div className="text-sm">
+                            <span className="text-green-600">{job.successCount} success</span>
+                            {job.errorCount > 0 && (
+                              <span className="text-red-600 ml-2">{job.errorCount} failed</span>
+                            )}
+                            <span className="text-muted-foreground ml-2">/ {job.totalRows} total</span>
+                          </div>
+                          <div className="flex gap-2">
+                            {job.errorCount > 0 && (
+                              <>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  onClick={() => downloadErrorsCsv(job.id)}
+                                  data-testid={`button-download-errors-${job.id}`}
+                                >
+                                  <Download className="h-3 w-3 mr-1" />
+                                  Errors
+                                </Button>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  onClick={() => retryMutation.mutate(job.id)}
+                                  disabled={retryMutation.isPending}
+                                  data-testid={`button-retry-${job.id}`}
+                                >
+                                  <RotateCcw className="h-3 w-3 mr-1" />
+                                  Retry
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <Progress 
+                          value={job.totalRows > 0 ? (job.processedRows / job.totalRows) * 100 : 0} 
+                          className="h-1" 
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
 
         <div className="space-y-6">
@@ -490,6 +577,7 @@ export default function AdminImportPage() {
               <p>Boolean fields accept: true/false or 1/0</p>
               <p>Prices should be in GBP without currency symbol.</p>
               <p>Maximum file size: 50MB</p>
+              <p className="font-medium text-foreground">Import runs in background - you can leave the page!</p>
             </CardContent>
           </Card>
         </div>

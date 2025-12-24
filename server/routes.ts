@@ -31,6 +31,14 @@ import {
 } from "./email";
 import { sessionMiddleware } from "./session-store";
 import feedsRouter from "./feeds";
+import { 
+  createImportJob, 
+  getImportJob, 
+  getImportJobs, 
+  getImportJobErrors,
+  retryImportJobErrors,
+  startImportProcessor 
+} from "./import-processor";
 
 declare module "express-session" {
   interface SessionData {
@@ -1085,6 +1093,126 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     } catch (error) {
       console.error("CSV import error:", error);
       res.status(500).json({ message: "Import failed" });
+    }
+  });
+
+  // ==================== BACKGROUND IMPORT API ====================
+  
+  // Create a new background import job
+  app.post("/api/admin/import-jobs", requireStaffOrAdmin, async (req, res) => {
+    try {
+      const { products: productData, filename } = req.body;
+      
+      if (!Array.isArray(productData) || productData.length === 0) {
+        return res.status(400).json({ message: "No products to import" });
+      }
+      
+      const userId = req.session.userId!;
+      const jobId = await createImportJob(userId, filename || "import.csv", productData);
+      
+      res.json({ 
+        message: "Import job created", 
+        jobId,
+        totalRows: productData.length 
+      });
+    } catch (error) {
+      console.error("Failed to create import job:", error);
+      res.status(500).json({ message: "Failed to create import job" });
+    }
+  });
+  
+  // Get all import jobs (history)
+  app.get("/api/admin/import-jobs", requireStaffOrAdmin, async (req, res) => {
+    try {
+      const jobs = await getImportJobs(undefined, 50);
+      res.json(jobs);
+    } catch (error) {
+      console.error("Failed to fetch import jobs:", error);
+      res.status(500).json({ message: "Failed to fetch import jobs" });
+    }
+  });
+  
+  // Get a specific import job
+  app.get("/api/admin/import-jobs/:id", requireStaffOrAdmin, async (req, res) => {
+    try {
+      const job = await getImportJob(parseInt(req.params.id, 10));
+      if (!job) {
+        return res.status(404).json({ message: "Job not found" });
+      }
+      res.json(job);
+    } catch (error) {
+      console.error("Failed to fetch import job:", error);
+      res.status(500).json({ message: "Failed to fetch import job" });
+    }
+  });
+  
+  // Get error lines for a job
+  app.get("/api/admin/import-jobs/:id/errors", requireStaffOrAdmin, async (req, res) => {
+    try {
+      const jobId = parseInt(req.params.id, 10);
+      const errors = await getImportJobErrors(jobId);
+      res.json(errors);
+    } catch (error) {
+      console.error("Failed to fetch import errors:", error);
+      res.status(500).json({ message: "Failed to fetch import errors" });
+    }
+  });
+  
+  // Download error lines as CSV
+  app.get("/api/admin/import-jobs/:id/errors.csv", requireStaffOrAdmin, async (req, res) => {
+    try {
+      const jobId = parseInt(req.params.id, 10);
+      const job = await getImportJob(jobId);
+      
+      if (!job) {
+        return res.status(404).json({ message: "Job not found" });
+      }
+      
+      const errors = await getImportJobErrors(jobId);
+      
+      if (errors.length === 0) {
+        return res.status(404).json({ message: "No errors found for this job" });
+      }
+      
+      // Build CSV from error lines
+      let csv = "rowNumber,sku,productName,brand,category,error\n";
+      for (const err of errors) {
+        try {
+          const data = JSON.parse(err.payload);
+          csv += `${err.rowNumber},"${(data.sku || "").replace(/"/g, '""')}","${(data.productName || "").replace(/"/g, '""')}","${(data.brand || "").replace(/"/g, '""')}","${(data.category || "").replace(/"/g, '""')}","${(err.errorMessage || "").replace(/"/g, '""')}"\n`;
+        } catch {
+          csv += `${err.rowNumber},,,,,"${(err.errorMessage || "").replace(/"/g, '""')}"\n`;
+        }
+      }
+      
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", `attachment; filename="import_job_${jobId}_errors.csv"`);
+      res.send(csv);
+    } catch (error) {
+      console.error("Failed to download error CSV:", error);
+      res.status(500).json({ message: "Failed to download error CSV" });
+    }
+  });
+  
+  // Retry failed lines for a job
+  app.post("/api/admin/import-jobs/:id/retry", requireStaffOrAdmin, async (req, res) => {
+    try {
+      const jobId = parseInt(req.params.id, 10);
+      const job = await getImportJob(jobId);
+      
+      if (!job) {
+        return res.status(404).json({ message: "Job not found" });
+      }
+      
+      if (job.status !== "completed" && job.status !== "failed") {
+        return res.status(400).json({ message: "Job must be completed or failed to retry" });
+      }
+      
+      const retriedCount = await retryImportJobErrors(jobId);
+      res.json({ message: `Retrying ${retriedCount} failed rows`, retriedCount });
+    } catch (error) {
+      console.error("Failed to retry import job:", error);
+      res.status(500).json({ message: "Failed to retry import job" });
     }
   });
 
