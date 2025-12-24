@@ -13,22 +13,25 @@ declare module "http" {
   }
 }
 
-// CRITICAL: Health check endpoints FIRST - before ANY imports that touch the database
-// These must respond instantly for deployment health checks
-let appReady = false;
-
+// CRITICAL: Health check endpoints FIRST - before ANY middleware
+// These must respond instantly for deployment health checks - no middleware overhead
 app.get("/health", (_, res) => {
   res.status(200).send("OK");
 });
 
-// Root endpoint - return OK for health checks until app is fully ready
-// Once ready, this middleware is bypassed and Vite/static serves the SPA
+// Root health check - responds OK for non-browser requests (health probes)
+// Browsers (Accept: text/html) fall through to Vite/static serving
 app.get("/", (req, res, next) => {
-  if (!appReady) {
-    // App still initializing - respond OK for health checks
-    return res.status(200).type("text/plain").send("OK");
+  const accept = req.headers.accept || "";
+  const userAgent = req.headers["user-agent"] || "";
+  
+  // Health check probes don't typically send browser-like headers
+  const isBrowser = accept.includes("text/html") && 
+                    (userAgent.includes("Mozilla") || userAgent.includes("Chrome") || userAgent.includes("Safari"));
+  
+  if (!isBrowser) {
+    return res.status(200).send("OK");
   }
-  // App ready - let Vite/static handle the request
   next();
 });
 
@@ -175,9 +178,6 @@ async function initializeApp() {
     }
 
     log("Routes and static serving ready");
-    
-    // Mark app as ready - "/" will now serve the SPA instead of health check
-    appReady = true;
 
     // Background tasks - don't block main initialization
     runBackgroundTasks(db, users, eq);
