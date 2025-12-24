@@ -25,15 +25,15 @@ app.get("/health", (_, res) => {
   res.status(200).send("OK");
 });
 
-// Root health check - always respond OK immediately for deployment platform
-// SPA will be served by static file middleware registered later
-let appReady = false;
+// Root health check for deployment platform - responds before any other processing
+// Browsers get SPA from static middleware, health checks get instant OK
 app.get("/", (req, res, next) => {
-  // Always respond OK for health checks (non-browser requests)
-  const acceptHeader = req.headers.accept || "";
-  if (!acceptHeader.includes("text/html") || !appReady) {
+  const accept = req.headers.accept || "";
+  // Health checks don't request HTML - respond instantly
+  if (!accept.includes("text/html")) {
     return res.status(200).send("OK");
   }
+  // Browser requests continue to static file serving
   next();
 });
 
@@ -271,7 +271,5 @@ httpServer.listen(
     await setupVite(httpServer, app);
   }
   
-  // Mark app as ready for full SPA serving
-  appReady = true;
   log("Application fully initialized");
 })();
