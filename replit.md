@@ -175,6 +175,29 @@ Admin panel includes product import from CSV with field mapping for:
 - Environment-based configuration for sensitive data
 - MHRA and GPhC regulatory field validation
 - GDP compliance documentation requirements in registration forms
+- Helmet middleware with production-grade security headers:
+  - Content-Security-Policy (CSP) for XSS protection
+  - HSTS with 1-year max-age and preload
+  - X-Frame-Options: DENY (clickjacking protection)
+  - Referrer-Policy: strict-origin-when-cross-origin
+- Response compression via gzip/deflate middleware
+
+**Performance & SEO:**
+- Static asset caching:
+  - Hashed build assets: 1 year, immutable
+  - Public assets: 7 days with ETag
+  - Attached assets (product images): 30 days, immutable
+- Health check endpoint: GET /health (for uptime monitoring)
+- SEO-compliant file locations:
+  - /robots.txt at root (blocks /admin/ and /api/)
+  - /sitemap.xml at root (dynamic with products, brands, categories)
+  - SITE_URL: https://pharmaoasis.co.uk
+
+**Deployment:**
+- Replit hosting (recommended to keep for WebSockets and AI background agents)
+- For production without cold starts: set deploymentTarget = "reserved-vm" in .replit
+- US-based servers (GCP) with 80-150ms latency to UK/EU
+- AI agents use in-memory scheduling (must restart after deployment)
 
 ### AI Agents
 
