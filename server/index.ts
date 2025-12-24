@@ -4,6 +4,21 @@ import path from "path";
 import compression from "compression";
 import helmet from "helmet";
 
+// ============================================================================
+// DEPLOYMENT GATE: Explicit control over when background tasks start
+// Background tasks are DISABLED until explicitly enabled via:
+// 1. Admin endpoint: POST /api/admin/activate-background-tasks
+// 2. Auto-activation after delay (if AUTO_ACTIVATE_DELAY is set)
+// 3. Immediate activation in development mode
+// ============================================================================
+const AUTO_ACTIVATE_DELAY_MS = parseInt(process.env.AUTO_ACTIVATE_DELAY || "0", 10);
+const DISABLE_BACKGROUND_TASKS = process.env.DISABLE_BACKGROUND_TASKS === "true";
+const IS_PRODUCTION = process.env.NODE_ENV === "production";
+
+// Gate state
+let backgroundTasksEnabled = false;
+let backgroundTasksInitialized = false;
+
 // Create Express app
 const app = express();
 
@@ -15,8 +30,20 @@ app.get("/", (_, res) => res.status(200).send("OK"));
 app.get("/health", (_, res) => res.status(200).send("OK"));
 app.get("/healthz", (_, res) => res.status(200).send("OK"));
 
+// Gate status endpoint - shows whether background tasks are enabled
+app.get("/api/gate-status", (_, res) => {
+  res.json({
+    backgroundTasksEnabled,
+    backgroundTasksInitialized,
+    disabledByEnv: DISABLE_BACKGROUND_TASKS,
+    isProduction: IS_PRODUCTION,
+    autoActivateDelay: AUTO_ACTIVATE_DELAY_MS,
+  });
+});
+
 // ============================================================================
 // STEP 2: MIDDLEWARE - REGISTERED SYNCHRONOUSLY BEFORE listen()
+// NO database imports happen here - pure Express middleware only
 // ============================================================================
 declare module "http" {
   interface IncomingMessage {
@@ -63,7 +90,7 @@ app.use(
 );
 app.use(express.urlencoded({ extended: false, limit: '50mb' }));
 
-// Request logging middleware
+// Request logging middleware (lightweight, no DB)
 app.use((req, res, next) => {
   const start = Date.now();
   const reqPath = req.path;
@@ -105,7 +132,8 @@ export function log(message: string, source = "express") {
 
 // ============================================================================
 // STEP 4: CREATE HTTP SERVER AND START LISTENING
-// Express is fully configured with health routes + middleware before listen()
+// Express has ONLY health routes and middleware - NO database imports
+// Event loop is COMPLETELY FREE for health checks
 // ============================================================================
 const httpServer = createServer(app);
 const port = parseInt(process.env.PORT || "5000", 10);
@@ -120,29 +148,96 @@ httpServer.listen(
     log(`serving on port ${port}`);
     log("Health check endpoints ready: /health, /healthz, /");
     
-    // CRITICAL: Only HEAVY ASYNC work is deferred after listen()
-    // Middleware is already registered synchronously above
-    setImmediate(() => {
-      initializeApp().catch((err) => {
-        log(`Initialization failed: ${err.message}`);
-      });
-    });
+    // ========================================================================
+    // DEPLOYMENT GATE CONTROL
+    // ========================================================================
+    if (DISABLE_BACKGROUND_TASKS) {
+      log("DISABLE_BACKGROUND_TASKS=true - Auto-start disabled, waiting for manual activation");
+      log("POST /api/admin/activate-background-tasks to enable after promotion");
+      return;
+    }
+    
+    // In development, start immediately
+    if (!IS_PRODUCTION) {
+      log("Development mode - starting full initialization immediately");
+      activateBackgroundTasks();
+      return;
+    }
+    
+    // In production with auto-activate delay
+    if (AUTO_ACTIVATE_DELAY_MS > 0) {
+      log(`Production mode - auto-activation in ${AUTO_ACTIVATE_DELAY_MS / 1000} seconds`);
+      log("Or POST /api/admin/activate-background-tasks to enable immediately");
+      setTimeout(() => {
+        if (!backgroundTasksEnabled) {
+          log("Auto-activation timer expired - starting background tasks");
+          activateBackgroundTasks();
+        }
+      }, AUTO_ACTIVATE_DELAY_MS);
+      return;
+    }
+    
+    // Production without auto-activate - wait for manual trigger
+    log("Production mode - waiting for manual activation");
+    log("POST /api/admin/activate-background-tasks to enable background tasks");
   },
 );
 
 // ============================================================================
-// STEP 5: ASYNC INITIALIZATION - DATABASE, ROUTES, WEBSOCKET
-// Only heavy work that requires async/await is deferred here
+// STEP 5: ACTIVATION ENDPOINT - Triggers background task initialization
+// Call this AFTER deployment promotion completes
+// DISABLE_BACKGROUND_TASKS only prevents AUTO-start, not manual activation
 // ============================================================================
-async function initializeApp() {
+app.post("/api/admin/activate-background-tasks", async (req, res) => {
+  if (backgroundTasksEnabled) {
+    return res.json({ success: true, message: "Background tasks already enabled" });
+  }
+  
   try {
-    // Dynamic imports for heavy modules
-    const { db } = await import("./db");
-    const { users } = await import("@shared/schema");
-    const { eq } = await import("drizzle-orm");
+    await activateBackgroundTasks();
+    res.json({ success: true, message: "Background tasks activated successfully" });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ============================================================================
+// STEP 6: ACTIVATION FUNCTION - Initializes full application
+// ============================================================================
+async function activateBackgroundTasks() {
+  if (backgroundTasksEnabled) {
+    log("Background tasks already enabled, skipping");
+    return;
+  }
+  
+  backgroundTasksEnabled = true;
+  log("Activating background tasks...");
+  
+  try {
+    await initializeFullApplication();
+    backgroundTasksInitialized = true;
+    log("Background tasks fully initialized");
+  } catch (error: any) {
+    log(`Background task activation failed: ${error.message}`);
+    throw error;
+  }
+}
+
+// ============================================================================
+// STEP 7: FULL APPLICATION INITIALIZATION
+// ALL database operations are contained here
+// ============================================================================
+async function initializeFullApplication() {
+  try {
+    // NOW we can import modules that touch the database
     const { setupChatWebSocket } = await import("./chat-websocket");
     const { registerRoutes } = await import("./routes");
     const { serveStatic } = await import("./static");
+    const { db } = await import("./db");
+    const { users } = await import("@shared/schema");
+    const { eq } = await import("drizzle-orm");
+
+    log("Database connection established");
 
     // Setup WebSocket for chat
     setupChatWebSocket(httpServer);
@@ -174,7 +269,7 @@ async function initializeApp() {
     }));
 
     // Setup Vite in development or static serving in production
-    if (process.env.NODE_ENV === "production") {
+    if (IS_PRODUCTION) {
       serveStatic(app);
     } else {
       const { setupVite } = await import("./vite");
@@ -183,98 +278,79 @@ async function initializeApp() {
 
     log("Routes and static serving ready");
 
-    // Stage 2: Background tasks - further deferred
-    setImmediate(() => {
-      runBackgroundTasks(db, users, eq);
-    });
+    // Chat tables creation
+    try {
+      await db.execute(`
+        CREATE TABLE IF NOT EXISTS chat_sessions (
+          id SERIAL PRIMARY KEY,
+          session_id VARCHAR(100) UNIQUE NOT NULL,
+          status VARCHAR(20) DEFAULT 'active',
+          visitor_name VARCHAR(100),
+          visitor_email VARCHAR(255),
+          visitor_phone VARCHAR(50),
+          visitor_company VARCHAR(200),
+          lead_captured BOOLEAN DEFAULT false,
+          message_count INTEGER DEFAULT 0,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+      await db.execute(`
+        CREATE TABLE IF NOT EXISTS chat_messages (
+          id SERIAL PRIMARY KEY,
+          session_id VARCHAR(100) NOT NULL,
+          role VARCHAR(20) NOT NULL,
+          content TEXT NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+      await db.execute(`
+        CREATE TABLE IF NOT EXISTS chat_leads (
+          id SERIAL PRIMARY KEY,
+          session_id VARCHAR(100),
+          name VARCHAR(100),
+          email VARCHAR(255),
+          phone VARCHAR(50),
+          company VARCHAR(200),
+          interest TEXT,
+          status VARCHAR(20) DEFAULT 'new',
+          notes TEXT,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+      log("Chat tables verified/created");
+    } catch (err: any) {
+      log(`Chat tables warning: ${err.message}`);
+    }
+
+    // Auto-seed check
+    try {
+      const adminUser = await db.select().from(users).where(eq(users.email, "admin@pharmaoasis.com"));
+      if (adminUser.length === 0) {
+        log("Database appears empty, auto-seeding demo data...");
+        const { seed } = await import("./seed");
+        await seed();
+        log("Auto-seed completed successfully!");
+      } else {
+        log("Database already has data, skipping auto-seed");
+      }
+    } catch (seedError: any) {
+      log(`Auto-seed check skipped: ${seedError.message}`);
+    }
+
+    // Import processor
+    try {
+      const { startImportProcessor } = await import("./import-processor");
+      startImportProcessor();
+    } catch (err: any) {
+      log(`Import processor warning: ${err.message}`);
+    }
+
+    log("Application fully initialized");
 
   } catch (error: any) {
     log(`Initialization error: ${error.message}`);
-  }
-}
-
-// ============================================================================
-// STEP 6: BACKGROUND TASKS - FULLY DEFERRED, NON-BLOCKING
-// ============================================================================
-async function runBackgroundTasks(db: any, users: any, eq: any) {
-  try {
-    // Chat tables creation
-    setImmediate(async () => {
-      try {
-        await db.execute(`
-          CREATE TABLE IF NOT EXISTS chat_sessions (
-            id SERIAL PRIMARY KEY,
-            session_id VARCHAR(100) UNIQUE NOT NULL,
-            status VARCHAR(20) DEFAULT 'active',
-            visitor_name VARCHAR(100),
-            visitor_email VARCHAR(255),
-            visitor_phone VARCHAR(50),
-            visitor_company VARCHAR(200),
-            lead_captured BOOLEAN DEFAULT false,
-            message_count INTEGER DEFAULT 0,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-          );
-        `);
-        await db.execute(`
-          CREATE TABLE IF NOT EXISTS chat_messages (
-            id SERIAL PRIMARY KEY,
-            session_id VARCHAR(100) NOT NULL,
-            role VARCHAR(20) NOT NULL,
-            content TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-          );
-        `);
-        await db.execute(`
-          CREATE TABLE IF NOT EXISTS chat_leads (
-            id SERIAL PRIMARY KEY,
-            session_id VARCHAR(100),
-            name VARCHAR(100),
-            email VARCHAR(255),
-            phone VARCHAR(50),
-            company VARCHAR(200),
-            interest TEXT,
-            status VARCHAR(20) DEFAULT 'new',
-            notes TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-          );
-        `);
-        log("Chat tables verified/created");
-      } catch (err: any) {
-        log(`Chat tables warning: ${err.message}`);
-      }
-    });
-
-    // Auto-seed check
-    setTimeout(async () => {
-      try {
-        const adminUser = await db.select().from(users).where(eq(users.email, "admin@pharmaoasis.com"));
-        if (adminUser.length === 0) {
-          log("Database appears empty, auto-seeding demo data...");
-          const { seed } = await import("./seed");
-          await seed();
-          log("Auto-seed completed successfully!");
-        } else {
-          log("Database already has data, skipping auto-seed");
-        }
-      } catch (seedError: any) {
-        log(`Auto-seed check skipped: ${seedError.message}`);
-      }
-    }, 100);
-
-    // Import processor
-    setTimeout(async () => {
-      try {
-        const { startImportProcessor } = await import("./import-processor");
-        startImportProcessor();
-        log("Application fully initialized");
-      } catch (err: any) {
-        log(`Import processor warning: ${err.message}`);
-      }
-    }, 200);
-
-  } catch (error: any) {
-    log(`Background task warning: ${error.message}`);
+    throw error;
   }
 }
