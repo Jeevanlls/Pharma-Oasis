@@ -1,26 +1,45 @@
 import express, { type Request, Response, NextFunction } from "express";
-import { createServer } from "http";
+import { createServer, IncomingMessage, ServerResponse } from "http";
 import path from "path";
 import compression from "compression";
 import helmet from "helmet";
 
 const app = express();
-const httpServer = createServer(app);
+
+// Track initialization state - health checks pass immediately, SPA served after init
+let isInitialized = false;
+
+// Create HTTP server WITHOUT passing Express - we handle routing manually
+const httpServer = createServer();
+
+// CRITICAL: Raw HTTP health check - bypasses ALL Express middleware including session store
+// This responds BEFORE Node's event loop is blocked by database operations
+httpServer.on("request", (req: IncomingMessage, res: ServerResponse) => {
+  const url = req.url || "";
+  
+  // Health check endpoints - always respond immediately at HTTP level
+  if (url === "/health" || url === "/healthz") {
+    res.writeHead(200, { "Content-Type": "text/plain" });
+    res.end("OK");
+    return;
+  }
+  
+  // Root "/" - return OK during init (for health check), serve SPA after init
+  if (url === "/" && !isInitialized) {
+    res.writeHead(200, { "Content-Type": "text/plain" });
+    res.end("OK");
+    return;
+  }
+  
+  // All other requests (and "/" after init) go through Express
+  app(req, res);
+});
 
 declare module "http" {
   interface IncomingMessage {
     rawBody: unknown;
   }
 }
-
-// CRITICAL: Health check middleware - MUST be first, returns instantly
-// This intercepts health endpoints at HTTP level before ANY other processing
-app.use((req, res, next) => {
-  if (req.path === "/" || req.path === "/health" || req.path === "/healthz") {
-    return res.status(200).send("OK");
-  }
-  next();
-});
 
 // Enable gzip/brotli compression for all responses
 app.use(compression());
@@ -165,6 +184,10 @@ async function initializeApp() {
     }
 
     log("Routes and static serving ready");
+    
+    // Mark as initialized - "/" will now serve SPA instead of health check
+    isInitialized = true;
+    log("Health check mode disabled - serving SPA on /");
 
     // Background tasks - don't block main initialization
     runBackgroundTasks(db, users, eq);
