@@ -313,26 +313,48 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
   // ==================== PUBLIC PRODUCT ROUTES ====================
   app.get("/api/products", async (req, res) => {
     try {
-      const { category, brand, search, featured, limit, offset } = req.query;
+      const { category, brand, search, featured, limit, offset, page } = req.query;
       
-      let productList;
+      const pageSize = limit ? Math.min(Number(limit), 100) : 24;
+      const pageNum = page ? Math.max(1, Number(page)) : 1;
+      const offsetNum = offset ? Number(offset) : (pageNum - 1) * pageSize;
       
-      if (search && typeof search === "string") {
-        productList = await storage.searchProducts(search, true);
+      let productList: any[];
+      let totalCount: number;
+      
+      const paginationOpts = { activeOnly: true, limit: pageSize, offset: offsetNum };
+      
+      if (search && typeof search === "string" && search.trim().length > 0) {
+        // Use full-text search for better performance and relevance
+        productList = await storage.searchProductsFullText(search, paginationOpts);
+        totalCount = await storage.getProductCount({ activeOnly: true, search });
       } else if (category) {
-        productList = await storage.getProductsByCategory(Number(category), true);
+        const categoryId = Number(category);
+        productList = await storage.getProductsByCategory(categoryId, paginationOpts);
+        totalCount = await storage.getProductCount({ activeOnly: true, categoryId });
       } else if (brand) {
-        productList = await storage.getProductsByBrand(Number(brand), true);
+        const brandId = Number(brand);
+        productList = await storage.getProductsByBrand(brandId, paginationOpts);
+        totalCount = await storage.getProductCount({ activeOnly: true, brandId });
       } else {
         productList = await storage.getAllProducts({
           activeOnly: true,
           featuredOnly: featured === "true",
-          limit: limit ? Number(limit) : undefined,
-          offset: offset ? Number(offset) : undefined,
+          limit: pageSize,
+          offset: offsetNum,
         });
+        totalCount = await storage.getProductCount({ activeOnly: true });
       }
       
-      res.json(productList);
+      res.json({
+        products: productList,
+        pagination: {
+          page: pageNum,
+          pageSize,
+          total: totalCount,
+          totalPages: Math.ceil(totalCount / pageSize),
+        }
+      });
     } catch (error) {
       console.error("Error fetching products:", error);
       res.status(500).json({ message: "Failed to fetch products" });
@@ -357,9 +379,20 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
   });
 
   // ==================== PUBLIC BRAND & CATEGORY ROUTES ====================
+  // In-memory cache for frequently accessed data
+  let brandsCache: { data: any; timestamp: number } | null = null;
+  let categoriesCache: { data: any; timestamp: number } | null = null;
+  const CACHE_TTL = 60000; // 1 minute cache
+
   app.get("/api/brands", async (req, res) => {
     try {
+      if (brandsCache && Date.now() - brandsCache.timestamp < CACHE_TTL) {
+        res.set("Cache-Control", "public, max-age=60");
+        return res.json(brandsCache.data);
+      }
       const brandList = await storage.getAllBrands(true);
+      brandsCache = { data: brandList, timestamp: Date.now() };
+      res.set("Cache-Control", "public, max-age=60");
       res.json(brandList);
     } catch (error) {
       console.error("Error fetching brands:", error);
@@ -369,7 +402,13 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
 
   app.get("/api/categories", async (req, res) => {
     try {
+      if (categoriesCache && Date.now() - categoriesCache.timestamp < CACHE_TTL) {
+        res.set("Cache-Control", "public, max-age=60");
+        return res.json(categoriesCache.data);
+      }
       const categoryList = await storage.getAllCategories(true);
+      categoriesCache = { data: categoryList, timestamp: Date.now() };
+      res.set("Cache-Control", "public, max-age=60");
       res.json(categoryList);
     } catch (error) {
       console.error("Error fetching categories:", error);

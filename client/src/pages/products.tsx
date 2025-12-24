@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { PageTracker } from "@/hooks/use-page-tracking";
@@ -22,43 +22,120 @@ import {
   Building2,
   Tag,
   Loader2,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import placeholderImage from "@assets/generated_images/product_placeholder_coming_soon.png";
 import { ProductListJsonLd } from "@/components/seo/product-json-ld";
 
+interface PaginatedResponse {
+  products: Product[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+function LazyImage({ src, alt, className }: { src: string; alt: string; className?: string }) {
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [isInView, setIsInView] = useState(false);
+  const imgRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsInView(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "100px" }
+    );
+
+    if (imgRef.current) {
+      observer.observe(imgRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div ref={imgRef} className={className}>
+      {isInView ? (
+        <img
+          src={src}
+          alt={alt}
+          className={`w-full h-full object-contain transition-opacity duration-300 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
+          onLoad={() => setIsLoaded(true)}
+          onError={(e) => {
+            (e.target as HTMLImageElement).src = placeholderImage;
+            setIsLoaded(true);
+          }}
+          loading="lazy"
+        />
+      ) : (
+        <div className="w-full h-full bg-muted animate-pulse" />
+      )}
+    </div>
+  );
+}
+
 export default function ProductsPage() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [selectedBrand, setSelectedBrand] = useState<string>("");
+  const [currentPage, setCurrentPage] = useState(1);
   const [quantities, setQuantities] = useState<Record<number, number>>({});
   const { addItem } = useQuoteBasket();
   const { isAuthenticated, isCustomer, isAdmin } = useAuth();
   const { toast } = useToast();
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setCurrentPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedCategory, selectedBrand]);
+
   const buildProductsUrl = () => {
     const params = new URLSearchParams();
-    if (searchQuery) params.append("search", searchQuery);
+    if (debouncedSearch) params.append("search", debouncedSearch);
     if (selectedCategory) params.append("category", selectedCategory);
     if (selectedBrand) params.append("brand", selectedBrand);
-    const queryString = params.toString();
-    return queryString ? `/api/products?${queryString}` : "/api/products";
+    params.append("page", String(currentPage));
+    params.append("limit", "24");
+    return `/api/products?${params.toString()}`;
   };
 
-  const { data: products, isLoading: productsLoading } = useQuery<Product[]>({
-    queryKey: ["/api/products", searchQuery, selectedCategory, selectedBrand],
+  const { data, isLoading: productsLoading } = useQuery<PaginatedResponse>({
+    queryKey: ["/api/products", debouncedSearch, selectedCategory, selectedBrand, currentPage],
     queryFn: async () => {
       const res = await fetch(buildProductsUrl(), { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch products");
       return res.json();
     },
+    staleTime: 30000,
   });
+
+  const products = data?.products || [];
+  const pagination = data?.pagination;
 
   const { data: categories } = useQuery<Category[]>({
     queryKey: ["/api/categories"],
+    staleTime: 60000,
   });
 
   const { data: brands } = useQuery<Brand[]>({
     queryKey: ["/api/brands"],
+    staleTime: 60000,
   });
 
   const topLevelCategories = categories?.filter(c => !c.parentId) || [];
@@ -100,11 +177,80 @@ export default function ProductsPage() {
 
   const clearFilters = () => {
     setSearchQuery("");
+    setDebouncedSearch("");
     setSelectedCategory("");
     setSelectedBrand("");
+    setCurrentPage(1);
   };
 
   const hasActiveFilters = searchQuery || selectedCategory || selectedBrand;
+
+  const goToPage = (page: number) => {
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const renderPagination = () => {
+    if (!pagination || pagination.totalPages <= 1) return null;
+
+    const { page, totalPages, total } = pagination;
+    const pages: (number | string)[] = [];
+
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      pages.push(1);
+      if (page > 3) pages.push('...');
+      for (let i = Math.max(2, page - 1); i <= Math.min(totalPages - 1, page + 1); i++) {
+        pages.push(i);
+      }
+      if (page < totalPages - 2) pages.push('...');
+      pages.push(totalPages);
+    }
+
+    return (
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8">
+        <p className="text-sm text-muted-foreground">
+          Showing {((page - 1) * pagination.pageSize) + 1} - {Math.min(page * pagination.pageSize, total)} of {total.toLocaleString()} products
+        </p>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="outline"
+            size="icon"
+            disabled={page === 1}
+            onClick={() => goToPage(page - 1)}
+            data-testid="button-prev-page"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          {pages.map((p, i) => (
+            typeof p === 'number' ? (
+              <Button
+                key={i}
+                variant={p === page ? "default" : "outline"}
+                size="sm"
+                onClick={() => goToPage(p)}
+                data-testid={`button-page-${p}`}
+              >
+                {p}
+              </Button>
+            ) : (
+              <span key={i} className="px-2 text-muted-foreground">...</span>
+            )
+          ))}
+          <Button
+            variant="outline"
+            size="icon"
+            disabled={page === totalPages}
+            onClick={() => goToPage(page + 1)}
+            data-testid="button-next-page"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <PublicLayout>
@@ -120,6 +266,7 @@ export default function ProductsPage() {
             </h1>
             <p className="mt-2 text-muted-foreground">
               Browse our extensive range of healthcare, wellness and beauty products
+              {pagination && ` (${pagination.total.toLocaleString()} products)`}
             </p>
           </div>
 
@@ -178,7 +325,7 @@ export default function ProductsPage() {
                 )}
                 {selectedCategory && (
                   <Badge variant="secondary" className="gap-1">
-                    Category: {categories?.find(c => c.id === Number(selectedCategory))?.name}
+                    Category: {topLevelCategories.find(c => String(c.id) === selectedCategory)?.name}
                     <button onClick={() => setSelectedCategory("")} className="ml-1">
                       <X className="h-3 w-3" />
                     </button>
@@ -186,13 +333,13 @@ export default function ProductsPage() {
                 )}
                 {selectedBrand && (
                   <Badge variant="secondary" className="gap-1">
-                    Brand: {brands?.find(b => b.id === Number(selectedBrand))?.name}
+                    Brand: {brands?.find(b => String(b.id) === selectedBrand)?.name}
                     <button onClick={() => setSelectedBrand("")} className="ml-1">
                       <X className="h-3 w-3" />
                     </button>
                   </Badge>
                 )}
-                <Button variant="ghost" size="sm" onClick={clearFilters}>
+                <Button variant="ghost" size="sm" onClick={clearFilters} className="h-7 text-xs">
                   Clear all
                 </Button>
               </div>
@@ -200,138 +347,104 @@ export default function ProductsPage() {
           </div>
 
           {productsLoading ? (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {Array.from({ length: 8 }).map((_, i) => (
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {Array.from({ length: 12 }).map((_, i) => (
                 <Card key={i}>
                   <CardContent className="p-4">
-                    <Skeleton className="mb-4 h-40 w-full rounded-md" />
-                    <Skeleton className="mb-2 h-4 w-20" />
-                    <Skeleton className="mb-2 h-5 w-full" />
-                    <Skeleton className="mb-4 h-4 w-3/4" />
-                    <Skeleton className="h-9 w-full" />
+                    <Skeleton className="aspect-square w-full mb-4" />
+                    <Skeleton className="h-4 w-3/4 mb-2" />
+                    <Skeleton className="h-4 w-1/2 mb-4" />
+                    <Skeleton className="h-10 w-full" />
                   </CardContent>
                 </Card>
               ))}
             </div>
-          ) : products && products.length > 0 ? (
-            <>
-              <p className="mb-4 text-sm text-muted-foreground">
-                Showing {products.length} product{products.length !== 1 ? "s" : ""}
-              </p>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {products.map((product) => (
-                  <ProductCard
-                    key={product.id}
-                    product={product}
-                    brands={brands}
-                    quantity={quantities[product.id] || 1}
-                    onQuantityChange={(qty) => handleQuantityChange(product.id, qty)}
-                    onAddToQuote={() => handleAddToQuote(product)}
-                    isAuthenticated={isAuthenticated}
-                  />
-                ))}
-              </div>
-            </>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <Package className="mb-4 h-16 w-16 text-muted-foreground/50" />
-              <h2 className="text-xl font-semibold">No products found</h2>
-              <p className="mt-2 text-muted-foreground">
-                Try adjusting your search or filter criteria
+          ) : products.length === 0 ? (
+            <div className="text-center py-16">
+              <Package className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+              <h3 className="text-lg font-medium mb-2">No products found</h3>
+              <p className="text-muted-foreground mb-4">
+                {hasActiveFilters 
+                  ? "Try adjusting your filters or search terms"
+                  : "Check back later for new products"
+                }
               </p>
               {hasActiveFilters && (
-                <Button variant="outline" onClick={clearFilters} className="mt-4">
-                  Clear all filters
+                <Button variant="outline" onClick={clearFilters}>
+                  Clear Filters
                 </Button>
               )}
             </div>
+          ) : (
+            <>
+              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {products.map((product) => (
+                  <Card key={product.id} className="overflow-hidden" data-testid={`card-product-${product.id}`}>
+                    <Link href={`/products/${product.slug || product.id}`}>
+                      <div className="aspect-square bg-muted overflow-hidden">
+                        <LazyImage
+                          src={product.imageUrl || placeholderImage}
+                          alt={product.productName}
+                          className="w-full h-full"
+                        />
+                      </div>
+                    </Link>
+                    <CardContent className="p-4">
+                      <Link href={`/products/${product.slug || product.id}`}>
+                        <h3 className="font-medium line-clamp-2 hover:text-primary transition-colors mb-1">
+                          {product.productName}
+                        </h3>
+                      </Link>
+                      <p className="text-sm text-muted-foreground mb-2">{product.sku}</p>
+                      {product.packSize && (
+                        <p className="text-sm text-muted-foreground mb-3">{product.packSize}</p>
+                      )}
+                      
+                      <div className="flex items-center gap-2 mb-3">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleQuantityChange(product.id, (quantities[product.id] || 1) - 1)}
+                          disabled={!isAuthenticated || (!isCustomer && !isAdmin)}
+                        >
+                          -
+                        </Button>
+                        <Input
+                          type="number"
+                          min="1"
+                          value={quantities[product.id] || 1}
+                          onChange={(e) => handleQuantityChange(product.id, parseInt(e.target.value) || 1)}
+                          className="w-16 text-center"
+                          disabled={!isAuthenticated || (!isCustomer && !isAdmin)}
+                        />
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleQuantityChange(product.id, (quantities[product.id] || 1) + 1)}
+                          disabled={!isAuthenticated || (!isCustomer && !isAdmin)}
+                        >
+                          +
+                        </Button>
+                      </div>
+
+                      <Button 
+                        className="w-full gap-2" 
+                        onClick={() => handleAddToQuote(product)}
+                        disabled={!isAuthenticated || (!isCustomer && !isAdmin)}
+                        data-testid={`button-add-quote-${product.id}`}
+                      >
+                        <ShoppingCart className="h-4 w-4" />
+                        Add to Quote
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+              {renderPagination()}
+            </>
           )}
         </div>
       </div>
     </PublicLayout>
-  );
-}
-
-interface ProductCardProps {
-  product: Product;
-  brands?: Brand[];
-  quantity: number;
-  onQuantityChange: (newQuantity: number) => void;
-  onAddToQuote: () => void;
-  isAuthenticated: boolean;
-}
-
-function ProductCard({ product, brands, quantity, onQuantityChange, onAddToQuote, isAuthenticated }: ProductCardProps) {
-  const brand = brands?.find(b => b.id === product.brandId);
-  
-  return (
-    <Card className="group flex flex-col overflow-visible" data-testid={`card-product-${product.id}`}>
-      <CardContent className="flex flex-1 flex-col p-4">
-        <div className="relative mb-4 aspect-square overflow-hidden rounded-md bg-muted">
-          <img
-            src={product.imageUrl || placeholderImage}
-            alt={product.imageUrl ? product.productName : "Image coming soon"}
-            className="h-full w-full object-contain"
-          />
-          {product.isFeatured && (
-            <Badge className="absolute top-2 left-2" variant="default">
-              Featured
-            </Badge>
-          )}
-        </div>
-
-        <div className="mb-1 flex items-center gap-2">
-          {brand && (
-            <Badge variant="outline" className="text-xs">
-              {brand.name}
-            </Badge>
-          )}
-          <span className="text-xs text-muted-foreground">{product.sku}</span>
-        </div>
-
-        <h3 className="mb-1 font-medium leading-tight line-clamp-2" title={product.productName}>
-          {product.productName}
-        </h3>
-
-        {(product.packSize || product.caseSize) && (
-          <div className="mb-2 text-sm text-muted-foreground">
-            {product.packSize && <span>{product.packSize}</span>}
-            {product.packSize && product.caseSize && <span> | </span>}
-            {product.caseSize && <span>Case: {product.caseSize}</span>}
-          </div>
-        )}
-
-        <div className="mt-auto space-y-3">
-          {isAuthenticated ? (
-            <div className="flex gap-2">
-              <Input
-                type="number"
-                min="1"
-                value={quantity}
-                onChange={(e) => onQuantityChange(parseInt(e.target.value) || 1)}
-                className="w-20 text-center"
-                placeholder="Qty"
-                data-testid={`input-qty-${product.id}`}
-              />
-              <Button
-                className="flex-1 gap-1"
-                size="sm"
-                onClick={onAddToQuote}
-                data-testid={`button-add-to-quote-${product.id}`}
-              >
-                <ShoppingCart className="h-4 w-4" />
-                Request Quote
-              </Button>
-            </div>
-          ) : (
-            <Link href="/login">
-              <Button variant="outline" className="w-full" size="sm">
-                Login to Request Quote
-              </Button>
-            </Link>
-          )}
-        </div>
-      </CardContent>
-    </Card>
   );
 }

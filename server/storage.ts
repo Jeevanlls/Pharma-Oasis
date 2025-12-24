@@ -64,10 +64,11 @@ export interface IStorage {
   updateProduct(id: number, updates: Partial<InsertProduct>): Promise<Product | undefined>;
   deleteProduct(id: number): Promise<void>;
   getAllProducts(options?: { activeOnly?: boolean; featuredOnly?: boolean; limit?: number; offset?: number }): Promise<Product[]>;
-  getProductsByCategory(categoryId: number, activeOnly?: boolean): Promise<Product[]>;
-  getProductsByBrand(brandId: number, activeOnly?: boolean): Promise<Product[]>;
-  searchProducts(query: string, activeOnly?: boolean): Promise<Product[]>;
-  getProductCount(activeOnly?: boolean): Promise<number>;
+  getProductsByCategory(categoryId: number, options?: { activeOnly?: boolean; limit?: number; offset?: number }): Promise<Product[]>;
+  getProductsByBrand(brandId: number, options?: { activeOnly?: boolean; limit?: number; offset?: number }): Promise<Product[]>;
+  searchProducts(query: string, options?: { activeOnly?: boolean; limit?: number; offset?: number }): Promise<Product[]>;
+  searchProductsFullText(query: string, options?: { activeOnly?: boolean; limit?: number; offset?: number }): Promise<Product[]>;
+  getProductCount(options?: { activeOnly?: boolean; categoryId?: number; brandId?: number; search?: string }): Promise<number>;
   bulkCreateProducts(products: InsertProduct[]): Promise<Product[]>;
 
   // Quotes
@@ -346,21 +347,32 @@ export class DatabaseStorage implements IStorage {
     return query;
   }
 
-  async getProductsByCategory(categoryId: number, activeOnly = false): Promise<Product[]> {
+  async getProductsByCategory(categoryId: number, options: { activeOnly?: boolean; limit?: number; offset?: number } = {}): Promise<Product[]> {
+    const { activeOnly = false, limit = 24, offset = 0 } = options;
     const conditions = [
       or(eq(products.categoryId, categoryId), eq(products.subcategoryId, categoryId))
     ];
     if (activeOnly) conditions.push(eq(products.isActive, true));
-    return db.select().from(products).where(and(...conditions)).orderBy(asc(products.productName));
+    return db.select().from(products)
+      .where(and(...conditions))
+      .orderBy(asc(products.productName))
+      .limit(limit)
+      .offset(offset);
   }
 
-  async getProductsByBrand(brandId: number, activeOnly = false): Promise<Product[]> {
+  async getProductsByBrand(brandId: number, options: { activeOnly?: boolean; limit?: number; offset?: number } = {}): Promise<Product[]> {
+    const { activeOnly = false, limit = 24, offset = 0 } = options;
     const conditions = [eq(products.brandId, brandId)];
     if (activeOnly) conditions.push(eq(products.isActive, true));
-    return db.select().from(products).where(and(...conditions)).orderBy(asc(products.productName));
+    return db.select().from(products)
+      .where(and(...conditions))
+      .orderBy(asc(products.productName))
+      .limit(limit)
+      .offset(offset);
   }
 
-  async searchProducts(query: string, activeOnly = false): Promise<Product[]> {
+  async searchProducts(query: string, options: { activeOnly?: boolean; limit?: number; offset?: number } = {}): Promise<Product[]> {
+    const { activeOnly = false, limit = 24, offset = 0 } = options;
     const searchTerm = `%${query}%`;
     const conditions = [
       or(
@@ -370,13 +382,53 @@ export class DatabaseStorage implements IStorage {
       )
     ];
     if (activeOnly) conditions.push(eq(products.isActive, true));
-    return db.select().from(products).where(and(...conditions)).orderBy(asc(products.productName)).limit(50);
+    return db.select().from(products)
+      .where(and(...conditions))
+      .orderBy(asc(products.productName))
+      .limit(limit)
+      .offset(offset);
   }
 
-  async getProductCount(activeOnly = false): Promise<number> {
+  async searchProductsFullText(query: string, options: { activeOnly?: boolean; limit?: number; offset?: number } = {}): Promise<Product[]> {
+    const { activeOnly = false, limit = 24, offset = 0 } = options;
+    const searchTerm = query.trim();
+    
+    if (!searchTerm) return [];
+    
+    try {
+      const result = await db.execute(sql`
+        SELECT * FROM ${products}
+        WHERE to_tsvector('english', COALESCE(product_name, '')) @@ plainto_tsquery('english', ${searchTerm})
+        ${activeOnly ? sql`AND is_active = true` : sql``}
+        ORDER BY ts_rank(to_tsvector('english', COALESCE(product_name, '')), plainto_tsquery('english', ${searchTerm})) DESC
+        LIMIT ${limit} OFFSET ${offset}
+      `);
+      
+      return result.rows as Product[];
+    } catch (err) {
+      console.error("Full-text search failed, falling back to ILIKE:", err);
+      return this.searchProducts(query, options);
+    }
+  }
+
+  async getProductCount(options: { activeOnly?: boolean; categoryId?: number; brandId?: number; search?: string } = {}): Promise<number> {
+    const { activeOnly = false, categoryId, brandId, search } = options;
+    const conditions = [];
+    
+    if (activeOnly) conditions.push(eq(products.isActive, true));
+    if (categoryId) conditions.push(or(eq(products.categoryId, categoryId), eq(products.subcategoryId, categoryId)));
+    if (brandId) conditions.push(eq(products.brandId, brandId));
+    if (search) {
+      const searchTerm = `%${search}%`;
+      conditions.push(or(
+        ilike(products.productName, searchTerm),
+        ilike(products.sku, searchTerm)
+      ));
+    }
+    
     const result = await db.select({ count: sql<number>`count(*)` })
       .from(products)
-      .where(activeOnly ? eq(products.isActive, true) : undefined);
+      .where(conditions.length > 0 ? and(...conditions) : undefined);
     return Number(result[0]?.count ?? 0);
   }
 
