@@ -1,16 +1,21 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { createServer, IncomingMessage, ServerResponse } from "http";
 import path from "path";
-import compression from "compression";
-import helmet from "helmet";
 
+// Create Express app
 const app = express();
 
-// Create HTTP server WITHOUT passing Express - we handle routing manually
+// Create HTTP server - we'll set up the request handler after health routes
 const httpServer = createServer();
 
-// CRITICAL: Raw HTTP health check - bypasses ALL Express middleware
-// Distinguishes between health probes (no Accept) and browsers (Accept: text/html)
+// ============================================================================
+// STEP 1: HEALTH CHECK ROUTES - MUST BE FIRST, BEFORE ANY MIDDLEWARE
+// These respond immediately with no database or middleware overhead
+// ============================================================================
+app.get("/health", (_, res) => res.status(200).send("OK"));
+app.get("/healthz", (_, res) => res.status(200).send("OK"));
+
+// Raw HTTP health check as fallback - catches requests before Express middleware
 httpServer.on("request", (req: IncomingMessage, res: ServerResponse) => {
   const url = req.url || "";
   const accept = req.headers["accept"] || "";
@@ -22,67 +27,108 @@ httpServer.on("request", (req: IncomingMessage, res: ServerResponse) => {
     return;
   }
   
-  // Root "/" - check if it's a health probe or a real browser
-  // Health probes don't send Accept: text/html, browsers do
+  // Root "/" - health probes don't send Accept: text/html, browsers do
   if (url === "/") {
     const isBrowser = accept.includes("text/html") || accept.includes("application/xhtml+xml");
     if (!isBrowser) {
-      // Health check probe - respond instantly
       res.writeHead(200, { "Content-Type": "text/plain" });
       res.end("OK");
       return;
     }
   }
   
-  // Browser requests and all other routes go through Express
+  // All other requests go through Express
   app(req, res);
 });
 
+// ============================================================================
+// STEP 2: MIDDLEWARE - REGISTERED AFTER HEALTH ROUTES
+// ============================================================================
 declare module "http" {
   interface IncomingMessage {
     rawBody: unknown;
   }
 }
 
-// Enable gzip/brotli compression for all responses
-app.use(compression());
+// Lazy load compression and helmet to avoid blocking startup
+let compressionMiddleware: any = null;
+let helmetMiddleware: any = null;
 
-// Security headers with Helmet
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-      fontSrc: ["'self'", "https://fonts.gstatic.com"],
-      imgSrc: ["'self'", "data:", "https:", "blob:"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
-      connectSrc: ["'self'", "wss:", "ws:"],
-      frameSrc: ["'self'"],
-      objectSrc: ["'none'"],
+// Middleware will be set up after server starts listening
+function setupMiddleware() {
+  const compression = require("compression");
+  const helmet = require("helmet");
+  
+  compressionMiddleware = compression();
+  helmetMiddleware = helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        fontSrc: ["'self'", "https://fonts.gstatic.com"],
+        imgSrc: ["'self'", "data:", "https:", "blob:"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+        connectSrc: ["'self'", "wss:", "ws:"],
+        frameSrc: ["'self'"],
+        objectSrc: ["'none'"],
+      },
     },
-  },
-  hsts: {
-    maxAge: 31536000,
-    includeSubDomains: true,
-    preload: true,
-  },
-  frameguard: { action: "deny" },
-  referrerPolicy: { policy: "strict-origin-when-cross-origin" },
-  xssFilter: true,
-  noSniff: true,
-}));
-
-app.use(
-  express.json({
-    limit: '50mb',
-    verify: (req, _res, buf) => {
-      req.rawBody = buf;
+    hsts: {
+      maxAge: 31536000,
+      includeSubDomains: true,
+      preload: true,
     },
-  }),
-);
+    frameguard: { action: "deny" },
+    referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+    xssFilter: true,
+    noSniff: true,
+  });
 
-app.use(express.urlencoded({ extended: false, limit: '50mb' }));
+  // Register middleware AFTER health routes
+  app.use(compressionMiddleware);
+  app.use(helmetMiddleware);
+  
+  app.use(
+    express.json({
+      limit: '50mb',
+      verify: (req: any, _res: any, buf: any) => {
+        req.rawBody = buf;
+      },
+    }),
+  );
+  
+  app.use(express.urlencoded({ extended: false, limit: '50mb' }));
 
+  // Request logging middleware
+  app.use((req, res, next) => {
+    const start = Date.now();
+    const reqPath = req.path;
+    let capturedJsonResponse: Record<string, any> | undefined = undefined;
+
+    const originalResJson = res.json;
+    res.json = function (bodyJson, ...args) {
+      capturedJsonResponse = bodyJson;
+      return originalResJson.apply(res, [bodyJson, ...args]);
+    };
+
+    res.on("finish", () => {
+      const duration = Date.now() - start;
+      if (reqPath.startsWith("/api")) {
+        let logLine = `${req.method} ${reqPath} ${res.statusCode} in ${duration}ms`;
+        if (capturedJsonResponse) {
+          logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+        }
+        log(logLine);
+      }
+    });
+
+    next();
+  });
+}
+
+// ============================================================================
+// STEP 3: LOGGING UTILITY
+// ============================================================================
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",
@@ -94,33 +140,9 @@ export function log(message: string, source = "express") {
   console.log(`${formattedTime} [${source}] ${message}`);
 }
 
-app.use((req, res, next) => {
-  const start = Date.now();
-  const reqPath = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
-
-  const originalResJson = res.json;
-  res.json = function (bodyJson, ...args) {
-    capturedJsonResponse = bodyJson;
-    return originalResJson.apply(res, [bodyJson, ...args]);
-  };
-
-  res.on("finish", () => {
-    const duration = Date.now() - start;
-    if (reqPath.startsWith("/api")) {
-      let logLine = `${req.method} ${reqPath} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
-
-      log(logLine);
-    }
-  });
-
-  next();
-});
-
-// START SERVER IMMEDIATELY for health checks
+// ============================================================================
+// STEP 4: START SERVER IMMEDIATELY - NO BLOCKING CODE BEFORE THIS
+// ============================================================================
 const port = parseInt(process.env.PORT || "5000", 10);
 
 httpServer.listen(
@@ -131,21 +153,31 @@ httpServer.listen(
   },
   () => {
     log(`serving on port ${port}`);
+    log("Health check endpoints ready: /health, /healthz, /");
     
-    // CRITICAL: Use setImmediate to defer initialization to NEXT event loop tick
-    // This allows health check requests to be processed BEFORE any blocking code runs
+    // CRITICAL: All initialization happens AFTER server is listening
+    // Use setImmediate to ensure health checks can be processed first
     setImmediate(() => {
-      initializeApp().catch((err) => {
-        log(`Initialization failed: ${err.message}`);
+      // Stage 1: Setup middleware (fast, no DB)
+      setupMiddleware();
+      log("Middleware configured");
+      
+      // Stage 2: Initialize app (database, routes, etc.)
+      setImmediate(() => {
+        initializeApp().catch((err) => {
+          log(`Initialization failed: ${err.message}`);
+        });
       });
     });
   },
 );
 
-// Async initialization - runs AFTER server is already accepting health checks
+// ============================================================================
+// STEP 5: ASYNC INITIALIZATION - ALL HEAVY WORK HERE, AFTER SERVER IS HEALTHY
+// ============================================================================
 async function initializeApp() {
   try {
-    // Dynamic imports to avoid blocking startup with database connections
+    // Dynamic imports to avoid blocking startup
     const { db } = await import("./db");
     const { users } = await import("@shared/schema");
     const { eq } = await import("drizzle-orm");
@@ -192,7 +224,7 @@ async function initializeApp() {
 
     log("Routes and static serving ready");
 
-    // Background tasks - defer to next tick to keep event loop responsive
+    // Stage 3: Background tasks - further deferred to keep event loop free
     setImmediate(() => {
       runBackgroundTasks(db, users, eq);
     });
@@ -202,71 +234,86 @@ async function initializeApp() {
   }
 }
 
-// Background tasks that can run after routes are ready
+// ============================================================================
+// STEP 6: BACKGROUND TASKS - FULLY DEFERRED, NON-BLOCKING
+// ============================================================================
 async function runBackgroundTasks(db: any, users: any, eq: any) {
   try {
-    // Ensure chat tables exist
-    await db.execute(`
-      CREATE TABLE IF NOT EXISTS chat_sessions (
-        id SERIAL PRIMARY KEY,
-        session_id VARCHAR(100) UNIQUE NOT NULL,
-        status VARCHAR(20) DEFAULT 'active',
-        visitor_name VARCHAR(100),
-        visitor_email VARCHAR(255),
-        visitor_phone VARCHAR(50),
-        visitor_company VARCHAR(200),
-        lead_captured BOOLEAN DEFAULT false,
-        message_count INTEGER DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-    await db.execute(`
-      CREATE TABLE IF NOT EXISTS chat_messages (
-        id SERIAL PRIMARY KEY,
-        session_id VARCHAR(100) NOT NULL,
-        role VARCHAR(20) NOT NULL,
-        content TEXT NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-    await db.execute(`
-      CREATE TABLE IF NOT EXISTS chat_leads (
-        id SERIAL PRIMARY KEY,
-        session_id VARCHAR(100),
-        name VARCHAR(100),
-        email VARCHAR(255),
-        phone VARCHAR(50),
-        company VARCHAR(200),
-        interest TEXT,
-        status VARCHAR(20) DEFAULT 'new',
-        notes TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-    log("Chat tables verified/created");
-
-    // Auto-seed if database is empty (quick check, no retries)
-    try {
-      const adminUser = await db.select().from(users).where(eq(users.email, "admin@pharmaoasis.com"));
-      if (adminUser.length === 0) {
-        log("Database appears empty, auto-seeding demo data...");
-        const { seed } = await import("./seed");
-        await seed();
-        log("Auto-seed completed successfully!");
-      } else {
-        log("Database already has data, skipping auto-seed");
+    // Stage 3a: Chat tables - deferred
+    setImmediate(async () => {
+      try {
+        await db.execute(`
+          CREATE TABLE IF NOT EXISTS chat_sessions (
+            id SERIAL PRIMARY KEY,
+            session_id VARCHAR(100) UNIQUE NOT NULL,
+            status VARCHAR(20) DEFAULT 'active',
+            visitor_name VARCHAR(100),
+            visitor_email VARCHAR(255),
+            visitor_phone VARCHAR(50),
+            visitor_company VARCHAR(200),
+            lead_captured BOOLEAN DEFAULT false,
+            message_count INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          );
+        `);
+        await db.execute(`
+          CREATE TABLE IF NOT EXISTS chat_messages (
+            id SERIAL PRIMARY KEY,
+            session_id VARCHAR(100) NOT NULL,
+            role VARCHAR(20) NOT NULL,
+            content TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          );
+        `);
+        await db.execute(`
+          CREATE TABLE IF NOT EXISTS chat_leads (
+            id SERIAL PRIMARY KEY,
+            session_id VARCHAR(100),
+            name VARCHAR(100),
+            email VARCHAR(255),
+            phone VARCHAR(50),
+            company VARCHAR(200),
+            interest TEXT,
+            status VARCHAR(20) DEFAULT 'new',
+            notes TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          );
+        `);
+        log("Chat tables verified/created");
+      } catch (err: any) {
+        log(`Chat tables warning: ${err.message}`);
       }
-    } catch (seedError: any) {
-      log(`Auto-seed check skipped: ${seedError.message}`);
-    }
+    });
 
-    // Start background import processor
-    const { startImportProcessor } = await import("./import-processor");
-    startImportProcessor();
+    // Stage 3b: Auto-seed check - deferred with setTimeout for extra delay
+    setTimeout(async () => {
+      try {
+        const adminUser = await db.select().from(users).where(eq(users.email, "admin@pharmaoasis.com"));
+        if (adminUser.length === 0) {
+          log("Database appears empty, auto-seeding demo data...");
+          const { seed } = await import("./seed");
+          await seed();
+          log("Auto-seed completed successfully!");
+        } else {
+          log("Database already has data, skipping auto-seed");
+        }
+      } catch (seedError: any) {
+        log(`Auto-seed check skipped: ${seedError.message}`);
+      }
+    }, 100);
 
-    log("Application fully initialized");
+    // Stage 3c: Import processor - deferred with setTimeout
+    setTimeout(async () => {
+      try {
+        const { startImportProcessor } = await import("./import-processor");
+        startImportProcessor();
+        log("Application fully initialized");
+      } catch (err: any) {
+        log(`Import processor warning: ${err.message}`);
+      }
+    }, 200);
 
   } catch (error: any) {
     log(`Background task warning: ${error.message}`);
