@@ -25,6 +25,17 @@ app.get("/health", (_, res) => {
   res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
+// Root health check for deployment platform (responds to / without Accept: text/html)
+app.get("/", (req, res, next) => {
+  const acceptHeader = req.headers.accept || "";
+  // If it's a health check (no HTML expected), respond immediately
+  if (!acceptHeader.includes("text/html")) {
+    return res.status(200).send("OK");
+  }
+  // Otherwise, continue to serve the React SPA
+  next();
+});
+
 // Enable gzip/brotli compression for all responses
 app.use(compression());
 
