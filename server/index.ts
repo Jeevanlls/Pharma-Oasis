@@ -6,32 +6,35 @@ import helmet from "helmet";
 
 const app = express();
 
-// Track initialization state - health checks pass immediately, SPA served after init
-let isInitialized = false;
-
 // Create HTTP server WITHOUT passing Express - we handle routing manually
 const httpServer = createServer();
 
-// CRITICAL: Raw HTTP health check - bypasses ALL Express middleware including session store
-// This responds BEFORE Node's event loop is blocked by database operations
+// CRITICAL: Raw HTTP health check - bypasses ALL Express middleware
+// Distinguishes between health probes (no Accept) and browsers (Accept: text/html)
 httpServer.on("request", (req: IncomingMessage, res: ServerResponse) => {
   const url = req.url || "";
+  const accept = req.headers["accept"] || "";
   
-  // Health check endpoints - always respond immediately at HTTP level
+  // Dedicated health endpoints - always respond immediately
   if (url === "/health" || url === "/healthz") {
     res.writeHead(200, { "Content-Type": "text/plain" });
     res.end("OK");
     return;
   }
   
-  // Root "/" - return OK during init (for health check), serve SPA after init
-  if (url === "/" && !isInitialized) {
-    res.writeHead(200, { "Content-Type": "text/plain" });
-    res.end("OK");
-    return;
+  // Root "/" - check if it's a health probe or a real browser
+  // Health probes don't send Accept: text/html, browsers do
+  if (url === "/") {
+    const isBrowser = accept.includes("text/html") || accept.includes("application/xhtml+xml");
+    if (!isBrowser) {
+      // Health check probe - respond instantly
+      res.writeHead(200, { "Content-Type": "text/plain" });
+      res.end("OK");
+      return;
+    }
   }
   
-  // All other requests (and "/" after init) go through Express
+  // Browser requests and all other routes go through Express
   app(req, res);
 });
 
@@ -56,7 +59,6 @@ app.use(helmet({
       connectSrc: ["'self'", "wss:", "ws:"],
       frameSrc: ["'self'"],
       objectSrc: ["'none'"],
-      upgradeInsecureRequests: [],
     },
   },
   hsts: {
@@ -184,10 +186,6 @@ async function initializeApp() {
     }
 
     log("Routes and static serving ready");
-    
-    // Mark as initialized - "/" will now serve SPA instead of health check
-    isInitialized = true;
-    log("Health check mode disabled - serving SPA on /");
 
     // Background tasks - don't block main initialization
     runBackgroundTasks(db, users, eq);
