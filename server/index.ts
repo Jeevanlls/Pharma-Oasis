@@ -13,13 +13,14 @@ declare module "http" {
   }
 }
 
-// CRITICAL: Health check - must respond INSTANTLY before ANY middleware or routes
-// Use custom router to ensure these bypass all middleware and other routes
-const healthRouter = express.Router();
-healthRouter.all("/health", (_, res) => res.status(200).send("OK"));
-healthRouter.all("/healthz", (_, res) => res.status(200).send("OK"));
-healthRouter.all("/", (_, res) => res.status(200).send("OK"));
-app.use(healthRouter);
+// CRITICAL: Health check middleware - MUST be first, returns instantly
+// This intercepts health endpoints at HTTP level before ANY other processing
+app.use((req, res, next) => {
+  if (req.path === "/" || req.path === "/health" || req.path === "/healthz") {
+    return res.status(200).send("OK");
+  }
+  next();
+});
 
 // Enable gzip/brotli compression for all responses
 app.use(compression());
