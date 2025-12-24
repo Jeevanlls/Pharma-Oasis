@@ -25,16 +25,18 @@ app.get("/health", (_, res) => {
   res.status(200).send("OK");
 });
 
-// Root health check for deployment platform - responds before any other processing
-// Browsers get SPA from static middleware, health checks get instant OK
-app.get("/", (req, res, next) => {
+// Root endpoint - always responds immediately (no next() call)
+// Health checks get plain OK, browsers get redirect to load SPA
+app.get("/", (req, res) => {
   const accept = req.headers.accept || "";
-  // Health checks don't request HTML - respond instantly
-  if (!accept.includes("text/html")) {
-    return res.status(200).send("OK");
+  if (accept.includes("text/html")) {
+    // Browser request - serve minimal HTML that loads the SPA
+    return res.status(200).send(`<!DOCTYPE html>
+<html><head><meta http-equiv="refresh" content="0;url=/home"></head>
+<body></body></html>`);
   }
-  // Browser requests continue to static file serving
-  next();
+  // Health check - plain OK
+  res.status(200).send("OK");
 });
 
 // Enable gzip/brotli compression for all responses
