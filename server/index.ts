@@ -1,45 +1,21 @@
 import express, { type Request, Response, NextFunction } from "express";
-import { createServer, IncomingMessage, ServerResponse } from "http";
+import { createServer } from "http";
 import path from "path";
 
 // Create Express app
 const app = express();
 
-// Create HTTP server - we'll set up the request handler after health routes
-const httpServer = createServer();
-
 // ============================================================================
 // STEP 1: HEALTH CHECK ROUTES - MUST BE FIRST, BEFORE ANY MIDDLEWARE
 // These respond immediately with no database or middleware overhead
 // ============================================================================
+app.get("/", (_, res) => res.status(200).send("OK"));
 app.get("/health", (_, res) => res.status(200).send("OK"));
 app.get("/healthz", (_, res) => res.status(200).send("OK"));
 
-// Raw HTTP health check as fallback - catches requests before Express middleware
-httpServer.on("request", (req: IncomingMessage, res: ServerResponse) => {
-  const url = req.url || "";
-  const accept = req.headers["accept"] || "";
-  
-  // Dedicated health endpoints - always respond immediately
-  if (url === "/health" || url === "/healthz") {
-    res.writeHead(200, { "Content-Type": "text/plain" });
-    res.end("OK");
-    return;
-  }
-  
-  // Root "/" - health probes don't send Accept: text/html, browsers do
-  if (url === "/") {
-    const isBrowser = accept.includes("text/html") || accept.includes("application/xhtml+xml");
-    if (!isBrowser) {
-      res.writeHead(200, { "Content-Type": "text/plain" });
-      res.end("OK");
-      return;
-    }
-  }
-  
-  // All other requests go through Express
-  app(req, res);
-});
+// Create HTTP server WITH Express app attached directly
+// This ensures Express handles all requests without interception
+const httpServer = createServer(app);
 
 // ============================================================================
 // STEP 2: MIDDLEWARE - REGISTERED AFTER HEALTH ROUTES
