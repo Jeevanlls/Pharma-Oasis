@@ -25,11 +25,15 @@ app.get("/health", (_, res) => {
   res.status(200).send("OK");
 });
 
-// Root endpoint - unconditional OK response for Replit health checks
-// No header inspection, no redirects - just plain text OK
-// SPA is served via catch-all route for actual page paths like /home, /products
-app.get("/", (_, res) => {
-  res.status(200).type("text/plain").send("OK");
+// Root endpoint serves health check for non-browser clients, SPA for browsers
+app.get("/", (req, res, next) => {
+  const accept = req.get("Accept") || "";
+  // Health check probes typically don't send Accept: text/html
+  if (!accept.includes("text/html")) {
+    return res.status(200).type("text/plain").send("OK");
+  }
+  // Let Vite/static serve the SPA for browsers
+  next();
 });
 
 // Enable gzip/brotli compression for all responses
