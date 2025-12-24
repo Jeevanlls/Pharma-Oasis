@@ -19,6 +19,12 @@ declare module "http" {
   }
 }
 
+// Fast health check endpoints - MUST be before all middleware for quick response
+// Deployment health checks go to / by default
+app.get("/health", (_, res) => {
+  res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
 // Enable gzip/brotli compression for all responses
 app.use(compression());
 
@@ -47,11 +53,6 @@ app.use(helmet({
   xssFilter: true,
   noSniff: true,
 }));
-
-// Health check endpoint for uptime monitoring
-app.get("/health", (_, res) => {
-  res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
-});
 
 app.use(
   express.json({
