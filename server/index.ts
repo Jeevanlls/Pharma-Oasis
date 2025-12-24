@@ -13,27 +13,12 @@ declare module "http" {
   }
 }
 
-// CRITICAL: Health check endpoints FIRST - before ANY middleware
-// These must respond instantly for deployment health checks - no middleware overhead
-app.get("/health", (_, res) => {
-  res.status(200).send("OK");
-});
-
-// Root health check - responds OK for non-browser requests (health probes)
-// Browsers (Accept: text/html) fall through to Vite/static serving
-app.get("/", (req, res, next) => {
-  const accept = req.headers.accept || "";
-  const userAgent = req.headers["user-agent"] || "";
-  
-  // Health check probes don't typically send browser-like headers
-  const isBrowser = accept.includes("text/html") && 
-                    (userAgent.includes("Mozilla") || userAgent.includes("Chrome") || userAgent.includes("Safari"));
-  
-  if (!isBrowser) {
-    return res.status(200).send("OK");
-  }
-  next();
-});
+// CRITICAL: Health check - must respond INSTANTLY before ANY middleware
+app.get("/health", (_, res) => res.status(200).send("OK"));
+app.head("/health", (_, res) => res.status(200).send("OK"));
+app.get("/healthz", (_, res) => res.status(200).send("OK"));
+app.head("/", (_, res) => res.status(200).send("OK"));
+app.get("/", (_, res) => res.status(200).send("OK"));
 
 // Enable gzip/brotli compression for all responses
 app.use(compression());
