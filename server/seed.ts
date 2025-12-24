@@ -987,9 +987,8 @@ Sunday: Closed
 }
 
 // Only run if called directly (not imported)
-// ESM-compatible check
-const isMainModule = import.meta.url === `file://${process.argv[1]}`;
-if (isMainModule) {
+// CommonJS-compatible check
+if (require.main === module) {
   seed()
     .then(() => process.exit(0))
     .catch((error) => {
