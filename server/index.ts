@@ -50,17 +50,13 @@ declare module "http" {
   }
 }
 
-// Lazy load compression and helmet to avoid blocking startup
-let compressionMiddleware: any = null;
-let helmetMiddleware: any = null;
-
 // Middleware will be set up after server starts listening
-function setupMiddleware() {
-  const compression = require("compression");
-  const helmet = require("helmet");
+async function setupMiddleware() {
+  const compression = (await import("compression")).default;
+  const helmet = (await import("helmet")).default;
   
-  compressionMiddleware = compression();
-  helmetMiddleware = helmet({
+  const compressionMiddleware = compression();
+  const helmetMiddleware = helmet({
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
@@ -157,17 +153,21 @@ httpServer.listen(
     
     // CRITICAL: All initialization happens AFTER server is listening
     // Use setImmediate to ensure health checks can be processed first
-    setImmediate(() => {
-      // Stage 1: Setup middleware (fast, no DB)
-      setupMiddleware();
-      log("Middleware configured");
-      
-      // Stage 2: Initialize app (database, routes, etc.)
-      setImmediate(() => {
-        initializeApp().catch((err) => {
-          log(`Initialization failed: ${err.message}`);
+    setImmediate(async () => {
+      try {
+        // Stage 1: Setup middleware (fast, no DB)
+        await setupMiddleware();
+        log("Middleware configured");
+        
+        // Stage 2: Initialize app (database, routes, etc.)
+        setImmediate(() => {
+          initializeApp().catch((err) => {
+            log(`Initialization failed: ${err.message}`);
+          });
         });
-      });
+      } catch (err: any) {
+        log(`Middleware setup failed: ${err.message}`);
+      }
     });
   },
 );
