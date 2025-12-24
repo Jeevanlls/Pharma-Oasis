@@ -1,6 +1,8 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { createServer } from "http";
 import path from "path";
+import compression from "compression";
+import helmet from "helmet";
 
 // Create Express app
 const app = express();
@@ -13,12 +15,8 @@ app.get("/", (_, res) => res.status(200).send("OK"));
 app.get("/health", (_, res) => res.status(200).send("OK"));
 app.get("/healthz", (_, res) => res.status(200).send("OK"));
 
-// Create HTTP server WITH Express app attached directly
-// This ensures Express handles all requests without interception
-const httpServer = createServer(app);
-
 // ============================================================================
-// STEP 2: MIDDLEWARE - REGISTERED AFTER HEALTH ROUTES
+// STEP 2: MIDDLEWARE - REGISTERED SYNCHRONOUSLY BEFORE listen()
 // ============================================================================
 declare module "http" {
   interface IncomingMessage {
@@ -26,77 +24,70 @@ declare module "http" {
   }
 }
 
-// Middleware will be set up after server starts listening
-async function setupMiddleware() {
-  const compression = (await import("compression")).default;
-  const helmet = (await import("helmet")).default;
-  
-  const compressionMiddleware = compression();
-  const helmetMiddleware = helmet({
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-        fontSrc: ["'self'", "https://fonts.gstatic.com"],
-        imgSrc: ["'self'", "data:", "https:", "blob:"],
-        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
-        connectSrc: ["'self'", "wss:", "ws:"],
-        frameSrc: ["'self'"],
-        objectSrc: ["'none'"],
-      },
+// Compression middleware
+app.use(compression());
+
+// Security headers
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "https:", "blob:"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      connectSrc: ["'self'", "wss:", "ws:"],
+      frameSrc: ["'self'"],
+      objectSrc: ["'none'"],
     },
-    hsts: {
-      maxAge: 31536000,
-      includeSubDomains: true,
-      preload: true,
+  },
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true,
+  },
+  frameguard: { action: "deny" },
+  referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+  xssFilter: true,
+  noSniff: true,
+}));
+
+// Body parsers
+app.use(
+  express.json({
+    limit: '50mb',
+    verify: (req: any, _res: any, buf: any) => {
+      req.rawBody = buf;
     },
-    frameguard: { action: "deny" },
-    referrerPolicy: { policy: "strict-origin-when-cross-origin" },
-    xssFilter: true,
-    noSniff: true,
-  });
+  }),
+);
+app.use(express.urlencoded({ extended: false, limit: '50mb' }));
 
-  // Register middleware AFTER health routes
-  app.use(compressionMiddleware);
-  app.use(helmetMiddleware);
-  
-  app.use(
-    express.json({
-      limit: '50mb',
-      verify: (req: any, _res: any, buf: any) => {
-        req.rawBody = buf;
-      },
-    }),
-  );
-  
-  app.use(express.urlencoded({ extended: false, limit: '50mb' }));
+// Request logging middleware
+app.use((req, res, next) => {
+  const start = Date.now();
+  const reqPath = req.path;
+  let capturedJsonResponse: Record<string, any> | undefined = undefined;
 
-  // Request logging middleware
-  app.use((req, res, next) => {
-    const start = Date.now();
-    const reqPath = req.path;
-    let capturedJsonResponse: Record<string, any> | undefined = undefined;
+  const originalResJson = res.json;
+  res.json = function (bodyJson, ...args) {
+    capturedJsonResponse = bodyJson;
+    return originalResJson.apply(res, [bodyJson, ...args]);
+  };
 
-    const originalResJson = res.json;
-    res.json = function (bodyJson, ...args) {
-      capturedJsonResponse = bodyJson;
-      return originalResJson.apply(res, [bodyJson, ...args]);
-    };
-
-    res.on("finish", () => {
-      const duration = Date.now() - start;
-      if (reqPath.startsWith("/api")) {
-        let logLine = `${req.method} ${reqPath} ${res.statusCode} in ${duration}ms`;
-        if (capturedJsonResponse) {
-          logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-        }
-        log(logLine);
+  res.on("finish", () => {
+    const duration = Date.now() - start;
+    if (reqPath.startsWith("/api")) {
+      let logLine = `${req.method} ${reqPath} ${res.statusCode} in ${duration}ms`;
+      if (capturedJsonResponse) {
+        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       }
-    });
-
-    next();
+      log(logLine);
+    }
   });
-}
+
+  next();
+});
 
 // ============================================================================
 // STEP 3: LOGGING UTILITY
@@ -113,8 +104,10 @@ export function log(message: string, source = "express") {
 }
 
 // ============================================================================
-// STEP 4: START SERVER IMMEDIATELY - NO BLOCKING CODE BEFORE THIS
+// STEP 4: CREATE HTTP SERVER AND START LISTENING
+// Express is fully configured with health routes + middleware before listen()
 // ============================================================================
+const httpServer = createServer(app);
 const port = parseInt(process.env.PORT || "5000", 10);
 
 httpServer.listen(
@@ -127,33 +120,23 @@ httpServer.listen(
     log(`serving on port ${port}`);
     log("Health check endpoints ready: /health, /healthz, /");
     
-    // CRITICAL: All initialization happens AFTER server is listening
-    // Use setImmediate to ensure health checks can be processed first
-    setImmediate(async () => {
-      try {
-        // Stage 1: Setup middleware (fast, no DB)
-        await setupMiddleware();
-        log("Middleware configured");
-        
-        // Stage 2: Initialize app (database, routes, etc.)
-        setImmediate(() => {
-          initializeApp().catch((err) => {
-            log(`Initialization failed: ${err.message}`);
-          });
-        });
-      } catch (err: any) {
-        log(`Middleware setup failed: ${err.message}`);
-      }
+    // CRITICAL: Only HEAVY ASYNC work is deferred after listen()
+    // Middleware is already registered synchronously above
+    setImmediate(() => {
+      initializeApp().catch((err) => {
+        log(`Initialization failed: ${err.message}`);
+      });
     });
   },
 );
 
 // ============================================================================
-// STEP 5: ASYNC INITIALIZATION - ALL HEAVY WORK HERE, AFTER SERVER IS HEALTHY
+// STEP 5: ASYNC INITIALIZATION - DATABASE, ROUTES, WEBSOCKET
+// Only heavy work that requires async/await is deferred here
 // ============================================================================
 async function initializeApp() {
   try {
-    // Dynamic imports to avoid blocking startup
+    // Dynamic imports for heavy modules
     const { db } = await import("./db");
     const { users } = await import("@shared/schema");
     const { eq } = await import("drizzle-orm");
@@ -164,7 +147,7 @@ async function initializeApp() {
     // Setup WebSocket for chat
     setupChatWebSocket(httpServer);
 
-    // Register all routes
+    // Register all API routes
     await registerRoutes(httpServer, app);
 
     // Error handler
@@ -200,7 +183,7 @@ async function initializeApp() {
 
     log("Routes and static serving ready");
 
-    // Stage 3: Background tasks - further deferred to keep event loop free
+    // Stage 2: Background tasks - further deferred
     setImmediate(() => {
       runBackgroundTasks(db, users, eq);
     });
@@ -215,7 +198,7 @@ async function initializeApp() {
 // ============================================================================
 async function runBackgroundTasks(db: any, users: any, eq: any) {
   try {
-    // Stage 3a: Chat tables - deferred
+    // Chat tables creation
     setImmediate(async () => {
       try {
         await db.execute(`
@@ -263,7 +246,7 @@ async function runBackgroundTasks(db: any, users: any, eq: any) {
       }
     });
 
-    // Stage 3b: Auto-seed check - deferred with setTimeout for extra delay
+    // Auto-seed check
     setTimeout(async () => {
       try {
         const adminUser = await db.select().from(users).where(eq(users.email, "admin@pharmaoasis.com"));
@@ -280,7 +263,7 @@ async function runBackgroundTasks(db: any, users: any, eq: any) {
       }
     }, 100);
 
-    // Stage 3c: Import processor - deferred with setTimeout
+    // Import processor
     setTimeout(async () => {
       try {
         const { startImportProcessor } = await import("./import-processor");
