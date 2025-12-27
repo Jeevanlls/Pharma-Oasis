@@ -1,0 +1,97 @@
+Objective:
+Make small, low-risk Google PageSpeed performance improvements (especially LCP and initial render) without changing any content, layout, or visuals.
+
+CRITICAL CONSTRAINTS (PLEASE FOLLOW STRICTLY):
+
+❌ Do NOT change, replace, redesign, crop, or remove any hero images
+
+❌ Do NOT change any text, layout, branding, or page structure
+
+❌ Do NOT change routing, backend logic, hosting, or deployment setup
+
+❌ Do NOT introduce SSR, framework changes, or new libraries
+
+The site must look 100% identical before and after.
+
+✅ Allowed optimisations (technical only, non-visual)
+
+Please limit changes to the following safe delivery optimisations:
+
+1️⃣ Improve Largest Contentful Paint (LCP)
+
+Identify the current LCP element (likely the existing hero image)
+
+Keep the same hero image, but:
+
+Serve it more efficiently (e.g. WebP/AVIF if already supported)
+
+Preserve visual quality (no visible degradation)
+
+Add explicit width and height
+
+Load it eagerly:
+
+loading="eager"
+fetchpriority="high"
+
+2️⃣ Defer non-critical JavaScript
+
+Defer or lazy-load non-essential scripts only (analytics, cookie banner logic, tracking)
+
+Do NOT delay core UI or navigation JS
+
+3️⃣ Reduce unused CSS (build-time only)
+
+Verify Tailwind / CSS purge configuration
+
+Remove unused styles in production build only
+
+4️⃣ Fonts & static assets
+
+Ensure fonts use font-display: swap
+
+Preload critical fonts if applicable
+
+Confirm long-term cache headers remain unchanged
+
+Expected outcome
+
+Improve PageSpeed Performance score by ~10–20 points
+
+Faster mobile first paint
+
+No visual or content changes
+
+No impact on SEO, compliance, or backend behaviour
+
+Please confirm:
+
+Exactly what was changed
+
+Which PageSpeed metric each change improves
+
+That visuals and content are unchanged
+
+Thank you.
+
+🟢 Why this prompt is safe
+
+Protects hero images & brand
+
+Targets only delivery mechanics
+
+Aligns with Google PageSpeed Insights
+
+Zero SEO, MHRA, or B2B risk
+
+No architectural changes
+
+Once Replit replies with what they changed, paste their response here and I’ll:
+
+verify nothing visual was altered
+
+confirm if you should accept it
+
+tell you if you’re fully “done” or if one last tweak is worth it
+
+ChatGPT can make mistakes. Check important info. See Cookie Preferences.

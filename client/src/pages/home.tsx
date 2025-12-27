@@ -156,7 +156,7 @@ function HeroCarousel() {
         className="w-full"
       >
         <CarouselContent className="ml-0">
-          {slides.map((slide) => (
+          {slides.map((slide, index) => (
             <CarouselItem
               key={slide.id}
               className="pl-0 relative min-h-[500px] sm:min-h-[550px]"
@@ -166,6 +166,11 @@ function HeroCarousel() {
                   src={slide.imageUrl}
                   alt={slide.title}
                   className="absolute inset-0 w-full h-full object-cover"
+                  width={1920}
+                  height={550}
+                  loading={index === 0 ? "eager" : "lazy"}
+                  fetchPriority={index === 0 ? "high" : "auto"}
+                  decoding={index === 0 ? "sync" : "async"}
                 />
               )}
               <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-transparent" />
