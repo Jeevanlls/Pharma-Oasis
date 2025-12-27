@@ -45,9 +45,10 @@ export default function AdminSeoPage() {
   const [editingSeo, setEditingSeo] = useState<EditingSEO | null>(null);
   const { toast } = useToast();
 
-  const { data: products, isLoading: productsLoading } = useQuery<Product[]>({
+  const { data: productsData, isLoading: productsLoading } = useQuery<{ products: Product[] }>({
     queryKey: ["/api/products"],
   });
+  const products = productsData?.products;
 
   const { data: brands, isLoading: brandsLoading } = useQuery<Brand[]>({
     queryKey: ["/api/brands"],
