@@ -5,6 +5,21 @@ import compression from "compression";
 import helmet from "helmet";
 
 // ============================================================================
+// REPLIT PROMOTION MODE DETECTION
+// During Replit's promotion phase, ONLY health checks are allowed
+// ANY initialization work (even deferred) will cause promotion to fail
+// 
+// Replit sets REPLIT_DEPLOYMENT="1" in deployed containers
+// We detect promotion by checking for deployment AND a specific env var
+// that indicates we should stay in health-check-only mode
+// ============================================================================
+const REPLIT_DEPLOYMENT = process.env.REPLIT_DEPLOYMENT;
+const REPLIT_DEPLOYMENT_ID = process.env.REPLIT_DEPLOYMENT_ID;
+// Use explicit PROMOTION_MODE env var for reliable detection
+const PROMOTION_MODE_ENABLED = process.env.PROMOTION_MODE === "true";
+const IS_PROMOTION_MODE = PROMOTION_MODE_ENABLED;
+
+// ============================================================================
 // DEPLOYMENT GATE: Explicit control over when background tasks start
 // Background tasks are DISABLED until explicitly enabled via:
 // 1. Admin endpoint: POST /api/admin/activate-background-tasks
@@ -35,9 +50,13 @@ app.get("/api/gate-status", (_, res) => {
   res.json({
     backgroundTasksEnabled,
     backgroundTasksInitialized,
+    isPromotionMode: IS_PROMOTION_MODE,
+    promotionModeEnv: PROMOTION_MODE_ENABLED,
     disabledByEnv: DISABLE_BACKGROUND_TASKS,
     isProduction: IS_PRODUCTION,
     autoActivateDelay: AUTO_ACTIVATE_DELAY_MS,
+    replitDeployment: REPLIT_DEPLOYMENT || null,
+    replitDeploymentId: REPLIT_DEPLOYMENT_ID || null,
   });
 });
 
@@ -149,7 +168,20 @@ httpServer.listen(
     log("Health check endpoints ready: /health, /healthz, /");
     
     // ========================================================================
-    // DEPLOYMENT GATE CONTROL
+    // REPLIT PROMOTION MODE - ZERO INITIALIZATION
+    // During promotion, Replit requires the process to ONLY serve health checks
+    // ANY additional work (even deferred) will cause promotion to fail
+    // ========================================================================
+    if (IS_PROMOTION_MODE) {
+      log("PROMOTION MODE DETECTED - Health checks only, no initialization");
+      log(`REPLIT_DEPLOYMENT=${REPLIT_DEPLOYMENT}, REPLIT_DEPLOYMENT_ID=${REPLIT_DEPLOYMENT_ID}`);
+      log("App will fully initialize after restart post-promotion");
+      // DO NOT schedule any work - return immediately
+      return;
+    }
+    
+    // ========================================================================
+    // DEPLOYMENT GATE CONTROL (post-promotion)
     // ========================================================================
     if (DISABLE_BACKGROUND_TASKS) {
       log("DISABLE_BACKGROUND_TASKS=true - Auto-start disabled, waiting for manual activation");
