@@ -22,9 +22,29 @@ const app = express();
 // STEP 1: HEALTH CHECK ROUTES - MUST BE FIRST, BEFORE ANY MIDDLEWARE
 // These respond immediately with no database or middleware overhead
 // ============================================================================
-app.get("/", (_, res) => res.status(200).send("OK"));
+// /health and /healthz are dedicated health endpoints
 app.get("/health", (_, res) => res.status(200).send("OK"));
 app.get("/healthz", (_, res) => res.status(200).send("OK"));
+
+// "/" only returns "OK" for health probes (not browsers wanting the app)
+// Health probes typically don't send Accept: text/html or have no User-Agent
+app.get("/", (req, res, next) => {
+  const acceptHeader = req.headers.accept || "";
+  const userAgent = req.headers["user-agent"] || "";
+  
+  // If it's a health probe (no browser indicators), return OK
+  const isBrowser = acceptHeader.includes("text/html") || 
+                    userAgent.includes("Mozilla") ||
+                    userAgent.includes("Chrome") ||
+                    userAgent.includes("Safari");
+  
+  if (!isBrowser) {
+    return res.status(200).send("OK");
+  }
+  
+  // For browsers, pass through to static file serving
+  next();
+});
 
 // Gate status endpoint - shows application state
 app.get("/api/gate-status", (_, res) => {
