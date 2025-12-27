@@ -1,0 +1,96 @@
+Objective:
+Fix deployment promotion failures by separating promotion-time health checks from full application initialization, in a way that is compatible with ES modules and Replit’s promotion lifecycle.
+
+Key Constraint (non-negotiable):
+ES module import statements are hoisted and cannot be conditionally gated. Therefore, promotion mode must use a separate entry file, not branching logic inside the same file.
+
+REQUIRED CHANGES
+1️⃣ Create a new promotion-only entry file
+
+File: server/promotion.ts
+
+This file must:
+
+Import only express
+
+Start a minimal Express server
+
+Respond immediately with HTTP 200 on:
+
+/
+
+/health
+
+/healthz
+
+Perform no other imports
+
+Perform no database access
+
+Perform no middleware setup
+
+Perform no background tasks
+
+Exact implementation:
+
+import express from "express";
+
+const app = express();
+
+app.get("/", (_, res) => res.status(200).send("OK"));
+app.get("/health", (_, res) => res.status(200).send("OK"));
+app.get("/healthz", (_, res) => res.status(200).send("OK"));
+
+const port = parseInt(process.env.PORT || "5000", 10);
+
+app.listen(port, "0.0.0.0", () => {
+  console.log("PROMOTION MODE — health checks only");
+});
+
+2️⃣ Rename the existing application entry
+
+Rename current server/index.ts → server/app.ts
+
+Remove all promotion-mode logic from this file
+
+Keep full initialization exactly as-is (DB, routes, WebSockets, background tasks)
+
+3️⃣ Adjust build output
+
+Ensure both files compile to:
+
+dist/promotion.cjs
+
+dist/app.cjs
+
+4️⃣ Update deployment run commands
+
+Promotion deploy (health-check only):
+
+PROMOTION_MODE=true node dist/promotion.cjs
+
+
+Normal production run:
+
+node dist/app.cjs
+
+EXPECTED RESULT
+
+Promotion phase responds instantly to /
+
+Replit health checks pass
+
+Deployment promotion succeeds
+
+Reserved VM remains enabled
+
+Full app initializes only when using app.cjs
+
+Important:
+Do NOT attempt to gate promotion logic inside a single ES module file.
+Do NOT use conditional import.
+Do NOT use return or export {} to short-circuit module execution.
+
+This must be implemented using separate entrypoints.
+
+Please implement exactly as described.

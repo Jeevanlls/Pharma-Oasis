@@ -46,12 +46,29 @@ async function buildAll() {
   ];
   const externals = allDeps.filter((dep) => !allowlist.includes(dep));
 
+  // Build main application entry point (via index.ts wrapper)
   await esbuild({
     entryPoints: ["server/index.ts"],
     platform: "node",
     bundle: true,
     format: "cjs",
     outfile: "dist/index.cjs",
+    define: {
+      "process.env.NODE_ENV": '"production"',
+    },
+    minify: true,
+    external: externals,
+    logLevel: "info",
+  });
+
+  // Build promotion-only entry point (health checks only)
+  console.log("building promotion entry point...");
+  await esbuild({
+    entryPoints: ["server/promotion.ts"],
+    platform: "node",
+    bundle: true,
+    format: "cjs",
+    outfile: "dist/promotion.cjs",
     define: {
       "process.env.NODE_ENV": '"production"',
     },
