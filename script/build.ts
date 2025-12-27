@@ -59,6 +59,9 @@ async function buildAll() {
     minify: true,
     external: externals,
     logLevel: "info",
+    logOverride: {
+      "empty-import-meta": "silent",
+    },
   });
 
   // Build promotion-only entry point (health checks only)
@@ -75,6 +78,9 @@ async function buildAll() {
     minify: true,
     external: externals,
     logLevel: "info",
+    logOverride: {
+      "empty-import-meta": "silent",
+    },
   });
 
   console.log("build complete!");
