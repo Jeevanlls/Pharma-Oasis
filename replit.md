@@ -233,15 +233,21 @@ Admin panel includes product import from CSV with field mapping for:
   - GET `/api/admin/seo-agent/actions` - Action history (paginated)
 
 **AI Blog Generator** (`server/routes.ts` - POST `/api/admin/blog/generate-draft`):
-- Generates professional, regulatory-focused blog articles
+- Generates professional, compliance-safe blog articles
 - Uses GPT-4o-mini with structured JSON output
-- Smart topic detection for compliance-related content
+- Topic classification system (Step 1): Regulatory/Compliance, OTC Medicines, Vitamins & Supplements, Medical Devices, Product/Brand
+- Topic-specific source selection rules (Step 2):
+  - Regulatory/Compliance → GOV.UK, MHRA, EMA
+  - OTC Medicines → NHS, GOV.UK, MHRA
+  - Vitamins & Supplements → NHS, EFSA
+  - Medical Devices → MHRA device guidance, GOV.UK
+  - Product/Brand → Manufacturer official site only
 - Automatic internal and external linking:
-  - External links: GOV.UK, MHRA, NHS, EMA with target="_blank" rel="noopener noreferrer"
+  - External links: target="_blank" rel="noopener noreferrer"
   - Internal links: /compliance, /products, /distribution-network, /how-to-order
   - Topic detection triggers REQUIRED compliance link for GDP/MHRA topics
 - Configurable internal links via INTERNAL_LINKS constant
-- COMPLIANCE_KEYWORDS array for topic detection
+- COMPLIANCE_KEYWORDS array for smart topic detection
 - Compliance disclaimer automatically appended
 - Draft-only workflow (requires manual review before publishing)
 - Admin control: `/admin/blog`
