@@ -690,6 +690,49 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     }
   });
 
+  // ==================== BLOG (PUBLIC) ====================
+  
+  // Get all published blog posts
+  app.get("/api/blog", async (req, res) => {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 10;
+      const offset = (page - 1) * limit;
+      
+      const [posts, total] = await Promise.all([
+        storage.getAllBlogPosts({ publishedOnly: true, limit, offset }),
+        storage.getBlogPostCount(true)
+      ]);
+      
+      res.json({
+        posts,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit)
+        }
+      });
+    } catch (error) {
+      console.error("Error fetching blog posts:", error);
+      res.status(500).json({ message: "Failed to fetch blog posts" });
+    }
+  });
+
+  // Get single blog post by slug (public)
+  app.get("/api/blog/:slug", async (req, res) => {
+    try {
+      const post = await storage.getBlogPostBySlug(req.params.slug);
+      if (!post || post.status !== "published") {
+        return res.status(404).json({ message: "Blog post not found" });
+      }
+      res.json(post);
+    } catch (error) {
+      console.error("Error fetching blog post:", error);
+      res.status(500).json({ message: "Failed to fetch blog post" });
+    }
+  });
+
   // ==================== ADMIN ROUTES ====================
   
   // Admin - Users
@@ -1934,6 +1977,123 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
       res.json({ message: "Supplier lead deleted" });
     } catch (error) {
       res.status(500).json({ message: "Failed to delete supplier lead" });
+    }
+  });
+
+  // Admin - Blog Posts
+  app.get("/api/admin/blog", requireAdmin, async (req, res) => {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 20;
+      const offset = (page - 1) * limit;
+      
+      const [posts, total] = await Promise.all([
+        storage.getAllBlogPosts({ limit, offset }),
+        storage.getBlogPostCount()
+      ]);
+      
+      res.json({
+        posts,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit)
+        }
+      });
+    } catch (error) {
+      console.error("Error fetching blog posts:", error);
+      res.status(500).json({ message: "Failed to fetch blog posts" });
+    }
+  });
+
+  app.get("/api/admin/blog/:id", requireAdmin, async (req, res) => {
+    try {
+      const post = await storage.getBlogPost(Number(req.params.id));
+      if (!post) {
+        return res.status(404).json({ message: "Blog post not found" });
+      }
+      res.json(post);
+    } catch (error) {
+      console.error("Error fetching blog post:", error);
+      res.status(500).json({ message: "Failed to fetch blog post" });
+    }
+  });
+
+  app.post("/api/admin/blog", requireAdmin, async (req, res) => {
+    try {
+      const { title, slug, excerpt, content, featuredImage, metaTitle, metaDescription, status } = req.body;
+      
+      // Generate slug from title if not provided
+      const finalSlug = slug || title.toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '');
+      
+      // Check for duplicate slug
+      const existing = await storage.getBlogPostBySlug(finalSlug);
+      if (existing) {
+        return res.status(400).json({ message: "A blog post with this URL already exists" });
+      }
+      
+      const post = await storage.createBlogPost({
+        title,
+        slug: finalSlug,
+        excerpt,
+        content,
+        featuredImage,
+        metaTitle: metaTitle || title,
+        metaDescription: metaDescription || excerpt,
+        status: status || 'draft',
+        publishedAt: status === 'published' ? new Date() : null,
+        authorId: (req as any).user?.id || null,
+      });
+      
+      res.status(201).json(post);
+    } catch (error) {
+      console.error("Error creating blog post:", error);
+      res.status(500).json({ message: "Failed to create blog post" });
+    }
+  });
+
+  app.patch("/api/admin/blog/:id", requireAdmin, async (req, res) => {
+    try {
+      const { title, slug, excerpt, content, featuredImage, metaTitle, metaDescription, status } = req.body;
+      const id = Number(req.params.id);
+      
+      const existing = await storage.getBlogPost(id);
+      if (!existing) {
+        return res.status(404).json({ message: "Blog post not found" });
+      }
+      
+      // If slug is changing, check for duplicates
+      if (slug && slug !== existing.slug) {
+        const duplicate = await storage.getBlogPostBySlug(slug);
+        if (duplicate && duplicate.id !== id) {
+          return res.status(400).json({ message: "A blog post with this URL already exists" });
+        }
+      }
+      
+      // Set publishedAt when first publishing
+      const updates: any = { title, slug, excerpt, content, featuredImage, metaTitle, metaDescription, status };
+      if (status === 'published' && existing.status !== 'published') {
+        updates.publishedAt = new Date();
+      }
+      
+      const post = await storage.updateBlogPost(id, updates);
+      res.json(post);
+    } catch (error) {
+      console.error("Error updating blog post:", error);
+      res.status(500).json({ message: "Failed to update blog post" });
+    }
+  });
+
+  app.delete("/api/admin/blog/:id", requireAdmin, async (req, res) => {
+    try {
+      await storage.deleteBlogPost(Number(req.params.id));
+      res.json({ message: "Blog post deleted" });
+    } catch (error) {
+      console.error("Error deleting blog post:", error);
+      res.status(500).json({ message: "Failed to delete blog post" });
     }
   });
 
