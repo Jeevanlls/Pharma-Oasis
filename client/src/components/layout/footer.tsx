@@ -105,6 +105,7 @@ export function Footer() {
       { label: "Product Catalogue", url: "/products" },
       { label: "Our Brands", url: "/brands" },
       { label: "How to Order", url: "/how-to-order" },
+      { label: "Blog & Insights", url: "/blog" },
       { label: "Register as Customer", url: "/register" },
       { label: "Become a Supplier", url: "/supplier-registration" }
     ];

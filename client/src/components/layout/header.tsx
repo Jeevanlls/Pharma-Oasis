@@ -18,6 +18,7 @@ import {
   HelpCircle,
   Phone,
   Network,
+  BookOpen,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -33,6 +34,7 @@ const publicNavItems = [
   { href: "/distribution-network", label: "Distribution Network", icon: Network },
   { href: "/how-to-order", label: "How to Order", icon: HelpCircle },
   { href: "/contact", label: "Contact", icon: Phone },
+  { href: "/blog", label: "Insights", icon: BookOpen },
 ];
 
 export function Header() {
