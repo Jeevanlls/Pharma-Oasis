@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "./db";
-import { products, brands, categories } from "@shared/schema";
+import { products, brands, categories, blogPosts } from "@shared/schema";
 import { eq, and, sql } from "drizzle-orm";
 
 const router = Router();
@@ -39,6 +39,10 @@ router.get("/sitemap.xml", async (req, res) => {
   </sitemap>
   <sitemap>
     <loc>${SITE_URL}/feeds/sitemap-categories.xml</loc>
+    <lastmod>${now}</lastmod>
+  </sitemap>
+  <sitemap>
+    <loc>${SITE_URL}/feeds/sitemap-blog.xml</loc>
     <lastmod>${now}</lastmod>
   </sitemap>
 `;
@@ -85,6 +89,7 @@ async function generateSingleSitemap(req: any, res: any) {
     { loc: "/", priority: "1.0", changefreq: "daily" },
     { loc: "/products", priority: "0.9", changefreq: "daily" },
     { loc: "/brands", priority: "0.8", changefreq: "weekly" },
+    { loc: "/blog", priority: "0.7", changefreq: "weekly" },
     { loc: "/about", priority: "0.6", changefreq: "monthly" },
     { loc: "/contact", priority: "0.6", changefreq: "monthly" },
     { loc: "/register", priority: "0.7", changefreq: "monthly" },
@@ -260,6 +265,52 @@ router.get("/sitemap-categories.xml", async (req, res) => {
     res.send(xml);
   } catch (error) {
     console.error("Error generating categories sitemap:", error);
+    res.status(500).send("Error generating sitemap");
+  }
+});
+
+router.get("/sitemap-blog.xml", async (req, res) => {
+  try {
+    const allPosts = await db.select({ 
+      id: blogPosts.id, 
+      slug: blogPosts.slug, 
+      updatedAt: blogPosts.updatedAt,
+      publishedAt: blogPosts.publishedAt
+    })
+      .from(blogPosts)
+      .where(eq(blogPosts.status, "published"));
+
+    const now = new Date().toISOString().split("T")[0];
+
+    let xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>${SITE_URL}/blog</loc>
+    <lastmod>${now}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+`;
+
+    for (const post of allPosts) {
+      const lastmod = post.updatedAt ? new Date(post.updatedAt).toISOString().split("T")[0] : 
+                      post.publishedAt ? new Date(post.publishedAt).toISOString().split("T")[0] : now;
+      xml += `  <url>
+    <loc>${SITE_URL}/blog/${post.slug}</loc>
+    <lastmod>${lastmod}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>
+`;
+    }
+
+    xml += `</urlset>`;
+
+    res.set("Content-Type", "application/xml");
+    res.set("Cache-Control", "public, max-age=86400");
+    res.send(xml);
+  } catch (error) {
+    console.error("Error generating blog sitemap:", error);
     res.status(500).send("Error generating sitemap");
   }
 });

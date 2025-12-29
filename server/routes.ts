@@ -11,6 +11,7 @@ import {
   insertProductSchema,
   profileUpdateSchema,
   uploadJobs,
+  insertBlogPostSchema,
 } from "@shared/schema";
 import { eq, desc } from "drizzle-orm";
 import bcrypt from "bcryptjs";
@@ -2020,9 +2021,22 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     }
   });
 
+  const createBlogPostSchema = insertBlogPostSchema.extend({
+    title: z.string().min(1, "Title is required").max(500),
+    content: z.string().min(1, "Content is required"),
+    status: z.enum(["draft", "published"]).default("draft"),
+  });
+
   app.post("/api/admin/blog", requireAdmin, async (req, res) => {
     try {
-      const { title, slug, excerpt, content, featuredImage, metaTitle, metaDescription, status } = req.body;
+      const validationResult = createBlogPostSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          message: validationResult.error.errors[0]?.message || "Invalid input" 
+        });
+      }
+      
+      const { title, slug, excerpt, content, featuredImage, metaTitle, metaDescription, status } = validationResult.data;
       
       // Generate slug from title if not provided
       const finalSlug = slug || title.toLowerCase()
@@ -2055,9 +2069,27 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     }
   });
 
+  const updateBlogPostSchema = z.object({
+    title: z.string().min(1, "Title is required").max(500).optional(),
+    slug: z.string().max(200).optional(),
+    excerpt: z.string().max(1000).optional().nullable(),
+    content: z.string().min(1, "Content is required").optional(),
+    featuredImage: z.string().max(500).optional().nullable(),
+    metaTitle: z.string().max(200).optional().nullable(),
+    metaDescription: z.string().max(500).optional().nullable(),
+    status: z.enum(["draft", "published"]).optional(),
+  });
+
   app.patch("/api/admin/blog/:id", requireAdmin, async (req, res) => {
     try {
-      const { title, slug, excerpt, content, featuredImage, metaTitle, metaDescription, status } = req.body;
+      const validationResult = updateBlogPostSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          message: validationResult.error.errors[0]?.message || "Invalid input" 
+        });
+      }
+      
+      const { title, slug, excerpt, content, featuredImage, metaTitle, metaDescription, status } = validationResult.data;
       const id = Number(req.params.id);
       
       const existing = await storage.getBlogPost(id);
