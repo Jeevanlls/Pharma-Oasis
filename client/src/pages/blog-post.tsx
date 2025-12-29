@@ -139,27 +139,65 @@ export default function BlogPostPage() {
 }
 
 function formatContent(content: string): string {
-  if (content.startsWith('<') || content.includes('<p>')) {
-    return content;
+  let formatted = content;
+  
+  if (!content.startsWith('<') && !content.includes('<p>')) {
+    const paragraphs = content.split(/\n\n+/);
+    formatted = paragraphs
+      .map(p => {
+        if (p.startsWith('# ')) {
+          return `<h1>${p.slice(2)}</h1>`;
+        }
+        if (p.startsWith('## ')) {
+          return `<h2>${p.slice(3)}</h2>`;
+        }
+        if (p.startsWith('### ')) {
+          return `<h3>${p.slice(4)}</h3>`;
+        }
+        if (p.startsWith('- ') || p.startsWith('* ')) {
+          const items = p.split('\n').map(line => `<li>${line.slice(2)}</li>`).join('');
+          return `<ul>${items}</ul>`;
+        }
+        return `<p>${p.replace(/\n/g, '<br/>')}</p>`;
+      })
+      .join('\n');
   }
   
-  const paragraphs = content.split(/\n\n+/);
-  return paragraphs
-    .map(p => {
-      if (p.startsWith('# ')) {
-        return `<h1>${p.slice(2)}</h1>`;
+  formatted = processExternalLinks(formatted);
+  
+  return formatted;
+}
+
+function processExternalLinks(html: string): string {
+  const externalDomains = [
+    'gov.uk',
+    'mhra.gov.uk',
+    'ema.europa.eu',
+    'who.int',
+    'nice.org.uk',
+    'nhs.uk',
+  ];
+  
+  return html.replace(/<a\s+([^>]*href\s*=\s*["'])(https?:\/\/[^"']+)(["'][^>]*)>/gi, (match, prefix, url, suffix) => {
+    const isExternal = externalDomains.some(domain => url.includes(domain)) || 
+                       (url.startsWith('http') && !url.includes('pharmaoasis.co.uk'));
+    
+    if (isExternal) {
+      const hasTarget = /target\s*=/i.test(match);
+      const hasRel = /rel\s*=/i.test(match);
+      
+      let newTag = `<a ${prefix}${url}${suffix}`;
+      
+      if (!hasTarget) {
+        newTag = newTag.replace(/>$/, ' target="_blank">');
       }
-      if (p.startsWith('## ')) {
-        return `<h2>${p.slice(3)}</h2>`;
+      if (!hasRel) {
+        newTag = newTag.replace(/>$/, ' rel="noopener noreferrer">');
       }
-      if (p.startsWith('### ')) {
-        return `<h3>${p.slice(4)}</h3>`;
-      }
-      if (p.startsWith('- ') || p.startsWith('* ')) {
-        const items = p.split('\n').map(line => `<li>${line.slice(2)}</li>`).join('');
-        return `<ul>${items}</ul>`;
-      }
-      return `<p>${p.replace(/\n/g, '<br/>')}</p>`;
-    })
-    .join('\n');
+      
+      return newTag;
+    }
+    
+    return match;
+  });
 }
