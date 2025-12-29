@@ -25,6 +25,8 @@ import PrivacyPolicyPage from "@/pages/privacy";
 import TermsOfServicePage from "@/pages/terms";
 import CookiePolicyPage from "@/pages/cookies";
 import DistributionNetworkPage from "@/pages/distribution-network";
+import BlogPage from "@/pages/blog";
+import BlogPostPage from "@/pages/blog-post";
 
 import AdminDashboard from "@/pages/admin/index";
 import AdminUsersPage from "@/pages/admin/users";
@@ -93,6 +95,8 @@ function Router() {
       <Route path="/privacy" component={PrivacyPolicyPage} />
       <Route path="/terms" component={TermsOfServicePage} />
       <Route path="/cookies" component={CookiePolicyPage} />
+      <Route path="/blog" component={BlogPage} />
+      <Route path="/blog/:slug" component={BlogPostPage} />
       
       <Route path="/admin">{() => <AdminRoute component={AdminDashboard} />}</Route>
       <Route path="/admin/users">{() => <AdminRoute component={AdminUsersPage} />}</Route>
