@@ -2152,15 +2152,53 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
         baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
       });
 
-      const systemPrompt = `You are an expert pharmaceutical industry B2B content writer for Pharma Oasis, a UK wholesale distributor of pharmaceuticals, healthcare, wellness and beauty products. You create professional, informative blog content for UK pharmacies, online retailers, and wholesalers.
+      const systemPrompt = `You are generating professional, regulatory-focused blog articles for Pharma Oasis, a UK pharmaceutical wholesaler. You create content for UK pharmacies, online retailers, and wholesalers.
 
-CRITICAL RULES - YOU MUST FOLLOW:
-1. INFORMATIONAL ONLY - Never provide medical advice, dosages, treatment recommendations, or therapeutic claims
-2. B2B FOCUS - Content is for business professionals, not consumers
-3. NEUTRAL TONE - Professional, factual, industry-focused language
-4. UK CONTEXT - Reference UK regulations (MHRA, GDP compliance) where relevant
-5. NO HEALTH CLAIMS - Do not make claims about product efficacy or health benefits
-6. COMPLIANCE AWARE - Mention regulatory frameworks appropriately (MHRA WDA(H), GDP)
+MANDATORY RULES:
+
+1. EXTERNAL REGULATORY LINKS:
+   - When a topic involves regulation, compliance, licensing, or public health, you MUST include authoritative external links to:
+     * GOV.UK (https://www.gov.uk/...)
+     * MHRA (https://www.gov.uk/government/organisations/medicines-and-healthcare-products-regulatory-agency)
+     * NHS (https://www.nhs.uk/...)
+     * EMA (https://www.ema.europa.eu/...) where relevant
+   - Include external links ONLY where they add value or authority
+   - Use official government or regulator pages - do NOT invent links
+   - Do not link to blogs unless explicitly instructed
+   - External links MUST include: target="_blank" rel="noopener noreferrer"
+   - Example: <a href="https://www.gov.uk/guidance/good-distribution-practice-gdp" target="_blank" rel="noopener noreferrer">GDP guidance</a>
+
+2. INTERNAL LINKING:
+   - Where relevant, include internal links to Pharma Oasis pages:
+     * https://pharmaoasis.co.uk/compliance - for GDP/compliance topics
+     * https://pharmaoasis.co.uk/products - for product-related content
+     * https://pharmaoasis.co.uk/distribution-network - for supply chain topics
+     * https://pharmaoasis.co.uk/how-to-order - for ordering information
+   - Use descriptive anchor text (e.g. "our GDP Compliance Framework")
+   - Internal links do NOT need target="_blank"
+
+3. HTML OUTPUT RULES:
+   - Always properly open and close all HTML tags
+   - NEVER nest <p> tags inside other <p> tags
+   - Avoid duplicated paragraphs
+   - Do not break sentence flow around links
+   - Use semantic HTML: <h2>, <h3>, <p>, <ul>, <li>
+   - No Markdown - pure HTML only
+   - No inline styles except for the disclaimer
+
+4. STYLE & TONE:
+   - Professional, neutral, and compliance-focused
+   - Suitable for MHRA-regulated B2B audiences
+   - Avoid marketing hype or informal language
+   - Never provide medical advice, dosages, or therapeutic claims
+
+5. CONTENT STRUCTURE:
+   - 800-1200 words
+   - Start with an engaging introduction
+   - Use <h2> for main sections, <h3> for subsections
+   - Include bullet points where appropriate
+   - Naturally embed 2-4 external regulatory links throughout
+   - Include 1-2 internal links where relevant
 
 OUTPUT FORMAT (JSON):
 {
@@ -2169,22 +2207,24 @@ OUTPUT FORMAT (JSON):
   "metaTitle": "SEO meta title (50-60 characters)",
   "metaDescription": "SEO meta description (150-160 characters)",
   "excerpt": "Brief summary for listing pages (150-200 characters)",
-  "content": "Full article in HTML format (800-1200 words). Use <h2>, <h3>, <p>, <ul>, <li> tags for structure. Include relevant UK pharma context.",
-  "suggestedLinks": ["Array of suggested internal link paths like /products, /brands, /how-to-order, /distribution-network"]
+  "content": "Full article in HTML format with embedded internal and external links",
+  "suggestedLinks": ["Array of internal link paths used"]
 }
 
-Always end the content with this compliance disclaimer wrapped in a styled div:
+DISCLAIMER - Always end content with:
 <div style="background-color: #f8f9fa; border-left: 4px solid #0066cc; padding: 16px; margin-top: 24px;">
 <p style="margin: 0; font-size: 14px; color: #666;"><strong>Disclaimer:</strong> This article is for informational purposes only and does not constitute medical advice. All pharmaceutical products distributed by Pharma Oasis are supplied in accordance with MHRA WDA(H) licensing requirements and GDP compliance standards. For product-specific information, please consult the relevant Summary of Product Characteristics (SmPC) or speak with a qualified healthcare professional.</p>
 </div>`;
 
       const userPrompt = `Write a blog article about: ${topic}${keywords ? `\n\nIncorporate these keywords where natural: ${keywords}` : ''}
 
-Remember:
+REQUIREMENTS:
 - Target audience: UK pharmacies, online retailers, wholesalers
-- Focus on industry trends, supply chain, business insights, regulatory updates
-- 800-1200 words
-- Include the compliance disclaimer at the end`;
+- Include 2-4 external links to GOV.UK, MHRA, NHS, or EMA where relevant
+- Include 1-2 internal links to pharmaoasis.co.uk pages where appropriate
+- All external links must have target="_blank" rel="noopener noreferrer"
+- 800-1200 words with proper HTML structure
+- End with the compliance disclaimer`;
 
       const response = await openai.chat.completions.create({
         model: "gpt-4o-mini",
