@@ -395,7 +395,25 @@ export class DatabaseStorage implements IStorage {
     
     if (!searchTerm) return [];
     
+    // Check if search term looks like a SKU/barcode (numeric or alphanumeric code)
+    const isSkuSearch = /^[0-9]{5,}$/.test(searchTerm) || /^[A-Z0-9-]{3,}$/i.test(searchTerm);
+    
     try {
+      if (isSkuSearch) {
+        // For SKU/barcode searches, use ILIKE which works better for codes
+        const result = await db.execute(sql`
+          SELECT * FROM ${products}
+          WHERE (sku ILIKE ${'%' + searchTerm + '%'} OR ean ILIKE ${'%' + searchTerm + '%'})
+          ${activeOnly ? sql`AND is_active = true` : sql``}
+          ORDER BY 
+            CASE WHEN sku = ${searchTerm} THEN 0 ELSE 1 END,
+            product_name ASC
+          LIMIT ${limit} OFFSET ${offset}
+        `);
+        return result.rows as Product[];
+      }
+      
+      // For text searches, use full-text search
       const result = await db.execute(sql`
         SELECT * FROM ${products}
         WHERE to_tsvector('english', COALESCE(product_name, '')) @@ plainto_tsquery('english', ${searchTerm})
