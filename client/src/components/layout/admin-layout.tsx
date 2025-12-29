@@ -35,6 +35,7 @@ import {
   Bot,
   MapPin,
   BarChart3,
+  Newspaper,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 
@@ -63,6 +64,7 @@ const homepageMenuItems = [
 ];
 
 const siteMenuItems = [
+  { title: "Blog", href: "/admin/blog", icon: Newspaper, staffAccess: false },
   { title: "SEO Management", href: "/admin/seo", icon: Globe, staffAccess: false },
   { title: "SEO AI Agent", href: "/admin/seo-agent", icon: Bot, staffAccess: false },
   { title: "Google Pricing", href: "/admin/google-pricing", icon: Tag, staffAccess: false },

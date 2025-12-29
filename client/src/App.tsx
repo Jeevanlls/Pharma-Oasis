@@ -51,6 +51,7 @@ import AdminSeoPage from "@/pages/admin/seo";
 import AdminGooglePricingPage from "@/pages/admin/google-pricing";
 import AdminAiCategoriesPage from "@/pages/admin/ai-categories";
 import AdminSeoAgentPage from "@/pages/admin/seo-agent";
+import AdminBlogPage from "@/pages/admin/blog";
 
 function AdminRoute({ component: Component }: { component: React.ComponentType }) {
   const { isAdmin, isLoading } = useAuth();
@@ -121,6 +122,7 @@ function Router() {
       <Route path="/admin/google-pricing">{() => <AdminRoute component={AdminGooglePricingPage} />}</Route>
       <Route path="/admin/ai-categories">{() => <AdminRoute component={AdminAiCategoriesPage} />}</Route>
       <Route path="/admin/seo-agent">{() => <AdminRoute component={AdminSeoAgentPage} />}</Route>
+      <Route path="/admin/blog">{() => <AdminRoute component={AdminBlogPage} />}</Route>
       
       <Route component={NotFound} />
     </Switch>
