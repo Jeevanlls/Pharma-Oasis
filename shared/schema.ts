@@ -231,6 +231,25 @@ export const contactMessages = pgTable("contact_messages", {
 });
 
 // ============================================
+// BLOG POSTS TABLE
+// ============================================
+export const blogPosts = pgTable("blog_posts", {
+  id: serial("id").primaryKey(),
+  title: varchar("title", { length: 500 }).notNull(),
+  slug: varchar("slug", { length: 255 }).notNull().unique(),
+  excerpt: text("excerpt"),
+  content: text("content").notNull(),
+  featuredImage: text("featured_image"),
+  metaTitle: varchar("meta_title", { length: 255 }),
+  metaDescription: text("meta_description"),
+  status: varchar("status", { length: 20 }).notNull().default("draft"), // draft, published
+  publishedAt: timestamp("published_at"),
+  authorId: integer("author_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ============================================
 // HERO SLIDES TABLE
 // ============================================
 export const heroSlides = pgTable("hero_slides", {
@@ -570,6 +589,16 @@ export const insertContactMessageSchema = createInsertSchema(contactMessages).om
 export const selectContactMessageSchema = createSelectSchema(contactMessages);
 export type InsertContactMessage = z.infer<typeof insertContactMessageSchema>;
 export type ContactMessage = typeof contactMessages.$inferSelect;
+
+// Blog posts schemas
+export const insertBlogPostSchema = createInsertSchema(blogPosts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const selectBlogPostSchema = createSelectSchema(blogPosts);
+export type InsertBlogPost = z.infer<typeof insertBlogPostSchema>;
+export type BlogPost = typeof blogPosts.$inferSelect;
 
 // Hero slides schemas
 export const insertHeroSlideSchema = createInsertSchema(heroSlides).omit({
