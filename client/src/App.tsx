@@ -27,6 +27,7 @@ import CookiePolicyPage from "@/pages/cookies";
 import DistributionNetworkPage from "@/pages/distribution-network";
 import BlogPage from "@/pages/blog";
 import BlogPostPage from "@/pages/blog-post";
+import CompliancePage from "@/pages/compliance";
 
 import AdminDashboard from "@/pages/admin/index";
 import AdminUsersPage from "@/pages/admin/users";
@@ -98,6 +99,7 @@ function Router() {
       <Route path="/cookies" component={CookiePolicyPage} />
       <Route path="/blog" component={BlogPage} />
       <Route path="/blog/:slug" component={BlogPostPage} />
+      <Route path="/compliance" component={CompliancePage} />
       
       <Route path="/admin">{() => <AdminRoute component={AdminDashboard} />}</Route>
       <Route path="/admin/users">{() => <AdminRoute component={AdminUsersPage} />}</Route>

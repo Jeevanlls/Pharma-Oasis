@@ -2129,6 +2129,23 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     }
   });
 
+  // Internal link configuration for AI blog generation
+  const INTERNAL_LINKS = {
+    compliance: "/compliance",
+    products: "/products",
+    brands: "/brands",
+    howToOrder: "/how-to-order",
+    distributionNetwork: "/distribution-network",
+    contact: "/contact",
+  };
+  const SITE_URL = "https://pharmaoasis.co.uk";
+  const COMPLIANCE_KEYWORDS = ["gdp", "good distribution practice", "mhra", "wda", "wda(h)", "wholesale dealer", "pharmaceutical regulation", "regulatory compliance", "pharmaceutical licensing", "quality management", "cold chain", "falsified medicines", "fmd", "responsible person", "pharmaceutical distribution"];
+  
+  function shouldIncludeComplianceLink(topic: string): boolean {
+    const lowerTopic = topic.toLowerCase();
+    return COMPLIANCE_KEYWORDS.some(keyword => lowerTopic.includes(keyword));
+  }
+
   // AI Blog Draft Generator
   const generateBlogDraftSchema = z.object({
     topic: z.string().min(5, "Topic must be at least 5 characters").max(500),
@@ -2146,11 +2163,19 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
 
       const { topic, keywords } = validationResult.data;
       
+      // Check if compliance link should be included based on topic
+      const includeComplianceLink = shouldIncludeComplianceLink(topic);
+      
       const OpenAI = (await import("openai")).default;
       const openai = new OpenAI({
         apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY,
         baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
       });
+
+      // Dynamic internal linking instructions based on topic relevance
+      const complianceLinkInstruction = includeComplianceLink 
+        ? `* ${SITE_URL}${INTERNAL_LINKS.compliance} - REQUIRED for this topic (GDP/compliance). Use anchor text like "GDP Compliance Framework" or "our regulatory compliance standards"`
+        : `* ${SITE_URL}${INTERNAL_LINKS.compliance} - for GDP/compliance topics (only if directly relevant)`;
 
       const systemPrompt = `You are generating professional, regulatory-focused blog articles for Pharma Oasis, a UK pharmaceutical wholesaler. You create content for UK pharmacies, online retailers, and wholesalers.
 
@@ -2168,14 +2193,19 @@ MANDATORY RULES:
    - External links MUST include: target="_blank" rel="noopener noreferrer"
    - Example: <a href="https://www.gov.uk/guidance/good-distribution-practice-gdp" target="_blank" rel="noopener noreferrer">GDP guidance</a>
 
-2. INTERNAL LINKING:
-   - Where relevant, include internal links to Pharma Oasis pages:
-     * https://pharmaoasis.co.uk/compliance - for GDP/compliance topics
-     * https://pharmaoasis.co.uk/products - for product-related content
-     * https://pharmaoasis.co.uk/distribution-network - for supply chain topics
-     * https://pharmaoasis.co.uk/how-to-order - for ordering information
-   - Use descriptive anchor text (e.g. "our GDP Compliance Framework")
-   - Internal links do NOT need target="_blank"
+2. INTERNAL LINKING (IMPORTANT):
+   Available internal pages - include where relevant:
+   ${complianceLinkInstruction}
+   * ${SITE_URL}${INTERNAL_LINKS.products} - for product-related content
+   * ${SITE_URL}${INTERNAL_LINKS.distributionNetwork} - for supply chain topics
+   * ${SITE_URL}${INTERNAL_LINKS.howToOrder} - for ordering information
+   * ${SITE_URL}${INTERNAL_LINKS.brands} - for brand-related content
+   
+   Internal link rules:
+   - Use descriptive anchor text (e.g. "our GDP Compliance Framework", "browse our product catalogue")
+   - Internal links do NOT use target="_blank" (they stay in the same tab)
+   - Embed links naturally within paragraphs, not as standalone lines
+   - Include 1-2 internal links per article
 
 3. HTML OUTPUT RULES:
    - Always properly open and close all HTML tags
@@ -2208,7 +2238,8 @@ OUTPUT FORMAT (JSON):
   "metaDescription": "SEO meta description (150-160 characters)",
   "excerpt": "Brief summary for listing pages (150-200 characters)",
   "content": "Full article in HTML format with embedded internal and external links",
-  "suggestedLinks": ["Array of internal link paths used"]
+  "suggestedLinks": ["Array of internal link paths used"],
+  "hasComplianceLink": true/false
 }
 
 DISCLAIMER - Always end content with:
@@ -2221,8 +2252,9 @@ DISCLAIMER - Always end content with:
 REQUIREMENTS:
 - Target audience: UK pharmacies, online retailers, wholesalers
 - Include 2-4 external links to GOV.UK, MHRA, NHS, or EMA where relevant
-- Include 1-2 internal links to pharmaoasis.co.uk pages where appropriate
+- Include 1-2 internal links to pharmaoasis.co.uk pages${includeComplianceLink ? ' (MUST include compliance page link for this topic)' : ''}
 - All external links must have target="_blank" rel="noopener noreferrer"
+- Internal links do NOT use target="_blank"
 - 800-1200 words with proper HTML structure
 - End with the compliance disclaimer`;
 
@@ -2280,6 +2312,108 @@ REQUIREMENTS:
       console.error("Error generating blog draft:", error);
       res.status(500).json({ message: "Failed to generate blog draft" });
     }
+  });
+
+  // Retroactive compliance link insertion for existing blogs
+  app.post("/api/admin/blog/insert-compliance-links", requireAdmin, async (req, res) => {
+    try {
+      const posts = await storage.getAllBlogPosts();
+      const COMPLIANCE_URL = `${SITE_URL}${INTERNAL_LINKS.compliance}`;
+      
+      const results = {
+        processed: 0,
+        updated: 0,
+        skipped: 0,
+        errors: 0,
+        details: [] as { id: number; title: string; status: string; reason?: string }[]
+      };
+
+      for (const post of posts) {
+        results.processed++;
+        
+        // Check if post already has compliance link
+        if (post.content?.includes(INTERNAL_LINKS.compliance) || post.content?.includes(COMPLIANCE_URL)) {
+          results.skipped++;
+          results.details.push({ id: post.id, title: post.title, status: 'skipped', reason: 'Already has compliance link' });
+          continue;
+        }
+
+        // Check if post topic is compliance-related based on title/content
+        const searchText = `${post.title} ${post.excerpt || ''} ${post.content || ''}`.toLowerCase();
+        const isComplianceRelated = COMPLIANCE_KEYWORDS.some(keyword => searchText.includes(keyword));
+        
+        if (!isComplianceRelated) {
+          results.skipped++;
+          results.details.push({ id: post.id, title: post.title, status: 'skipped', reason: 'Not compliance-related' });
+          continue;
+        }
+
+        try {
+          // Find a suitable location to insert the compliance link
+          let updatedContent = post.content || '';
+          
+          // Strategy: Insert after first mention of GDP, MHRA, compliance, etc.
+          const insertPatterns = [
+            /(<p>[^<]*(?:GDP|Good Distribution Practice)[^<]*<\/p>)/i,
+            /(<p>[^<]*(?:MHRA|regulatory compliance)[^<]*<\/p>)/i,
+            /(<p>[^<]*(?:pharmaceutical regulation|WDA\(H\))[^<]*<\/p>)/i,
+          ];
+          
+          let inserted = false;
+          for (const pattern of insertPatterns) {
+            const match = updatedContent.match(pattern);
+            if (match && match[1]) {
+              // Add compliance link to this paragraph
+              const originalParagraph = match[1];
+              const complianceLink = ` For more information about our regulatory standards, visit our <a href="${COMPLIANCE_URL}">GDP Compliance Framework</a>.`;
+              const updatedParagraph = originalParagraph.replace('</p>', `${complianceLink}</p>`);
+              updatedContent = updatedContent.replace(originalParagraph, updatedParagraph);
+              inserted = true;
+              break;
+            }
+          }
+          
+          if (!inserted) {
+            // Fallback: Add a new paragraph before the disclaimer
+            // Match the full disclaimer div opening to preserve all attributes
+            const disclaimerPattern = /(<div style="background-color: #f8f9fa; border-left: 4px solid #0066cc; padding: 16px; margin-top: 24px;">)/;
+            const disclaimerMatch = updatedContent.match(disclaimerPattern);
+            if (disclaimerMatch && disclaimerMatch[1]) {
+              const complianceParagraph = `<p>Learn more about how Pharma Oasis maintains the highest standards of pharmaceutical distribution by visiting our <a href="${COMPLIANCE_URL}">GDP Compliance Framework</a>.</p>\n\n`;
+              updatedContent = updatedContent.replace(disclaimerMatch[1], complianceParagraph + disclaimerMatch[1]);
+              inserted = true;
+            }
+          }
+
+          if (inserted) {
+            await storage.updateBlogPost(post.id, { content: updatedContent });
+            results.updated++;
+            results.details.push({ id: post.id, title: post.title, status: 'updated' });
+          } else {
+            results.skipped++;
+            results.details.push({ id: post.id, title: post.title, status: 'skipped', reason: 'No suitable insertion point found' });
+          }
+        } catch (err) {
+          results.errors++;
+          results.details.push({ id: post.id, title: post.title, status: 'error', reason: String(err) });
+        }
+      }
+
+      res.json({
+        message: `Processed ${results.processed} posts: ${results.updated} updated, ${results.skipped} skipped, ${results.errors} errors`,
+        ...results
+      });
+    } catch (error) {
+      console.error("Error inserting compliance links:", error);
+      res.status(500).json({ message: "Failed to insert compliance links" });
+    }
+  });
+
+  // Check if a page exists (for frontend safe fallback)
+  app.get("/api/pages/exists/:slug", async (req, res) => {
+    const validPages = ['compliance', 'products', 'brands', 'how-to-order', 'distribution-network', 'contact', 'blog', 'register'];
+    const exists = validPages.includes(req.params.slug);
+    res.json({ exists, slug: req.params.slug });
   });
 
   // Admin - Contact Messages

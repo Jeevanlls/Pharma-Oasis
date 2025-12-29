@@ -232,6 +232,34 @@ Admin panel includes product import from CSV with field mapping for:
   - POST `/api/admin/seo-agent/run-now` - Manual trigger
   - GET `/api/admin/seo-agent/actions` - Action history (paginated)
 
+**AI Blog Generator** (`server/routes.ts` - POST `/api/admin/blog/generate-draft`):
+- Generates professional, regulatory-focused blog articles
+- Uses GPT-4o-mini with structured JSON output
+- Smart topic detection for compliance-related content
+- Automatic internal and external linking:
+  - External links: GOV.UK, MHRA, NHS, EMA with target="_blank" rel="noopener noreferrer"
+  - Internal links: /compliance, /products, /distribution-network, /how-to-order
+  - Topic detection triggers REQUIRED compliance link for GDP/MHRA topics
+- Configurable internal links via INTERNAL_LINKS constant
+- COMPLIANCE_KEYWORDS array for topic detection
+- Compliance disclaimer automatically appended
+- Draft-only workflow (requires manual review before publishing)
+- Admin control: `/admin/blog`
+
+**Retroactive Compliance Link Insertion:**
+- Endpoint: POST `/api/admin/blog/insert-compliance-links`
+- Scans existing blog posts for compliance-related content
+- Inserts compliance links naturally in paragraphs mentioning GDP/MHRA
+- Skips posts that already have compliance links
+- Fallback adds paragraph before disclaimer if no suitable insertion point
+- Returns detailed results of processed posts
+
+**Compliance Page:**
+- Public page at `/compliance`
+- Comprehensive GDP, MHRA WDA(H), quality systems overview
+- Acts as single internal authority reference for compliance content
+- SEO-optimized with meta tags
+
 **Important Notes for AI Agents:**
 - Both agents use in-memory scheduling (intervals cleared on server restart)
 - Agents must be manually restarted after deployment
