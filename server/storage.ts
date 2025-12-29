@@ -398,6 +398,39 @@ export class DatabaseStorage implements IStorage {
     // Check if search term looks like a SKU/barcode (numeric or alphanumeric code)
     const isSkuSearch = /^[0-9]{5,}$/.test(searchTerm) || /^[A-Z0-9-]{3,}$/i.test(searchTerm);
     
+    // Helper to transform snake_case DB rows to camelCase Product objects
+    const transformRow = (row: any): Product => ({
+      id: row.id,
+      sku: row.sku,
+      ean: row.ean,
+      brandId: row.brand_id,
+      productName: row.product_name,
+      shortDescription: row.short_description,
+      longDescription: row.long_description,
+      categoryId: row.category_id,
+      subcategoryId: row.subcategory_id,
+      packSize: row.pack_size,
+      caseSize: row.case_size,
+      uom: row.uom,
+      rrp: row.rrp,
+      wholesalePrice: row.wholesale_price,
+      moq: row.moq,
+      vatRate: row.vat_rate,
+      isActive: row.is_active,
+      isFeatured: row.is_featured,
+      imageUrl: row.image_url,
+      countryOfOrigin: row.country_of_origin,
+      productType: row.product_type,
+      storageConditions: row.storage_conditions,
+      notesInternal: row.notes_internal,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      slug: row.slug,
+      metaTitle: row.meta_title,
+      metaDescription: row.meta_description,
+      googleFeedPrice: row.google_feed_price,
+    });
+    
     try {
       if (isSkuSearch) {
         // For SKU/barcode searches, use ILIKE which works better for codes
@@ -410,7 +443,7 @@ export class DatabaseStorage implements IStorage {
             product_name ASC
           LIMIT ${limit} OFFSET ${offset}
         `);
-        return result.rows as Product[];
+        return result.rows.map(transformRow);
       }
       
       // For text searches, use full-text search
@@ -422,7 +455,7 @@ export class DatabaseStorage implements IStorage {
         LIMIT ${limit} OFFSET ${offset}
       `);
       
-      return result.rows as Product[];
+      return result.rows.map(transformRow);
     } catch (err) {
       console.error("Full-text search failed, falling back to ILIKE:", err);
       return this.searchProducts(query, options);
