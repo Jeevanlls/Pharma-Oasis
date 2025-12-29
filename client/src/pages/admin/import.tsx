@@ -166,7 +166,9 @@ export default function AdminImportPage() {
         return;
       }
 
-      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+      // Normalize headers: lowercase and remove spaces/underscores for matching
+      const normalizeHeader = (h: string) => h.trim().toLowerCase().replace(/[\s_-]+/g, '');
+      const headers = lines[0].split(',').map(normalizeHeader);
       setOriginalHeaders(lines[0].split(',').map(h => h.trim()));
       
       const missingRequired = requiredColumns.filter(col => !headers.includes(col));
@@ -179,42 +181,50 @@ export default function AdminImportPage() {
         return;
       }
 
+      // Header mapping: normalized header -> camelCase property name
+      const headerMap: Record<string, string> = {
+        'sku': 'sku',
+        'ean': 'ean',
+        'productname': 'productName',
+        'brand': 'brand',
+        'category': 'category',
+        'subcategory': 'subcategory',
+        'shortdescription': 'shortDescription',
+        'longdescription': 'longDescription',
+        'packsize': 'packSize',
+        'casesize': 'caseSize',
+        'uom': 'uom',
+        'wholesaleprice': 'wholesalePrice',
+        'rrp': 'rrp',
+        'moq': 'moq',
+        'vatrate': 'vatRate',
+        'isactive': 'isActive',
+        'isfeatured': 'isFeatured',
+        'imageurl': 'imageUrl',
+        'countryoforigin': 'countryOfOrigin',
+        'producttype': 'productType',
+        'storageconditions': 'storageConditions',
+      };
+
       const products = lines.slice(1).map((line, index) => {
         const values = parseCSVLine(line);
         const product: any = { _originalLine: line, _rowIndex: index };
         
         headers.forEach((header, i) => {
-          let value = values[i] || '';
+          const value = values[i] || '';
+          const propertyName = headerMap[header] || header;
           
-          if (header === 'isactive' || header === 'isfeatured') {
-            product[header === 'isactive' ? 'isActive' : 'isFeatured'] = 
-              value.toLowerCase() === 'true' || value === '1';
-          } else if (header === 'moq') {
-            product.moq = parseInt(value) || 1;
-          } else if (header === 'productname') {
-            product.productName = value;
-          } else if (header === 'wholesaleprice') {
-            product.wholesalePrice = value;
-          } else if (header === 'shortdescription') {
-            product.shortDescription = value;
-          } else if (header === 'longdescription') {
-            product.longDescription = value;
-          } else if (header === 'packsize') {
-            product.packSize = value;
-          } else if (header === 'casesize') {
-            product.caseSize = value;
-          } else if (header === 'vatrate') {
-            product.vatRate = value;
-          } else if (header === 'imageurl') {
-            product.imageUrl = value;
-          } else if (header === 'countryoforigin') {
-            product.countryOfOrigin = value;
-          } else if (header === 'producttype') {
-            product.productType = value;
-          } else if (header === 'storageconditions') {
-            product.storageConditions = value;
-          } else {
-            product[header] = value;
+          // Handle boolean fields
+          if (propertyName === 'isActive' || propertyName === 'isFeatured') {
+            product[propertyName] = value.toLowerCase() === 'true' || value === '1';
+          } 
+          // Handle numeric fields
+          else if (propertyName === 'moq') {
+            product[propertyName] = parseInt(value) || 1;
+          }
+          // All other fields
+          else {
+            product[propertyName] = value;
           }
         });
         
