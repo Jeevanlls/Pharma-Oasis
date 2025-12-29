@@ -3,6 +3,7 @@ import {
   supplierLeads, cmsBlocks, siteSettings, contactMessages, heroSlides, companyLocations,
   homeStats, homeFeatures, homeCategories, homeProcessSteps, homeSections,
   footerSections, mediaAssets, chatSessions, chatMessages, chatLeads, pageViews,
+  blogPosts,
   type User, type InsertUser,
   type Brand, type InsertBrand,
   type Category, type InsertCategory,
@@ -26,6 +27,7 @@ import {
   type ChatMessage, type InsertChatMessage,
   type ChatLead, type InsertChatLead,
   type PageView, type InsertPageView,
+  type BlogPost, type InsertBlogPost,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, ilike, desc, asc, sql, isNull, inArray } from "drizzle-orm";
@@ -160,6 +162,15 @@ export interface IStorage {
   createChatLead(lead: InsertChatLead): Promise<ChatLead>;
   getAllChatLeads(): Promise<ChatLead[]>;
   updateChatLead(id: number, updates: Partial<InsertChatLead>): Promise<ChatLead | undefined>;
+
+  // Blog Posts
+  getBlogPost(id: number): Promise<BlogPost | undefined>;
+  getBlogPostBySlug(slug: string): Promise<BlogPost | undefined>;
+  createBlogPost(post: InsertBlogPost): Promise<BlogPost>;
+  updateBlogPost(id: number, updates: Partial<InsertBlogPost>): Promise<BlogPost | undefined>;
+  deleteBlogPost(id: number): Promise<void>;
+  getAllBlogPosts(options?: { publishedOnly?: boolean; limit?: number; offset?: number }): Promise<BlogPost[]>;
+  getBlogPostCount(publishedOnly?: boolean): Promise<number>;
 
   // Page Views (Analytics)
   createPageView(pageView: InsertPageView): Promise<PageView>;
@@ -760,6 +771,58 @@ export class DatabaseStorage implements IStorage {
       }
     }
     return this.getSiteSettings();
+  }
+
+  // ==================== BLOG POSTS ====================
+  async getBlogPost(id: number): Promise<BlogPost | undefined> {
+    const [post] = await db.select().from(blogPosts).where(eq(blogPosts.id, id));
+    return post;
+  }
+
+  async getBlogPostBySlug(slug: string): Promise<BlogPost | undefined> {
+    const [post] = await db.select().from(blogPosts).where(eq(blogPosts.slug, slug));
+    return post;
+  }
+
+  async createBlogPost(post: InsertBlogPost): Promise<BlogPost> {
+    const [created] = await db.insert(blogPosts).values(post).returning();
+    return created;
+  }
+
+  async updateBlogPost(id: number, updates: Partial<InsertBlogPost>): Promise<BlogPost | undefined> {
+    const [updated] = await db.update(blogPosts)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(blogPosts.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteBlogPost(id: number): Promise<void> {
+    await db.delete(blogPosts).where(eq(blogPosts.id, id));
+  }
+
+  async getAllBlogPosts(options: { publishedOnly?: boolean; limit?: number; offset?: number } = {}): Promise<BlogPost[]> {
+    const { publishedOnly = false, limit, offset } = options;
+    
+    let query = db.select().from(blogPosts);
+    
+    if (publishedOnly) {
+      query = query.where(eq(blogPosts.status, 'published')) as typeof query;
+    }
+    
+    query = query.orderBy(desc(blogPosts.publishedAt), desc(blogPosts.createdAt)) as typeof query;
+    
+    if (limit) query = query.limit(limit) as typeof query;
+    if (offset) query = query.offset(offset) as typeof query;
+    
+    return query;
+  }
+
+  async getBlogPostCount(publishedOnly?: boolean): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)` })
+      .from(blogPosts)
+      .where(publishedOnly ? eq(blogPosts.status, 'published') : undefined);
+    return Number(result[0]?.count ?? 0);
   }
 
   // ==================== HERO SLIDES ====================
