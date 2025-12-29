@@ -340,7 +340,8 @@ export class DatabaseStorage implements IStorage {
     if (conditions.length > 0) {
       query = query.where(and(...conditions)) as typeof query;
     }
-    query = query.orderBy(desc(products.createdAt)) as typeof query;
+    // Order by: products with images first, then by name
+    query = query.orderBy(sql`${products.imageUrl} IS NULL`, asc(products.productName)) as typeof query;
     if (limit) query = query.limit(limit) as typeof query;
     if (offset) query = query.offset(offset) as typeof query;
 
@@ -355,7 +356,7 @@ export class DatabaseStorage implements IStorage {
     if (activeOnly) conditions.push(eq(products.isActive, true));
     return db.select().from(products)
       .where(and(...conditions))
-      .orderBy(asc(products.productName))
+      .orderBy(sql`${products.imageUrl} IS NULL`, asc(products.productName))
       .limit(limit)
       .offset(offset);
   }
@@ -366,7 +367,7 @@ export class DatabaseStorage implements IStorage {
     if (activeOnly) conditions.push(eq(products.isActive, true));
     return db.select().from(products)
       .where(and(...conditions))
-      .orderBy(asc(products.productName))
+      .orderBy(sql`${products.imageUrl} IS NULL`, asc(products.productName))
       .limit(limit)
       .offset(offset);
   }
@@ -384,7 +385,7 @@ export class DatabaseStorage implements IStorage {
     if (activeOnly) conditions.push(eq(products.isActive, true));
     return db.select().from(products)
       .where(and(...conditions))
-      .orderBy(asc(products.productName))
+      .orderBy(sql`${products.imageUrl} IS NULL`, asc(products.productName))
       .limit(limit)
       .offset(offset);
   }
@@ -439,6 +440,7 @@ export class DatabaseStorage implements IStorage {
           WHERE (sku ILIKE ${'%' + searchTerm + '%'} OR ean ILIKE ${'%' + searchTerm + '%'})
           ${activeOnly ? sql`AND is_active = true` : sql``}
           ORDER BY 
+            image_url IS NULL,
             CASE WHEN sku = ${searchTerm} THEN 0 ELSE 1 END,
             product_name ASC
           LIMIT ${limit} OFFSET ${offset}
@@ -451,7 +453,7 @@ export class DatabaseStorage implements IStorage {
         SELECT * FROM ${products}
         WHERE to_tsvector('english', COALESCE(product_name, '')) @@ plainto_tsquery('english', ${searchTerm})
         ${activeOnly ? sql`AND is_active = true` : sql``}
-        ORDER BY ts_rank(to_tsvector('english', COALESCE(product_name, '')), plainto_tsquery('english', ${searchTerm})) DESC
+        ORDER BY image_url IS NULL, ts_rank(to_tsvector('english', COALESCE(product_name, '')), plainto_tsquery('english', ${searchTerm})) DESC
         LIMIT ${limit} OFFSET ${offset}
       `);
       
