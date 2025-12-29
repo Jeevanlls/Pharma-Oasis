@@ -2129,6 +2129,119 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     }
   });
 
+  // AI Blog Draft Generator
+  const generateBlogDraftSchema = z.object({
+    topic: z.string().min(5, "Topic must be at least 5 characters").max(500),
+    keywords: z.string().max(500).optional(),
+  });
+
+  app.post("/api/admin/blog/generate-draft", requireAdmin, async (req, res) => {
+    try {
+      const validationResult = generateBlogDraftSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          message: validationResult.error.errors[0]?.message || "Invalid input" 
+        });
+      }
+
+      const { topic, keywords } = validationResult.data;
+      
+      const OpenAI = (await import("openai")).default;
+      const openai = new OpenAI({
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+      });
+
+      const systemPrompt = `You are an expert pharmaceutical industry B2B content writer for Pharma Oasis, a UK wholesale distributor of pharmaceuticals, healthcare, wellness and beauty products. You create professional, informative blog content for UK pharmacies, online retailers, and wholesalers.
+
+CRITICAL RULES - YOU MUST FOLLOW:
+1. INFORMATIONAL ONLY - Never provide medical advice, dosages, treatment recommendations, or therapeutic claims
+2. B2B FOCUS - Content is for business professionals, not consumers
+3. NEUTRAL TONE - Professional, factual, industry-focused language
+4. UK CONTEXT - Reference UK regulations (MHRA, GDP compliance) where relevant
+5. NO HEALTH CLAIMS - Do not make claims about product efficacy or health benefits
+6. COMPLIANCE AWARE - Mention regulatory frameworks appropriately (MHRA WDA(H), GDP)
+
+OUTPUT FORMAT (JSON):
+{
+  "title": "Blog title (60-70 characters, engaging, SEO-friendly)",
+  "slug": "url-friendly-slug-format",
+  "metaTitle": "SEO meta title (50-60 characters)",
+  "metaDescription": "SEO meta description (150-160 characters)",
+  "excerpt": "Brief summary for listing pages (150-200 characters)",
+  "content": "Full article in HTML format (800-1200 words). Use <h2>, <h3>, <p>, <ul>, <li> tags for structure. Include relevant UK pharma context.",
+  "suggestedLinks": ["Array of suggested internal link paths like /products, /brands, /how-to-order, /distribution-network"]
+}
+
+Always end the content with this compliance disclaimer wrapped in a styled div:
+<div style="background-color: #f8f9fa; border-left: 4px solid #0066cc; padding: 16px; margin-top: 24px;">
+<p style="margin: 0; font-size: 14px; color: #666;"><strong>Disclaimer:</strong> This article is for informational purposes only and does not constitute medical advice. All pharmaceutical products distributed by Pharma Oasis are supplied in accordance with MHRA WDA(H) licensing requirements and GDP compliance standards. For product-specific information, please consult the relevant Summary of Product Characteristics (SmPC) or speak with a qualified healthcare professional.</p>
+</div>`;
+
+      const userPrompt = `Write a blog article about: ${topic}${keywords ? `\n\nIncorporate these keywords where natural: ${keywords}` : ''}
+
+Remember:
+- Target audience: UK pharmacies, online retailers, wholesalers
+- Focus on industry trends, supply chain, business insights, regulatory updates
+- 800-1200 words
+- Include the compliance disclaimer at the end`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        response_format: { type: "json_object" },
+        max_completion_tokens: 4096,
+      });
+
+      const content = response.choices[0]?.message?.content;
+      if (!content) {
+        return res.status(500).json({ message: "AI did not generate content" });
+      }
+
+      let generated;
+      try {
+        generated = JSON.parse(content);
+      } catch {
+        return res.status(500).json({ message: "Failed to parse AI response" });
+      }
+
+      // Generate unique slug
+      let slug = generated.slug || generated.title.toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '');
+      
+      const existingSlug = await storage.getBlogPostBySlug(slug);
+      if (existingSlug) {
+        slug = `${slug}-${Date.now()}`;
+      }
+
+      // Create draft blog post
+      const post = await storage.createBlogPost({
+        title: generated.title,
+        slug,
+        excerpt: generated.excerpt,
+        content: generated.content,
+        metaTitle: generated.metaTitle || generated.title,
+        metaDescription: generated.metaDescription || generated.excerpt,
+        status: 'draft',
+        publishedAt: null,
+        authorId: (req as any).user?.id || null,
+      });
+
+      res.status(201).json({
+        post,
+        suggestedLinks: generated.suggestedLinks || [],
+        message: "Blog draft generated successfully. Please review before publishing."
+      });
+    } catch (error) {
+      console.error("Error generating blog draft:", error);
+      res.status(500).json({ message: "Failed to generate blog draft" });
+    }
+  });
+
   // Admin - Contact Messages
   app.get("/api/admin/messages", requireAdmin, async (req, res) => {
     try {

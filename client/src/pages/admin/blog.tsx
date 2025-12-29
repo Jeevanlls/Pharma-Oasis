@@ -24,6 +24,7 @@ import {
   EyeOff,
   ExternalLink,
   Calendar,
+  Sparkles,
 } from "lucide-react";
 import { ImageUpload } from "@/components/admin/ImageUpload";
 import { format } from "date-fns";
@@ -45,6 +46,9 @@ export default function AdminBlogPage() {
   const [editingPost, setEditingPost] = useState<BlogPost | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deletingPost, setDeletingPost] = useState<BlogPost | null>(null);
+  const [isAiDialogOpen, setIsAiDialogOpen] = useState(false);
+  const [aiTopic, setAiTopic] = useState("");
+  const [aiKeywords, setAiKeywords] = useState("");
   const { toast } = useToast();
 
   const { data, isLoading } = useQuery<BlogResponse>({
@@ -120,6 +124,37 @@ export default function AdminBlogPage() {
     },
   });
 
+  const generateDraftMutation = useMutation({
+    mutationFn: async (data: { topic: string; keywords?: string }) => {
+      return apiRequest("POST", "/api/admin/blog/generate-draft", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/blog"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/blog"] });
+      toast({ 
+        title: "Blog draft generated", 
+        description: "A new draft has been created. Please review before publishing." 
+      });
+      setIsAiDialogOpen(false);
+      setAiTopic("");
+      setAiKeywords("");
+    },
+    onError: (error: Error) => {
+      toast({ title: error.message || "Failed to generate blog draft", variant: "destructive" });
+    },
+  });
+
+  const handleGenerateDraft = () => {
+    if (aiTopic.trim().length < 5) {
+      toast({ title: "Please enter a topic (at least 5 characters)", variant: "destructive" });
+      return;
+    }
+    generateDraftMutation.mutate({ 
+      topic: aiTopic.trim(), 
+      keywords: aiKeywords.trim() || undefined 
+    });
+  };
+
   const filteredPosts = posts.filter(post => {
     const matchesSearch = post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           post.slug.toLowerCase().includes(searchQuery.toLowerCase());
@@ -193,10 +228,16 @@ export default function AdminBlogPage() {
           <h1 className="text-2xl font-bold" style={{ fontFamily: "DM Sans, sans-serif" }}>Blog Management</h1>
           <p className="text-muted-foreground">Create and manage blog posts</p>
         </div>
-        <Button onClick={handleCreate} data-testid="button-create-post">
-          <Plus className="mr-2 h-4 w-4" />
-          New Post
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setIsAiDialogOpen(true)} data-testid="button-generate-ai-draft">
+            <Sparkles className="mr-2 h-4 w-4" />
+            Generate with AI
+          </Button>
+          <Button onClick={handleCreate} data-testid="button-create-post">
+            <Plus className="mr-2 h-4 w-4" />
+            New Post
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-col gap-4 sm:flex-row">
@@ -551,6 +592,74 @@ export default function AdminBlogPage() {
             >
               {deleteMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isAiDialogOpen} onOpenChange={setIsAiDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5" />
+              Generate Blog Draft with AI
+            </DialogTitle>
+            <DialogDescription>
+              Enter a topic and optional keywords. The AI will create a pharma-safe, B2B-focused draft article for your review.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Topic</label>
+              <Textarea
+                placeholder="e.g. Understanding GDP compliance requirements for UK pharmaceutical wholesalers"
+                value={aiTopic}
+                onChange={(e) => setAiTopic(e.target.value)}
+                rows={3}
+                data-testid="input-ai-topic"
+              />
+              <p className="text-xs text-muted-foreground">
+                Describe the blog topic in detail. More specific topics produce better results.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Keywords (Optional)</label>
+              <Input
+                placeholder="e.g. MHRA, wholesale distribution, pharmacy supply chain"
+                value={aiKeywords}
+                onChange={(e) => setAiKeywords(e.target.value)}
+                data-testid="input-ai-keywords"
+              />
+              <p className="text-xs text-muted-foreground">
+                Comma-separated keywords to include in the article for SEO.
+              </p>
+            </div>
+            <div className="rounded-md bg-muted p-3">
+              <p className="text-xs text-muted-foreground">
+                <strong>Note:</strong> Generated content will be saved as a <strong>Draft</strong> and must be reviewed before publishing. The AI follows pharma-safe content guidelines and includes a compliance disclaimer.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAiDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleGenerateDraft}
+              disabled={generateDraftMutation.isPending || aiTopic.trim().length < 5}
+              data-testid="button-confirm-generate"
+            >
+              {generateDraftMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  Generate Draft
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
