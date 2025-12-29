@@ -37,9 +37,11 @@ export default function AdminProductsPage() {
   const [isGeneratingDescription, setIsGeneratingDescription] = useState(false);
   const { toast } = useToast();
 
-  const { data: products, isLoading } = useQuery<Product[]>({
+  const { data: productsResponse, isLoading } = useQuery<{ products: Product[]; pagination: { page: number; pageSize: number; total: number; totalPages: number } }>({
     queryKey: ["/api/products"],
   });
+  
+  const products = productsResponse?.products;
 
   const { data: brands } = useQuery<Brand[]>({
     queryKey: ["/api/brands"],
