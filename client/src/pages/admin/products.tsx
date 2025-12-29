@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -37,8 +37,30 @@ export default function AdminProductsPage() {
   const [isGeneratingDescription, setIsGeneratingDescription] = useState(false);
   const { toast } = useToast();
 
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  
+  // Debounce search to avoid too many API calls
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+  
+  // Build query with search parameter for backend search
+  const queryParams = new URLSearchParams();
+  queryParams.set("limit", "100"); // Load more for admin
+  if (debouncedSearch.trim()) {
+    queryParams.set("search", debouncedSearch.trim());
+  }
+  
   const { data: productsResponse, isLoading } = useQuery<{ products: Product[]; pagination: { page: number; pageSize: number; total: number; totalPages: number } }>({
-    queryKey: ["/api/products"],
+    queryKey: ["/api/products", debouncedSearch],
+    queryFn: async () => {
+      const res = await fetch(`/api/products?${queryParams.toString()}`);
+      if (!res.ok) throw new Error("Failed to fetch products");
+      return res.json();
+    },
   });
   
   const products = productsResponse?.products;
@@ -149,10 +171,8 @@ export default function AdminProductsPage() {
     }
   };
 
-  const filteredProducts = products?.filter(product =>
-    product.productName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    product.sku.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Products are now searched server-side via the API
+  const filteredProducts = products;
 
   const handleEdit = (product: Product) => {
     setEditingProduct(product);
