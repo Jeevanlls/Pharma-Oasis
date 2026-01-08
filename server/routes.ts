@@ -1751,6 +1751,40 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     }
   });
 
+  // ==================== PRODUCT ROTATION MANAGEMENT ====================
+  app.get("/api/admin/product-rotation/status", requireAdmin, async (req, res) => {
+    try {
+      const rotation = await storage.getTodayFeaturedRotation();
+      const directBrandIds = await storage.getDirectDistributorBrandIds();
+      res.json({
+        hasRotation: !!rotation,
+        rotationDate: rotation?.rotationDate || null,
+        productCount: rotation ? JSON.parse(rotation.productIds as string).length : 0,
+        directDistributorBrandCount: directBrandIds.length,
+        criteria: rotation?.selectionCriteria ? JSON.parse(rotation.selectionCriteria as string) : null,
+      });
+    } catch (error) {
+      console.error("Error getting rotation status:", error);
+      res.status(500).json({ message: "Failed to get rotation status" });
+    }
+  });
+
+  app.post("/api/admin/product-rotation/generate", requireAdmin, async (req, res) => {
+    try {
+      await storage.generateDailyRotation();
+      const rotation = await storage.getTodayFeaturedRotation();
+      res.json({
+        success: true,
+        rotationDate: rotation?.rotationDate,
+        productCount: rotation ? JSON.parse(rotation.productIds as string).length : 0,
+        criteria: rotation?.selectionCriteria ? JSON.parse(rotation.selectionCriteria as string) : null,
+      });
+    } catch (error) {
+      console.error("Error generating rotation:", error);
+      res.status(500).json({ message: "Failed to generate rotation" });
+    }
+  });
+
   // Admin - Categories (staff and admin can access)
   app.get("/api/admin/categories", requireStaffOrAdmin, async (req, res) => {
     try {

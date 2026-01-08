@@ -355,61 +355,66 @@ export class DatabaseStorage implements IStorage {
     if (activeOnly) conditions.push(eq(products.isActive, true));
     if (featuredOnly) conditions.push(eq(products.isFeatured, true));
 
-    // For page 1, use intelligent sorting with daily rotation
+    // For page 1, try intelligent sorting with daily rotation (gracefully handle missing table)
     if (page === 1 && offset === 0) {
-      // Get today's featured rotation or generate one
-      const today = new Date().toISOString().split('T')[0];
-      let rotation = await db.select().from(featuredRotation)
-        .where(eq(featuredRotation.rotationDate, today))
-        .limit(1);
-      
-      if (rotation.length === 0) {
-        // Generate new daily rotation
-        await this.generateDailyRotation();
-        rotation = await db.select().from(featuredRotation)
+      try {
+        // Get today's featured rotation or generate one
+        const today = new Date().toISOString().split('T')[0];
+        let rotation = await db.select().from(featuredRotation)
           .where(eq(featuredRotation.rotationDate, today))
           .limit(1);
-      }
-      
-      if (rotation.length > 0 && rotation[0].productIds) {
-        const featuredIds = JSON.parse(rotation[0].productIds) as number[];
-        if (featuredIds.length > 0 && limit) {
-          // Get featured products in order
-          const featuredProducts = await db.select().from(products)
-            .where(and(
-              inArray(products.id, featuredIds),
-              eq(products.isActive, true)
-            ));
-          
-          // Sort by the order in featuredIds
-          const sortedFeatured = featuredIds
-            .map(id => featuredProducts.find(p => p.id === id))
-            .filter((p): p is Product => p !== undefined)
-            .slice(0, limit);
-          
-          // If we need more products to fill the page
-          if (sortedFeatured.length < limit) {
-            const remainingCount = limit - sortedFeatured.length;
-            const existingIds = sortedFeatured.map(p => p.id);
-            
-            const moreProducts = await db.select().from(products)
-              .leftJoin(brands, eq(products.brandId, brands.id))
-              .where(and(
-                eq(products.isActive, true),
-                sql`${products.id} NOT IN (${existingIds.length > 0 ? existingIds.join(',') : '0'})`
-              ))
-              .orderBy(
-                sql`${brands.isDirectDistributor} DESC NULLS LAST`,
-                sql`${products.imageUrl} IS NULL`,
-                asc(products.productName)
-              )
-              .limit(remainingCount);
-            
-            return [...sortedFeatured, ...moreProducts.map(r => r.products)];
-          }
-          
-          return sortedFeatured;
+        
+        if (rotation.length === 0) {
+          // Generate new daily rotation
+          await this.generateDailyRotation();
+          rotation = await db.select().from(featuredRotation)
+            .where(eq(featuredRotation.rotationDate, today))
+            .limit(1);
         }
+        
+        if (rotation.length > 0 && rotation[0].productIds) {
+          const featuredIds = JSON.parse(rotation[0].productIds) as number[];
+          if (featuredIds.length > 0 && limit) {
+            // Get featured products in order
+            const featuredProducts = await db.select().from(products)
+              .where(and(
+                inArray(products.id, featuredIds),
+                eq(products.isActive, true)
+              ));
+            
+            // Sort by the order in featuredIds
+            const sortedFeatured = featuredIds
+              .map(id => featuredProducts.find(p => p.id === id))
+              .filter((p): p is Product => p !== undefined)
+              .slice(0, limit);
+            
+            // If we need more products to fill the page
+            if (sortedFeatured.length < limit) {
+              const remainingCount = limit - sortedFeatured.length;
+              const existingIds = sortedFeatured.map(p => p.id);
+              
+              const moreProducts = await db.select().from(products)
+                .leftJoin(brands, eq(products.brandId, brands.id))
+                .where(and(
+                  eq(products.isActive, true),
+                  sql`${products.id} NOT IN (${existingIds.length > 0 ? existingIds.join(',') : '0'})`
+                ))
+                .orderBy(
+                  sql`${brands.isDirectDistributor} DESC NULLS LAST`,
+                  sql`${products.imageUrl} IS NULL`,
+                  asc(products.productName)
+                )
+                .limit(remainingCount);
+              
+              return [...sortedFeatured, ...moreProducts.map(r => r.products)];
+            }
+            
+            return sortedFeatured;
+          }
+        }
+      } catch (err) {
+        // Rotation table may not exist yet - fall through to default sorting
+        console.warn("Featured rotation not available, using default intelligent sorting");
       }
     }
 
