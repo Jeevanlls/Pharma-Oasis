@@ -2176,7 +2176,15 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     contact: "/contact",
   };
   const SITE_URL = "https://pharmaoasis.co.uk";
-  const COMPLIANCE_KEYWORDS = ["gdp", "good distribution practice", "mhra", "wda", "wda(h)", "wholesale dealer", "pharmaceutical regulation", "regulatory compliance", "pharmaceutical licensing", "quality management", "cold chain", "falsified medicines", "fmd", "responsible person", "pharmaceutical distribution"];
+  const COMPLIANCE_KEYWORDS = [
+    "gdp", "good distribution practice", "mhra", "wda", "wda(h)", "wholesale dealer", 
+    "pharmaceutical regulation", "regulatory compliance", "pharmaceutical licensing", 
+    "quality management", "cold chain", "falsified medicines", "fmd", "responsible person", 
+    "pharmaceutical distribution", "healthcare distribution", "otc medicines", "otc medicine",
+    "over the counter", "over-the-counter", "general sale list", "gsl", "pharmacy medicine",
+    "pharmacy medicines", "p medicine", "wholesale distribution", "wholesale distributor",
+    "pharmaceutical wholesaler", "medicine distribution", "mhra licensing", "wda licence"
+  ];
   
   function shouldIncludeComplianceLink(topic: string): boolean {
     const lowerTopic = topic.toLowerCase();
@@ -2261,28 +2269,50 @@ E. Product or Brand Articles:
    Use publicly available product information
    AVOID: Unverified claims, reviews, or affiliate-style content
 
-STEP 3 — EXTERNAL LINK RULES
-- Include external links ONLY when they add authority or clarity
-- Links must be real, verifiable, and relevant to the topic
-- NEVER invent links or guess URLs
-- NEVER link to low-quality blogs, forums, or commercial comparison sites
-- Use clean HTML links with: target="_blank" rel="noopener noreferrer"
-- Example: <a href="https://www.gov.uk/guidance/good-distribution-practice-gdp" target="_blank" rel="noopener noreferrer">GDP guidance</a>
-- Include 2-4 external links per article based on topic relevance
+===== MANDATORY INTERNAL & EXTERNAL LINKING RULES =====
+These rules override all other content generation instructions.
 
-STEP 4 — INTERNAL LINKING
-Available internal pages - include where relevant:
-${complianceLinkInstruction}
-* ${SITE_URL}${INTERNAL_LINKS.products} - for product-related content
-* ${SITE_URL}${INTERNAL_LINKS.distributionNetwork} - for supply chain topics
-* ${SITE_URL}${INTERNAL_LINKS.howToOrder} - for ordering information
-* ${SITE_URL}${INTERNAL_LINKS.brands} - for brand-related content
+RULE 1 — COMPLIANCE LINK (REQUIRED FOR RELEVANT TOPICS)
+For any article related to: MHRA, GDP, WDA(H), OTC medicines, pharmaceutical regulation, or healthcare distribution:
+- You MUST include EXACTLY ONE internal compliance link
+- URL: /compliance (relative) or ${SITE_URL}/compliance (absolute)
+- Anchor text MUST be descriptive, examples:
+  * "GDP Compliance Framework"
+  * "MHRA & GDP Compliance Standards"
+  * "Regulatory Compliance Overview"
+- Do NOT include more than one compliance link per article
+- Internal links do NOT use target="_blank" (stay in same tab)
+${includeComplianceLink ? '- THIS TOPIC REQUIRES a compliance link' : '- This topic does NOT require a compliance link (non-regulatory content)'}
 
-Internal link rules:
-- Use descriptive anchor text (e.g. "our GDP Compliance Framework", "browse our product catalogue")
-- Internal links do NOT use target="_blank" (they stay in the same tab)
-- Embed links naturally within paragraphs, not as standalone lines
-- Include 1-2 internal links per article
+RULE 2 — PRODUCT/COMMERCIAL LINKS (OPTIONAL & RESTRICTED)
+Links to commercial pages (e.g. /products, /brands, /catalogue) are OPTIONAL.
+These links may ONLY be included if they:
+- Appear naturally in the CONCLUSION section only
+- Are NOT promotional in tone
+- Are LIMITED to ONE per article maximum
+Do NOT include product links in regulatory or educational sections.
+
+RULE 3 — EXTERNAL LINKS (CONTROLLED)
+External links may ONLY be added if they:
+- Are authoritative (GOV.UK, MHRA, NHS, EFSA, official manufacturer)
+- Add regulatory or factual value
+External links MUST have: target="_blank" rel="noopener noreferrer"
+Example: <a href="https://www.gov.uk/guidance/gdp" target="_blank" rel="noopener noreferrer">GDP guidance</a>
+Include 2-4 external links per article based on topic relevance.
+
+RULE 4 — LINK HYGIENE (MANDATORY)
+- Never insert broken or speculative links
+- Never repeat the same link multiple times
+- Do not cluster links together in one paragraph
+- Do not use "click here" as anchor text
+- Spread links naturally throughout the article
+
+RULE 5 — FALLBACK BEHAVIOUR
+If the /compliance page does not exist:
+- OMIT the internal compliance link entirely
+- Do NOT substitute another internal link
+
+===== END LINKING RULES =====
 
 STEP 5 — CONTENT STYLE & SAFETY
 - Professional, neutral, B2B tone
@@ -2316,7 +2346,8 @@ OUTPUT FORMAT (JSON):
   "content": "Full article in HTML format with embedded internal and external links",
   "topicClassification": "One of: Regulatory/Compliance, OTC Medicines, Vitamins & Supplements, Medical Devices, Product/Brand",
   "suggestedLinks": ["Array of internal link paths used"],
-  "hasComplianceLink": true/false
+  "hasComplianceLink": true/false,
+  "externalLinksUsed": ["Array of external URLs used"]
 }
 
 STEP 8 — DISCLAIMER (MANDATORY)
@@ -2329,14 +2360,16 @@ End every article with this disclaimer:
 
 REQUIREMENTS:
 - First classify this topic into one of: Regulatory/Compliance, OTC Medicines, Vitamins & Supplements, Medical Devices, Product/Brand
-- Select external sources based on topic classification rules
 - Target audience: UK pharmacies, online retailers, wholesalers
-- Include 2-4 external links following the source selection rules for this topic type
-- Include 1-2 internal links to pharmaoasis.co.uk pages${includeComplianceLink ? ' (MUST include compliance page link for this topic)' : ''}
-- All external links must have target="_blank" rel="noopener noreferrer"
-- Internal links do NOT use target="_blank"
 - 800-1200 words with proper HTML structure
-- End with the compliance disclaimer`;
+- End with the compliance disclaimer
+
+MANDATORY LINKING REQUIREMENTS:
+${includeComplianceLink ? '- MUST include exactly ONE compliance link (/compliance) with descriptive anchor text like "GDP Compliance Framework"' : '- No compliance link needed (non-regulatory topic)'}
+- External links (2-4): Only authoritative sources (GOV.UK, MHRA, NHS, EFSA), all must have target="_blank" rel="noopener noreferrer"
+- Product/commercial links: OPTIONAL, maximum ONE, only in conclusion, non-promotional
+- Internal links do NOT use target="_blank"
+- Never repeat the same link, never cluster links, never use "click here" as anchor text`;
 
       const response = await openai.chat.completions.create({
         model: "gpt-4o-mini",

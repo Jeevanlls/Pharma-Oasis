@@ -49,6 +49,8 @@ export default function AdminBlogPage() {
   const [isAiDialogOpen, setIsAiDialogOpen] = useState(false);
   const [aiTopic, setAiTopic] = useState("");
   const [aiKeywords, setAiKeywords] = useState("");
+  const [isPreviewDialogOpen, setIsPreviewDialogOpen] = useState(false);
+  const [previewingPost, setPreviewingPost] = useState<BlogPost | null>(null);
   const { toast } = useToast();
 
   const { data, isLoading } = useQuery<BlogResponse>({
@@ -206,6 +208,11 @@ export default function AdminBlogPage() {
     setIsDeleteDialogOpen(true);
   };
 
+  const handlePreview = (post: BlogPost) => {
+    setPreviewingPost(post);
+    setIsPreviewDialogOpen(true);
+  };
+
   const onSubmit = (data: InsertBlogPost) => {
     const submitData = {
       ...data,
@@ -321,14 +328,25 @@ export default function AdminBlogPage() {
                   </div>
 
                   <div className="flex items-center gap-2">
-                    {post.status === "published" && (
+                    {post.status === "published" ? (
                       <Button 
                         variant="ghost" 
                         size="icon"
                         onClick={() => window.open(`/blog/${post.slug}`, "_blank")}
+                        title="View live post"
                         data-testid={`button-view-post-${post.id}`}
                       >
                         <ExternalLink className="h-4 w-4" />
+                      </Button>
+                    ) : (
+                      <Button 
+                        variant="ghost" 
+                        size="icon"
+                        onClick={() => handlePreview(post)}
+                        title="Preview draft"
+                        data-testid={`button-preview-post-${post.id}`}
+                      >
+                        <Eye className="h-4 w-4" />
                       </Button>
                     )}
                     <Button 
@@ -660,6 +678,80 @@ export default function AdminBlogPage() {
                   Generate Draft
                 </>
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isPreviewDialogOpen} onOpenChange={setIsPreviewDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader className="flex-shrink-0">
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="h-5 w-5" />
+              Draft Preview
+            </DialogTitle>
+            <DialogDescription>
+              Review the AI-generated content before publishing
+            </DialogDescription>
+          </DialogHeader>
+          
+          {previewingPost && (
+            <div className="flex-1 overflow-y-auto space-y-4 py-4">
+              <div className="space-y-2">
+                <h2 className="text-2xl font-bold" style={{ fontFamily: "DM Sans, sans-serif" }}>
+                  {previewingPost.title}
+                </h2>
+                {previewingPost.excerpt && (
+                  <p className="text-muted-foreground italic">
+                    {previewingPost.excerpt}
+                  </p>
+                )}
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Calendar className="h-4 w-4" />
+                  Created {format(new Date(previewingPost.createdAt), "MMMM d, yyyy")}
+                  <Badge variant="secondary" className="text-xs ml-2">
+                    <EyeOff className="mr-1 h-3 w-3" /> Draft
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="border-t pt-4">
+                <div className="prose prose-sm max-w-none dark:prose-invert">
+                  <div 
+                    dangerouslySetInnerHTML={{ __html: previewingPost.content || "" }}
+                  />
+                </div>
+              </div>
+
+              {previewingPost.metaTitle && (
+                <div className="border-t pt-4 space-y-2">
+                  <h4 className="text-sm font-semibold text-muted-foreground">SEO Information</h4>
+                  <div className="rounded-md bg-muted p-3 space-y-1">
+                    <p className="text-sm"><strong>Meta Title:</strong> {previewingPost.metaTitle}</p>
+                    {previewingPost.metaDescription && (
+                      <p className="text-sm"><strong>Meta Description:</strong> {previewingPost.metaDescription}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter className="flex-shrink-0 border-t pt-4">
+            <Button variant="outline" onClick={() => setIsPreviewDialogOpen(false)}>
+              Close
+            </Button>
+            <Button 
+              onClick={() => {
+                setIsPreviewDialogOpen(false);
+                if (previewingPost) {
+                  handleEdit(previewingPost);
+                }
+              }}
+              data-testid="button-edit-from-preview"
+            >
+              <Pencil className="mr-2 h-4 w-4" />
+              Edit Post
             </Button>
           </DialogFooter>
         </DialogContent>

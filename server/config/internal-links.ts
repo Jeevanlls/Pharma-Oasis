@@ -51,6 +51,22 @@ export const COMPLIANCE_KEYWORDS = [
   "fmd",
   "responsible person",
   "pharmaceutical distribution",
+  "healthcare distribution",
+  "otc medicines",
+  "otc medicine",
+  "over the counter",
+  "over-the-counter",
+  "general sale list",
+  "gsl",
+  "pharmacy medicine",
+  "pharmacy medicines",
+  "p medicine",
+  "wholesale distribution",
+  "wholesale distributor",
+  "pharmaceutical wholesaler",
+  "medicine distribution",
+  "mhra licensing",
+  "wda licence",
 ] as const;
 
 /**
