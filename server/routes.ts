@@ -2427,6 +2427,196 @@ ${includeComplianceLink ? '- MUST include exactly ONE compliance link (/complian
     }
   });
 
+  // AI Review & Correction endpoint
+  const reviewBlogDraftSchema = z.object({
+    instructions: z.string().min(10, "Instructions must be at least 10 characters").max(2000),
+  });
+
+  app.post("/api/admin/blog/:id/review", requireAdmin, async (req, res) => {
+    try {
+      const postId = parseInt(req.params.id);
+      if (isNaN(postId)) {
+        return res.status(400).json({ message: "Invalid post ID" });
+      }
+
+      const validationResult = reviewBlogDraftSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          message: validationResult.error.errors[0]?.message || "Invalid input" 
+        });
+      }
+
+      const { instructions } = validationResult.data;
+
+      // Get the existing post
+      const post = await storage.getBlogPost(postId);
+      if (!post) {
+        return res.status(404).json({ message: "Blog post not found" });
+      }
+
+      // Only allow review of draft posts
+      if (post.status !== 'draft') {
+        return res.status(400).json({ message: "Only draft posts can be reviewed and corrected" });
+      }
+
+      // Check if compliance link should be included based on title/content
+      const searchText = `${post.title} ${post.excerpt || ''} ${post.content || ''}`.toLowerCase();
+      const includeComplianceLink = COMPLIANCE_KEYWORDS.some(keyword => searchText.includes(keyword));
+
+      const OpenAI = (await import("openai")).default;
+      const openai = new OpenAI({
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+      });
+
+      const systemPrompt = `You are the Pharma Oasis compliance editor. Your role is to review and correct existing blog articles based on specific user instructions.
+
+===== CRITICAL RULES — YOU MUST FOLLOW =====
+
+1. DO NOT REWRITE THE ARTICLE COMPLETELY
+   - You are making targeted corrections only
+   - Preserve the original structure, flow, and intent
+   - Only change what the user specifically requests
+
+2. DO NOT CHANGE THE TOPIC OR INTENT
+   - The article topic must remain the same
+   - Do not introduce new subjects unless explicitly instructed
+   - Keep the same target audience focus
+
+3. ONLY APPLY REQUESTED CORRECTIONS
+   - Read the user's correction instructions carefully
+   - Apply only the changes they have asked for
+   - Do not "improve" sections that weren't mentioned
+
+4. PRESERVE PROFESSIONAL, REGULATORY TONE
+   - Maintain B2B pharmaceutical industry language
+   - Keep content suitable for MHRA-regulated audiences
+   - No casual language or marketing hype
+
+5. MAINTAIN VALID HTML
+   - Output must be valid semantic HTML
+   - Use <h2>, <h3>, <p>, <ul>, <li> appropriately
+   - Do NOT nest <p> tags inside other <p> tags
+   - No Markdown in output
+
+6. PREVENT DUPLICATE PARAGRAPHS
+   - Check that no paragraph is repeated
+   - If duplicate content exists, keep only one instance
+
+7. LINK CORRECTIONS
+   - Insert or correct external links where requested
+   - External links MUST have: target="_blank" rel="noopener noreferrer"
+   - Internal links (to Pharma Oasis pages) do NOT use target="_blank"
+   - Compliance link URL: ${SITE_URL}${INTERNAL_LINKS.compliance}
+   ${includeComplianceLink 
+     ? '- MANDATORY: This article MUST contain exactly ONE compliance link. If missing, ADD it with anchor text like "GDP Compliance Framework" or "MHRA & GDP Compliance Standards". Do NOT add more than one.' 
+     : '- This article does NOT require a compliance link (non-regulatory content). Do NOT add one unless explicitly requested.'}
+
+8. REMOVE PROBLEMATIC CONTENT IF FLAGGED
+   - Remove commercial or sales-style language if requested
+   - Remove medical advice if flagged
+   - Remove unverified claims if flagged
+
+===== OUTPUT FORMAT =====
+Return a JSON object with ONLY the fields that were changed. Include null for unchanged fields:
+
+{
+  "title": "Updated title or null if unchanged",
+  "excerpt": "Updated excerpt or null if unchanged",
+  "content": "Updated HTML content (always include this even if minimal changes)",
+  "metaTitle": "Updated SEO title or null if unchanged",
+  "metaDescription": "Updated SEO description or null if unchanged",
+  "changesSummary": "Brief summary of what was changed"
+}
+
+IMPORTANT: The "content" field should ALWAYS contain the full updated article HTML, even if only small changes were made.`;
+
+      const userPrompt = `Please review and correct this blog article based on my instructions.
+
+===== CURRENT ARTICLE =====
+Title: ${post.title}
+Excerpt: ${post.excerpt || 'No excerpt'}
+
+Content:
+${post.content}
+
+===== MY CORRECTION INSTRUCTIONS =====
+${instructions}
+
+===== TASK =====
+Apply ONLY the corrections I have requested above. Do not rewrite the entire article. Preserve the original structure and topic. Return the updated article in JSON format.`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        response_format: { type: "json_object" },
+        max_completion_tokens: 4096,
+      });
+
+      const content = response.choices[0]?.message?.content;
+      if (!content) {
+        return res.status(500).json({ message: "AI did not generate a response" });
+      }
+
+      let corrected;
+      try {
+        corrected = JSON.parse(content);
+      } catch {
+        return res.status(500).json({ message: "Failed to parse AI response" });
+      }
+
+      // Build validated update data - only allow specific fields to be updated
+      const updateData: {
+        title?: string;
+        excerpt?: string;
+        content?: string;
+        metaTitle?: string;
+        metaDescription?: string;
+      } = {};
+      
+      // Validate and sanitize AI response fields
+      if (corrected.title && typeof corrected.title === 'string' && corrected.title.trim() !== post.title) {
+        updateData.title = corrected.title.trim();
+      }
+      if (corrected.excerpt && typeof corrected.excerpt === 'string' && corrected.excerpt.trim() !== post.excerpt) {
+        updateData.excerpt = corrected.excerpt.trim();
+      }
+      if (corrected.content && typeof corrected.content === 'string') {
+        // Always update content if provided - this is the main correction target
+        updateData.content = corrected.content;
+      }
+      if (corrected.metaTitle && typeof corrected.metaTitle === 'string' && corrected.metaTitle.trim() !== post.metaTitle) {
+        updateData.metaTitle = corrected.metaTitle.trim();
+      }
+      if (corrected.metaDescription && typeof corrected.metaDescription === 'string' && corrected.metaDescription.trim() !== post.metaDescription) {
+        updateData.metaDescription = corrected.metaDescription.trim();
+      }
+
+      // Only update if there are changes
+      if (Object.keys(updateData).length === 0) {
+        return res.json({
+          post,
+          changesSummary: "No changes were needed based on the instructions.",
+          message: "Article reviewed - no changes applied."
+        });
+      }
+
+      const updatedPost = await storage.updateBlogPost(postId, updateData);
+
+      res.json({
+        post: updatedPost,
+        changesSummary: corrected.changesSummary || "Changes applied successfully.",
+        message: "Article corrected successfully. Please review before publishing."
+      });
+    } catch (error) {
+      console.error("Error reviewing blog draft:", error);
+      res.status(500).json({ message: "Failed to review blog draft" });
+    }
+  });
+
   // Retroactive compliance link insertion for existing blogs
   app.post("/api/admin/blog/insert-compliance-links", requireAdmin, async (req, res) => {
     try {

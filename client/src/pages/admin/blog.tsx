@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useForm } from "react-hook-form";
 import type { BlogPost, InsertBlogPost } from "@shared/schema";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Search, 
   FileText, 
@@ -25,6 +26,7 @@ import {
   ExternalLink,
   Calendar,
   Sparkles,
+  RefreshCw,
 } from "lucide-react";
 import { ImageUpload } from "@/components/admin/ImageUpload";
 import { format } from "date-fns";
@@ -49,6 +51,9 @@ export default function AdminBlogPage() {
   const [isAiDialogOpen, setIsAiDialogOpen] = useState(false);
   const [aiTopic, setAiTopic] = useState("");
   const [aiKeywords, setAiKeywords] = useState("");
+  const [aiMode, setAiMode] = useState<"writer" | "correction">("writer");
+  const [selectedDraftId, setSelectedDraftId] = useState<string>("");
+  const [correctionInstructions, setCorrectionInstructions] = useState("");
   const [isPreviewDialogOpen, setIsPreviewDialogOpen] = useState(false);
   const [previewingPost, setPreviewingPost] = useState<BlogPost | null>(null);
   const { toast } = useToast();
@@ -146,6 +151,26 @@ export default function AdminBlogPage() {
     },
   });
 
+  const reviewDraftMutation = useMutation({
+    mutationFn: async (data: { id: number; instructions: string }) => {
+      return apiRequest("POST", `/api/admin/blog/${data.id}/review`, { instructions: data.instructions });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/blog"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/blog"] });
+      toast({ 
+        title: "Draft corrected", 
+        description: "Your corrections have been applied. Please review the updated draft." 
+      });
+      setIsAiDialogOpen(false);
+      setSelectedDraftId("");
+      setCorrectionInstructions("");
+    },
+    onError: (error: Error) => {
+      toast({ title: error.message || "Failed to apply corrections", variant: "destructive" });
+    },
+  });
+
   const handleGenerateDraft = () => {
     if (aiTopic.trim().length < 5) {
       toast({ title: "Please enter a topic (at least 5 characters)", variant: "destructive" });
@@ -156,6 +181,23 @@ export default function AdminBlogPage() {
       keywords: aiKeywords.trim() || undefined 
     });
   };
+
+  const handleReviewDraft = () => {
+    if (!selectedDraftId) {
+      toast({ title: "Please select a draft to correct", variant: "destructive" });
+      return;
+    }
+    if (correctionInstructions.trim().length < 10) {
+      toast({ title: "Please enter correction instructions (at least 10 characters)", variant: "destructive" });
+      return;
+    }
+    reviewDraftMutation.mutate({ 
+      id: parseInt(selectedDraftId), 
+      instructions: correctionInstructions.trim() 
+    });
+  };
+
+  const draftPosts = posts.filter(p => p.status === "draft");
 
   const filteredPosts = posts.filter(post => {
     const matchesSearch = post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -615,71 +657,163 @@ export default function AdminBlogPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isAiDialogOpen} onOpenChange={setIsAiDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+      <Dialog open={isAiDialogOpen} onOpenChange={(open) => {
+        setIsAiDialogOpen(open);
+        if (!open) {
+          setAiTopic("");
+          setAiKeywords("");
+          setSelectedDraftId("");
+          setCorrectionInstructions("");
+        }
+      }}>
+        <DialogContent className="sm:max-w-[550px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Sparkles className="h-5 w-5" />
-              Generate Blog Draft with AI
+              AI Blog Assistant
             </DialogTitle>
             <DialogDescription>
-              Enter a topic and optional keywords. The AI will create a pharma-safe, B2B-focused draft article for your review.
+              Generate new drafts or correct existing ones with AI
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Topic</label>
-              <Textarea
-                placeholder="e.g. Understanding GDP compliance requirements for UK pharmaceutical wholesalers"
-                value={aiTopic}
-                onChange={(e) => setAiTopic(e.target.value)}
-                rows={3}
-                data-testid="input-ai-topic"
-              />
-              <p className="text-xs text-muted-foreground">
-                Describe the blog topic in detail. More specific topics produce better results.
-              </p>
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Keywords (Optional)</label>
-              <Input
-                placeholder="e.g. MHRA, wholesale distribution, pharmacy supply chain"
-                value={aiKeywords}
-                onChange={(e) => setAiKeywords(e.target.value)}
-                data-testid="input-ai-keywords"
-              />
-              <p className="text-xs text-muted-foreground">
-                Comma-separated keywords to include in the article for SEO.
-              </p>
-            </div>
-            <div className="rounded-md bg-muted p-3">
-              <p className="text-xs text-muted-foreground">
-                <strong>Note:</strong> Generated content will be saved as a <strong>Draft</strong> and must be reviewed before publishing. The AI follows pharma-safe content guidelines and includes a compliance disclaimer.
-              </p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAiDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleGenerateDraft}
-              disabled={generateDraftMutation.isPending || aiTopic.trim().length < 5}
-              data-testid="button-confirm-generate"
-            >
-              {generateDraftMutation.isPending ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Generating...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="mr-2 h-4 w-4" />
-                  Generate Draft
-                </>
-              )}
-            </Button>
-          </DialogFooter>
+          
+          <Tabs value={aiMode} onValueChange={(v) => setAiMode(v as "writer" | "correction")} className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="writer" className="flex items-center gap-2" data-testid="tab-ai-writer">
+                <Sparkles className="h-4 w-4" />
+                AI Writer
+              </TabsTrigger>
+              <TabsTrigger value="correction" className="flex items-center gap-2" data-testid="tab-ai-correction">
+                <RefreshCw className="h-4 w-4" />
+                Review & Correct
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="writer" className="space-y-4 pt-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Topic</label>
+                <Textarea
+                  placeholder="e.g. Understanding GDP compliance requirements for UK pharmaceutical wholesalers"
+                  value={aiTopic}
+                  onChange={(e) => setAiTopic(e.target.value)}
+                  rows={3}
+                  data-testid="input-ai-topic"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Describe the blog topic in detail. More specific topics produce better results.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Keywords (Optional)</label>
+                <Input
+                  placeholder="e.g. MHRA, wholesale distribution, pharmacy supply chain"
+                  value={aiKeywords}
+                  onChange={(e) => setAiKeywords(e.target.value)}
+                  data-testid="input-ai-keywords"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Comma-separated keywords to include in the article for SEO.
+                </p>
+              </div>
+              <div className="rounded-md bg-muted p-3">
+                <p className="text-xs text-muted-foreground">
+                  <strong>Note:</strong> Generated content will be saved as a <strong>Draft</strong> and must be reviewed before publishing.
+                </p>
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" onClick={() => setIsAiDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleGenerateDraft}
+                  disabled={generateDraftMutation.isPending || aiTopic.trim().length < 5}
+                  data-testid="button-confirm-generate"
+                >
+                  {generateDraftMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="mr-2 h-4 w-4" />
+                      Generate Draft
+                    </>
+                  )}
+                </Button>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="correction" className="space-y-4 pt-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Select Draft to Correct</label>
+                <Select value={selectedDraftId} onValueChange={setSelectedDraftId}>
+                  <SelectTrigger data-testid="select-draft-to-correct">
+                    <SelectValue placeholder="Choose a draft article..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {draftPosts.length === 0 ? (
+                      <SelectItem value="none" disabled>No drafts available</SelectItem>
+                    ) : (
+                      draftPosts.map((post) => (
+                        <SelectItem key={post.id} value={post.id.toString()}>
+                          {post.title}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Only draft articles can be corrected. Published posts must be unpublished first.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Correction Instructions</label>
+                <Textarea
+                  placeholder="Describe what you want to change, e.g.:
+- Fix the second paragraph to be more concise
+- Add a link to the MHRA website in the compliance section
+- Remove any promotional language
+- Make the tone more professional
+- Add a paragraph about cold chain requirements"
+                  value={correctionInstructions}
+                  onChange={(e) => setCorrectionInstructions(e.target.value)}
+                  rows={5}
+                  data-testid="input-correction-instructions"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Be specific about what changes you want. The AI will apply only your requested corrections without rewriting the entire article.
+                </p>
+              </div>
+              <div className="rounded-md bg-muted p-3">
+                <p className="text-xs text-muted-foreground">
+                  <strong>How it works:</strong> The AI will read your draft and apply only the corrections you specify. It will preserve the original structure, tone, and topic. The corrected draft replaces the original.
+                </p>
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" onClick={() => setIsAiDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleReviewDraft}
+                  disabled={reviewDraftMutation.isPending || !selectedDraftId || correctionInstructions.trim().length < 10}
+                  data-testid="button-apply-corrections"
+                >
+                  {reviewDraftMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Applying...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                      Apply Corrections
+                    </>
+                  )}
+                </Button>
+              </div>
+            </TabsContent>
+          </Tabs>
         </DialogContent>
       </Dialog>
 
