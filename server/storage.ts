@@ -3,7 +3,7 @@ import {
   supplierLeads, cmsBlocks, siteSettings, contactMessages, heroSlides, companyLocations,
   homeStats, homeFeatures, homeCategories, homeProcessSteps, homeSections,
   footerSections, mediaAssets, chatSessions, chatMessages, chatLeads, pageViews,
-  blogPosts,
+  blogPosts, productPopularity, featuredRotation,
   type User, type InsertUser,
   type Brand, type InsertBrand,
   type Category, type InsertCategory,
@@ -28,6 +28,8 @@ import {
   type ChatLead, type InsertChatLead,
   type PageView, type InsertPageView,
   type BlogPost, type InsertBlogPost,
+  type ProductPopularity, type InsertProductPopularity,
+  type FeaturedRotation, type InsertFeaturedRotation,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, ilike, desc, asc, sql, isNull, inArray } from "drizzle-orm";
@@ -65,13 +67,19 @@ export interface IStorage {
   createProduct(product: InsertProduct): Promise<Product>;
   updateProduct(id: number, updates: Partial<InsertProduct>): Promise<Product | undefined>;
   deleteProduct(id: number): Promise<void>;
-  getAllProducts(options?: { activeOnly?: boolean; featuredOnly?: boolean; limit?: number; offset?: number }): Promise<Product[]>;
+  getAllProducts(options?: { activeOnly?: boolean; featuredOnly?: boolean; limit?: number; offset?: number; page?: number }): Promise<Product[]>;
   getProductsByCategory(categoryId: number, options?: { activeOnly?: boolean; limit?: number; offset?: number }): Promise<Product[]>;
   getProductsByBrand(brandId: number, options?: { activeOnly?: boolean; limit?: number; offset?: number }): Promise<Product[]>;
   searchProducts(query: string, options?: { activeOnly?: boolean; limit?: number; offset?: number }): Promise<Product[]>;
   searchProductsFullText(query: string, options?: { activeOnly?: boolean; limit?: number; offset?: number }): Promise<Product[]>;
   getProductCount(options?: { activeOnly?: boolean; categoryId?: number; brandId?: number; search?: string }): Promise<number>;
   bulkCreateProducts(products: InsertProduct[]): Promise<Product[]>;
+  
+  // Intelligent Product Sorting
+  getTodayFeaturedRotation(): Promise<FeaturedRotation | undefined>;
+  createFeaturedRotation(productIds: number[], criteria?: object): Promise<FeaturedRotation>;
+  trackProductView(productId: number): Promise<void>;
+  getDirectDistributorBrandIds(): Promise<number[]>;
 
   // Quotes
   getQuote(id: number): Promise<Quote | undefined>;
@@ -341,22 +349,142 @@ export class DatabaseStorage implements IStorage {
     await db.delete(products).where(eq(products.id, id));
   }
 
-  async getAllProducts(options: { activeOnly?: boolean; featuredOnly?: boolean; limit?: number; offset?: number } = {}): Promise<Product[]> {
-    const { activeOnly = false, featuredOnly = false, limit, offset } = options;
+  async getAllProducts(options: { activeOnly?: boolean; featuredOnly?: boolean; limit?: number; offset?: number; page?: number } = {}): Promise<Product[]> {
+    const { activeOnly = false, featuredOnly = false, limit, offset, page = 1 } = options;
     const conditions = [];
     if (activeOnly) conditions.push(eq(products.isActive, true));
     if (featuredOnly) conditions.push(eq(products.isFeatured, true));
 
-    let query = db.select().from(products);
-    if (conditions.length > 0) {
-      query = query.where(and(...conditions)) as typeof query;
+    // For page 1, use intelligent sorting with daily rotation
+    if (page === 1 && offset === 0) {
+      // Get today's featured rotation or generate one
+      const today = new Date().toISOString().split('T')[0];
+      let rotation = await db.select().from(featuredRotation)
+        .where(eq(featuredRotation.rotationDate, today))
+        .limit(1);
+      
+      if (rotation.length === 0) {
+        // Generate new daily rotation
+        await this.generateDailyRotation();
+        rotation = await db.select().from(featuredRotation)
+          .where(eq(featuredRotation.rotationDate, today))
+          .limit(1);
+      }
+      
+      if (rotation.length > 0 && rotation[0].productIds) {
+        const featuredIds = JSON.parse(rotation[0].productIds) as number[];
+        if (featuredIds.length > 0 && limit) {
+          // Get featured products in order
+          const featuredProducts = await db.select().from(products)
+            .where(and(
+              inArray(products.id, featuredIds),
+              eq(products.isActive, true)
+            ));
+          
+          // Sort by the order in featuredIds
+          const sortedFeatured = featuredIds
+            .map(id => featuredProducts.find(p => p.id === id))
+            .filter((p): p is Product => p !== undefined)
+            .slice(0, limit);
+          
+          // If we need more products to fill the page
+          if (sortedFeatured.length < limit) {
+            const remainingCount = limit - sortedFeatured.length;
+            const existingIds = sortedFeatured.map(p => p.id);
+            
+            const moreProducts = await db.select().from(products)
+              .leftJoin(brands, eq(products.brandId, brands.id))
+              .where(and(
+                eq(products.isActive, true),
+                sql`${products.id} NOT IN (${existingIds.length > 0 ? existingIds.join(',') : '0'})`
+              ))
+              .orderBy(
+                sql`${brands.isDirectDistributor} DESC NULLS LAST`,
+                sql`${products.imageUrl} IS NULL`,
+                asc(products.productName)
+              )
+              .limit(remainingCount);
+            
+            return [...sortedFeatured, ...moreProducts.map(r => r.products)];
+          }
+          
+          return sortedFeatured;
+        }
+      }
     }
-    // Order by: products with images first, then by name
-    query = query.orderBy(sql`${products.imageUrl} IS NULL`, asc(products.productName)) as typeof query;
-    if (limit) query = query.limit(limit) as typeof query;
-    if (offset) query = query.offset(offset) as typeof query;
 
-    return query;
+    // Default intelligent sorting: direct distributor brands first, then products with images, then alphabetical
+    const result = await db.select({
+      product: products
+    }).from(products)
+      .leftJoin(brands, eq(products.brandId, brands.id))
+      .where(activeOnly ? eq(products.isActive, true) : undefined)
+      .orderBy(
+        sql`${brands.isDirectDistributor} DESC NULLS LAST`,
+        sql`${products.imageUrl} IS NULL`,
+        asc(products.productName)
+      )
+      .limit(limit || 50)
+      .offset(offset || 0);
+    
+    return result.map(r => r.product);
+  }
+
+  // Generate daily featured rotation
+  async generateDailyRotation(): Promise<void> {
+    const today = new Date().toISOString().split('T')[0];
+    
+    // Get direct distributor brand IDs
+    const directBrands = await db.select({ id: brands.id })
+      .from(brands)
+      .where(and(
+        eq(brands.isDirectDistributor, true),
+        eq(brands.isActive, true)
+      ));
+    const directBrandIds = directBrands.map(b => b.id);
+    
+    // Get products from direct distributor brands with images
+    let featuredProducts: Product[] = [];
+    
+    if (directBrandIds.length > 0) {
+      featuredProducts = await db.select().from(products)
+        .where(and(
+          eq(products.isActive, true),
+          inArray(products.brandId, directBrandIds),
+          sql`${products.imageUrl} IS NOT NULL`
+        ))
+        .limit(200); // Get pool of candidates
+    }
+    
+    // Shuffle and select 50 for today's rotation
+    const shuffled = featuredProducts.sort(() => Math.random() - 0.5);
+    const selectedIds = shuffled.slice(0, 50).map(p => p.id);
+    
+    // If not enough direct distributor products, fill with other products with images
+    if (selectedIds.length < 50) {
+      const remainingCount = 50 - selectedIds.length;
+      const moreProducts = await db.select().from(products)
+        .where(and(
+          eq(products.isActive, true),
+          sql`${products.imageUrl} IS NOT NULL`,
+          selectedIds.length > 0 ? sql`${products.id} NOT IN (${selectedIds.join(',')})` : undefined
+        ))
+        .limit(remainingCount * 2);
+      
+      const moreShuffled = moreProducts.sort(() => Math.random() - 0.5);
+      selectedIds.push(...moreShuffled.slice(0, remainingCount).map(p => p.id));
+    }
+    
+    // Store the rotation
+    await db.insert(featuredRotation).values({
+      rotationDate: today,
+      productIds: JSON.stringify(selectedIds),
+      selectionCriteria: JSON.stringify({
+        directDistributorBrands: directBrandIds.length,
+        totalSelected: selectedIds.length,
+        generatedAt: new Date().toISOString()
+      })
+    }).onConflictDoNothing();
   }
 
   async getProductsByCategory(categoryId: number, options: { activeOnly?: boolean; limit?: number; offset?: number } = {}): Promise<Product[]> {
@@ -1313,6 +1441,62 @@ export class DatabaseStorage implements IStorage {
       recentRegistrations,
       recentQuotes,
     };
+  }
+
+  // ==================== INTELLIGENT PRODUCT SORTING ====================
+  async getTodayFeaturedRotation(): Promise<FeaturedRotation | undefined> {
+    const today = new Date().toISOString().split('T')[0];
+    const [rotation] = await db.select().from(featuredRotation)
+      .where(eq(featuredRotation.rotationDate, today))
+      .limit(1);
+    return rotation;
+  }
+
+  async createFeaturedRotation(productIds: number[], criteria?: object): Promise<FeaturedRotation> {
+    const today = new Date().toISOString().split('T')[0];
+    const [created] = await db.insert(featuredRotation).values({
+      rotationDate: today,
+      productIds: JSON.stringify(productIds),
+      selectionCriteria: criteria ? JSON.stringify(criteria) : null,
+    }).returning();
+    return created;
+  }
+
+  async trackProductView(productId: number): Promise<void> {
+    // Upsert product popularity record
+    const existing = await db.select().from(productPopularity)
+      .where(eq(productPopularity.productId, productId))
+      .limit(1);
+    
+    if (existing.length > 0) {
+      await db.update(productPopularity)
+        .set({
+          viewCount: sql`${productPopularity.viewCount} + 1`,
+          lastViewedAt: new Date(),
+          lastUpdatedAt: new Date(),
+        })
+        .where(eq(productPopularity.productId, productId));
+    } else {
+      await db.insert(productPopularity).values({
+        productId,
+        viewCount: 1,
+        quoteAddCount: 0,
+        conversionCount: 0,
+        popularityScore: "0",
+        lastViewedAt: new Date(),
+        lastUpdatedAt: new Date(),
+      }).onConflictDoNothing();
+    }
+  }
+
+  async getDirectDistributorBrandIds(): Promise<number[]> {
+    const directBrands = await db.select({ id: brands.id })
+      .from(brands)
+      .where(and(
+        eq(brands.isDirectDistributor, true),
+        eq(brands.isActive, true)
+      ));
+    return directBrands.map(b => b.id);
   }
 }
 

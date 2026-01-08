@@ -343,6 +343,7 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
           featuredOnly: featured === "true",
           limit: pageSize,
           offset: offsetNum,
+          page: pageNum,
         });
         totalCount = await storage.getProductCount({ activeOnly: true });
       }
@@ -372,6 +373,8 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
       if (!product) {
         return res.status(404).json({ message: "Product not found" });
       }
+      // Track product view for analytics (non-blocking)
+      storage.trackProductView(id).catch(() => {});
       res.json(product);
     } catch (error) {
       console.error("Error fetching product:", error);
