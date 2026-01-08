@@ -36,6 +36,7 @@ import {
   MapPin,
   BarChart3,
   Newspaper,
+  Shuffle,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 
@@ -67,6 +68,7 @@ const siteMenuItems = [
   { title: "Blog", href: "/admin/blog", icon: Newspaper, staffAccess: false },
   { title: "SEO Management", href: "/admin/seo", icon: Globe, staffAccess: false },
   { title: "SEO AI Agent", href: "/admin/seo-agent", icon: Bot, staffAccess: false },
+  { title: "Product Rotation", href: "/admin/product-rotation", icon: Shuffle, staffAccess: false },
   { title: "Google Pricing", href: "/admin/google-pricing", icon: Tag, staffAccess: false },
   { title: "AI Categories", href: "/admin/ai-categories", icon: Bot, staffAccess: false },
   { title: "CMS", href: "/admin/cms", icon: LayoutDashboard, staffAccess: false },
