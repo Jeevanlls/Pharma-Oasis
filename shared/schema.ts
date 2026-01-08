@@ -1116,3 +1116,43 @@ export const contactFormSchema = z.object({
 });
 
 export type ContactFormData = z.infer<typeof contactFormSchema>;
+
+// ============================================
+// PRODUCT POPULARITY TABLE (Analytics for intelligent sorting)
+// ============================================
+export const productPopularity = pgTable("product_popularity", {
+  id: serial("id").primaryKey(),
+  productId: integer("product_id").notNull(),
+  viewCount: integer("view_count").default(0),
+  quoteAddCount: integer("quote_add_count").default(0),
+  conversionCount: integer("conversion_count").default(0),
+  popularityScore: decimal("popularity_score", { precision: 10, scale: 2 }).default("0"),
+  lastViewedAt: timestamp("last_viewed_at"),
+  lastUpdatedAt: timestamp("last_updated_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertProductPopularitySchema = createInsertSchema(productPopularity).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertProductPopularity = z.infer<typeof insertProductPopularitySchema>;
+export type ProductPopularity = typeof productPopularity.$inferSelect;
+
+// ============================================
+// FEATURED ROTATION TABLE (Daily featured product selection)
+// ============================================
+export const featuredRotation = pgTable("featured_rotation", {
+  id: serial("id").primaryKey(),
+  rotationDate: varchar("rotation_date", { length: 10 }).notNull(), // YYYY-MM-DD format
+  productIds: text("product_ids").notNull(), // JSON array of product IDs
+  selectionCriteria: text("selection_criteria"), // JSON with criteria used
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertFeaturedRotationSchema = createInsertSchema(featuredRotation).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertFeaturedRotation = z.infer<typeof insertFeaturedRotationSchema>;
+export type FeaturedRotation = typeof featuredRotation.$inferSelect;
