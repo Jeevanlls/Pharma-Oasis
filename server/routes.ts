@@ -2193,8 +2193,8 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
 
   // AI Blog Draft Generator
   const generateBlogDraftSchema = z.object({
-    topic: z.string().min(5, "Topic must be at least 5 characters").max(500),
-    keywords: z.string().max(500).optional(),
+    topic: z.string().min(5, "Topic must be at least 5 characters").max(2000),
+    keywords: z.string().max(1000).optional(),
   });
 
   app.post("/api/admin/blog/generate-draft", requireAdmin, async (req, res) => {
