@@ -387,8 +387,23 @@ export async function getImportJobErrors(jobId: number) {
 
 // Retry failed lines
 export async function retryImportJobErrors(jobId: number): Promise<number> {
+  // Count how many error lines we're about to retry
+  const errorCountResult = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(importJobLines)
+    .where(and(
+      eq(importJobLines.jobId, jobId),
+      eq(importJobLines.status, "error")
+    ));
+  
+  const errorRowCount = errorCountResult[0]?.count || 0;
+  
+  if (errorRowCount === 0) {
+    return 0;
+  }
+  
   // Reset error lines to pending
-  const result = await db
+  await db
     .update(importJobLines)
     .set({ 
       status: "pending",
@@ -399,21 +414,14 @@ export async function retryImportJobErrors(jobId: number): Promise<number> {
       eq(importJobLines.status, "error")
     ));
   
-  // Get count of reset lines
-  const errors = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(importJobLines)
-    .where(and(
-      eq(importJobLines.jobId, jobId),
-      eq(importJobLines.status, "pending")
-    ));
-  
-  // Reset job to processing
+  // Reset job to processing - decrease processedRows by retry count 
+  // so when they're re-processed, counts will be correct
   await db
     .update(importJobs)
     .set({ 
       status: "processing",
-      errorCount: 0,
+      processedRows: sql`GREATEST(0, ${importJobs.processedRows} - ${errorRowCount})`,
+      errorCount: sql`GREATEST(0, ${importJobs.errorCount} - ${errorRowCount})`,
       updatedAt: new Date()
     })
     .where(eq(importJobs.id, jobId));
@@ -421,5 +429,5 @@ export async function retryImportJobErrors(jobId: number): Promise<number> {
   // Ensure processor is running
   startImportProcessor();
   
-  return errors[0]?.count || 0;
+  return errorRowCount;
 }
