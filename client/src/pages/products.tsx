@@ -24,7 +24,9 @@ import {
   Loader2,
   ChevronLeft,
   ChevronRight,
+  Lock,
 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import placeholderImage from "@assets/generated_images/product_placeholder_coming_soon.png";
 import { ProductListJsonLd } from "@/components/seo/product-json-ld";
 
@@ -427,15 +429,34 @@ export default function ProductsPage() {
                         </Button>
                       </div>
 
-                      <Button 
-                        className="w-full gap-2" 
-                        onClick={() => handleAddToQuote(product)}
-                        disabled={!isAuthenticated || (!isCustomer && !isAdmin)}
-                        data-testid={`button-add-quote-${product.id}`}
-                      >
-                        <ShoppingCart className="h-4 w-4" />
-                        Add to Quote
-                      </Button>
+                      {(!isAuthenticated || (!isCustomer && !isAdmin)) ? (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Link href="/register">
+                              <Button 
+                                className="w-full gap-2" 
+                                variant="secondary"
+                                data-testid={`button-add-quote-${product.id}`}
+                              >
+                                <Lock className="h-4 w-4" />
+                                Register to Quote
+                              </Button>
+                            </Link>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-xs">
+                            <p>To request quotes and view wholesale prices, please register as an approved customer.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      ) : (
+                        <Button 
+                          className="w-full gap-2" 
+                          onClick={() => handleAddToQuote(product)}
+                          data-testid={`button-add-quote-${product.id}`}
+                        >
+                          <ShoppingCart className="h-4 w-4" />
+                          Add to Quote
+                        </Button>
+                      )}
                     </CardContent>
                   </Card>
                 ))}
