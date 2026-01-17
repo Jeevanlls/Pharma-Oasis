@@ -8,6 +8,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Check, ChevronsUpDown } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useQuoteBasket } from "@/lib/quote-basket";
 import { useAuth } from "@/lib/auth";
@@ -89,6 +92,7 @@ export default function ProductsPage() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [selectedBrand, setSelectedBrand] = useState<string>("");
+  const [brandPopoverOpen, setBrandPopoverOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [quantities, setQuantities] = useState<Record<number, number>>({});
   const { addItem } = useQuoteBasket();
@@ -298,20 +302,64 @@ export default function ProductsPage() {
                   ))}
                 </SelectContent>
               </Select>
-              <Select value={selectedBrand || "all"} onValueChange={(val) => setSelectedBrand(val === "all" ? "" : val)}>
-                <SelectTrigger className="w-full sm:w-[200px]" data-testid="select-brand">
-                  <Building2 className="mr-2 h-4 w-4" />
-                  <SelectValue placeholder="All Brands" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Brands</SelectItem>
-                  {brands?.map((brand) => (
-                    <SelectItem key={brand.id} value={String(brand.id)}>
-                      {brand.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={brandPopoverOpen} onOpenChange={setBrandPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={brandPopoverOpen}
+                    className="w-full sm:w-[200px] justify-between"
+                    data-testid="select-brand"
+                  >
+                    <div className="flex items-center gap-2 truncate">
+                      <Building2 className="h-4 w-4 shrink-0" />
+                      <span className="truncate">
+                        {selectedBrand
+                          ? brands?.find((b) => String(b.id) === selectedBrand)?.name
+                          : "All Brands"}
+                      </span>
+                    </div>
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[250px] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search brands..." />
+                    <CommandList>
+                      <CommandEmpty>No brand found.</CommandEmpty>
+                      <CommandGroup>
+                        <CommandItem
+                          value="all-brands"
+                          onSelect={() => {
+                            setSelectedBrand("");
+                            setBrandPopoverOpen(false);
+                          }}
+                        >
+                          <Check
+                            className={`mr-2 h-4 w-4 ${!selectedBrand ? "opacity-100" : "opacity-0"}`}
+                          />
+                          All Brands
+                        </CommandItem>
+                        {brands?.map((brand) => (
+                          <CommandItem
+                            key={brand.id}
+                            value={brand.name}
+                            onSelect={() => {
+                              setSelectedBrand(String(brand.id));
+                              setBrandPopoverOpen(false);
+                            }}
+                          >
+                            <Check
+                              className={`mr-2 h-4 w-4 ${selectedBrand === String(brand.id) ? "opacity-100" : "opacity-0"}`}
+                            />
+                            {brand.name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
 
             {hasActiveFilters && (
