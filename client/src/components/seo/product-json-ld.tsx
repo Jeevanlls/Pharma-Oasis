@@ -78,7 +78,7 @@ export function SingleProductJsonLd({ product, brandName, categoryName }: Single
     "category": categoryName || undefined,
     "offers": product.wholesalePrice ? {
       "@type": "Offer",
-      "url": `https://pharmaoasis.com/products/${product.slug || product.id}`,
+      "url": `https://pharmaoasis.co.uk/products/${product.slug || product.id}`,
       "availability": product.isActive 
         ? "https://schema.org/InStock" 
         : "https://schema.org/OutOfStock",
@@ -88,7 +88,7 @@ export function SingleProductJsonLd({ product, brandName, categoryName }: Single
       "seller": {
         "@type": "Organization",
         "name": "Pharma Oasis",
-        "url": "https://pharmaoasis.com"
+        "url": "https://pharmaoasis.co.uk"
       }
     } : undefined
   };
@@ -105,19 +105,32 @@ export function OrganizationJsonLd() {
   const orgSchema = {
     "@context": "https://schema.org",
     "@type": "Organization",
+    "@id": "https://pharmaoasis.co.uk/#organization",
     "name": "Pharma Oasis",
-    "url": "https://pharmaoasis.com",
-    "logo": "https://pharmaoasis.com/logo.png",
-    "description": "B2B wholesale pharmaceutical distributor serving UK pharmacies, online retailers, and wholesalers",
+    "legalName": "Pharma Oasis Limited",
+    "url": "https://pharmaoasis.co.uk",
+    "logo": "https://pharmaoasis.co.uk/logo.png",
+    "description": "MHRA-licensed pharmaceutical wholesaler and healthcare distributor serving UK pharmacies, hospitals, and healthcare providers with over 20,000 products.",
     "address": {
       "@type": "PostalAddress",
+      "streetAddress": "Unit - J, Doddington Park Farmhouse, Bridgemere",
+      "addressLocality": "Nantwich",
+      "postalCode": "CW5 7PU",
       "addressCountry": "GB"
     },
+    "telephone": "+44 7481 640640",
+    "email": "trade@pharmaoasis.com",
+    "taxID": "364 4962 68",
     "contactPoint": {
       "@type": "ContactPoint",
       "contactType": "sales",
+      "telephone": "+44 7481 640640",
+      "email": "trade@pharmaoasis.com",
       "availableLanguage": "English"
-    }
+    },
+    "sameAs": [
+      "https://pharmaoasis.com"
+    ]
   };
 
   return (
@@ -132,13 +145,17 @@ export function WebsiteJsonLd() {
   const websiteSchema = {
     "@context": "https://schema.org",
     "@type": "WebSite",
+    "@id": "https://pharmaoasis.co.uk/#website",
     "name": "Pharma Oasis",
-    "url": "https://pharmaoasis.com",
+    "url": "https://pharmaoasis.co.uk",
+    "publisher": {
+      "@id": "https://pharmaoasis.co.uk/#organization"
+    },
     "potentialAction": {
       "@type": "SearchAction",
       "target": {
         "@type": "EntryPoint",
-        "urlTemplate": "https://pharmaoasis.com/products?search={search_term_string}"
+        "urlTemplate": "https://pharmaoasis.co.uk/products?search={search_term_string}"
       },
       "query-input": "required name=search_term_string"
     }

@@ -28,6 +28,7 @@ import DistributionNetworkPage from "@/pages/distribution-network";
 import BlogPage from "@/pages/blog";
 import BlogPostPage from "@/pages/blog-post";
 import CompliancePage from "@/pages/compliance";
+import PharmaceuticalWholesalersPage from "@/pages/pharmaceutical-wholesalers";
 
 import AdminDashboard from "@/pages/admin/index";
 import AdminUsersPage from "@/pages/admin/users";
@@ -101,6 +102,7 @@ function Router() {
       <Route path="/blog" component={BlogPage} />
       <Route path="/blog/:slug" component={BlogPostPage} />
       <Route path="/compliance" component={CompliancePage} />
+      <Route path="/pharmaceutical-wholesalers" component={PharmaceuticalWholesalersPage} />
       
       <Route path="/admin">{() => <AdminRoute component={AdminDashboard} />}</Route>
       <Route path="/admin/users">{() => <AdminRoute component={AdminUsersPage} />}</Route>
