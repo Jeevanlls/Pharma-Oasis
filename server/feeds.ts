@@ -90,13 +90,14 @@ async function generateSingleSitemap(req: any, res: any) {
     { loc: "/products", priority: "0.9", changefreq: "daily" },
     { loc: "/brands", priority: "0.8", changefreq: "weekly" },
     { loc: "/blog", priority: "0.7", changefreq: "weekly" },
-    { loc: "/about", priority: "0.6", changefreq: "monthly" },
+    { loc: "/pharmaceutical-wholesalers", priority: "0.8", changefreq: "monthly" },
     { loc: "/contact", priority: "0.6", changefreq: "monthly" },
     { loc: "/register", priority: "0.7", changefreq: "monthly" },
     { loc: "/supplier-registration", priority: "0.6", changefreq: "monthly" },
-    { loc: "/privacy-policy", priority: "0.3", changefreq: "yearly" },
-    { loc: "/terms-conditions", priority: "0.3", changefreq: "yearly" },
-    { loc: "/cookie-policy", priority: "0.3", changefreq: "yearly" },
+    { loc: "/compliance", priority: "0.6", changefreq: "monthly" },
+    { loc: "/privacy", priority: "0.3", changefreq: "yearly" },
+    { loc: "/terms", priority: "0.3", changefreq: "yearly" },
+    { loc: "/cookies", priority: "0.3", changefreq: "yearly" },
   ];
 
   const now = new Date().toISOString().split("T")[0];
@@ -165,13 +166,14 @@ router.get("/sitemap-static.xml", async (req, res) => {
       { loc: "/", priority: "1.0", changefreq: "daily" },
       { loc: "/products", priority: "0.9", changefreq: "daily" },
       { loc: "/brands", priority: "0.8", changefreq: "weekly" },
-      { loc: "/about", priority: "0.6", changefreq: "monthly" },
+      { loc: "/pharmaceutical-wholesalers", priority: "0.8", changefreq: "monthly" },
       { loc: "/contact", priority: "0.6", changefreq: "monthly" },
       { loc: "/register", priority: "0.7", changefreq: "monthly" },
       { loc: "/supplier-registration", priority: "0.6", changefreq: "monthly" },
-      { loc: "/privacy-policy", priority: "0.3", changefreq: "yearly" },
-      { loc: "/terms-conditions", priority: "0.3", changefreq: "yearly" },
-      { loc: "/cookie-policy", priority: "0.3", changefreq: "yearly" },
+      { loc: "/compliance", priority: "0.6", changefreq: "monthly" },
+      { loc: "/privacy", priority: "0.3", changefreq: "yearly" },
+      { loc: "/terms", priority: "0.3", changefreq: "yearly" },
+      { loc: "/cookies", priority: "0.3", changefreq: "yearly" },
     ];
 
     const now = new Date().toISOString().split("T")[0];
