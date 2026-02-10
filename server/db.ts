@@ -28,3 +28,9 @@ export const pool = new Pool({
   connectionTimeoutMillis: 10000,
 });
 export const db = drizzle(pool, { schema });
+
+pool.query('CREATE EXTENSION IF NOT EXISTS pg_trgm')
+  .then(() => pool.query('CREATE INDEX IF NOT EXISTS idx_products_name_trgm ON products USING gin (product_name gin_trgm_ops)'))
+  .catch((err: Error) => {
+    console.warn('Could not setup pg_trgm extension/index:', err.message);
+  });

@@ -540,10 +540,8 @@ export class DatabaseStorage implements IStorage {
     
     if (!searchTerm) return [];
     
-    // Check if search term looks like a SKU/barcode (numeric or alphanumeric code)
-    const isSkuSearch = /^[0-9]{5,}$/.test(searchTerm) || /^[A-Z0-9-]{3,}$/i.test(searchTerm);
+    const isSkuSearch = /^[0-9]{5,}$/.test(searchTerm) || /^[0-9]+-?[0-9]+$/.test(searchTerm);
     
-    // Helper to transform snake_case DB rows to camelCase Product objects
     const transformRow = (row: any): Product => ({
       id: row.id,
       sku: row.sku,
@@ -578,50 +576,115 @@ export class DatabaseStorage implements IStorage {
     
     try {
       if (isSkuSearch) {
-        // For SKU/barcode searches, use ILIKE which works better for codes
         const result = await db.execute(sql`
           SELECT * FROM ${products}
           WHERE (sku ILIKE ${'%' + searchTerm + '%'} OR ean ILIKE ${'%' + searchTerm + '%'})
           ${activeOnly ? sql`AND is_active = true` : sql``}
           ORDER BY 
             image_url IS NULL,
-            CASE WHEN sku = ${searchTerm} THEN 0 ELSE 1 END,
+            CASE WHEN sku = ${searchTerm} OR ean = ${searchTerm} THEN 0 ELSE 1 END,
             product_name ASC
           LIMIT ${limit} OFFSET ${offset}
         `);
         return result.rows.map(transformRow);
       }
       
-      // For text searches, use full-text search
+      const activeFilter = activeOnly ? sql`AND is_active = true` : sql``;
+      const ilikeTerm = '%' + searchTerm + '%';
+      
       const result = await db.execute(sql`
-        SELECT * FROM ${products}
-        WHERE to_tsvector('english', COALESCE(product_name, '')) @@ plainto_tsquery('english', ${searchTerm})
-        ${activeOnly ? sql`AND is_active = true` : sql``}
-        ORDER BY image_url IS NULL, ts_rank(to_tsvector('english', COALESCE(product_name, '')), plainto_tsquery('english', ${searchTerm})) DESC
+        SELECT *, 
+          GREATEST(
+            similarity(COALESCE(product_name, ''), ${searchTerm}),
+            similarity(COALESCE(short_description, ''), ${searchTerm})
+          ) AS sim_score,
+          CASE WHEN LOWER(product_name) LIKE LOWER(${ilikeTerm}) THEN 1 ELSE 0 END AS exact_match,
+          CASE WHEN LOWER(sku) LIKE LOWER(${ilikeTerm}) THEN 1 ELSE 0 END AS sku_match,
+          ts_rank_cd(
+            to_tsvector('english', COALESCE(product_name, '') || ' ' || COALESCE(short_description, '')),
+            plainto_tsquery('english', ${searchTerm})
+          ) AS fts_rank
+        FROM ${products}
+        WHERE (
+          LOWER(product_name) LIKE LOWER(${ilikeTerm})
+          OR LOWER(sku) LIKE LOWER(${ilikeTerm})
+          OR LOWER(ean) LIKE LOWER(${ilikeTerm})
+          OR similarity(COALESCE(product_name, ''), ${searchTerm}) > 0.15
+          OR to_tsvector('english', COALESCE(product_name, '') || ' ' || COALESCE(short_description, '')) @@ plainto_tsquery('english', ${searchTerm})
+        )
+        ${activeFilter}
+        ORDER BY 
+          exact_match DESC,
+          sku_match DESC,
+          fts_rank DESC,
+          sim_score DESC,
+          image_url IS NULL,
+          product_name ASC
         LIMIT ${limit} OFFSET ${offset}
       `);
       
       return result.rows.map(transformRow);
     } catch (err) {
-      console.error("Full-text search failed, falling back to ILIKE:", err);
+      console.error("Advanced search failed, falling back to ILIKE:", err);
       return this.searchProducts(query, options);
     }
   }
 
   async getProductCount(options: { activeOnly?: boolean; categoryId?: number; brandId?: number; search?: string } = {}): Promise<number> {
     const { activeOnly = false, categoryId, brandId, search } = options;
-    const conditions = [];
     
+    if (search && search.trim().length > 0) {
+      const searchTerm = search.trim();
+      const isSkuSearch = /^[0-9]{5,}$/.test(searchTerm) || /^[0-9]+-?[0-9]+$/.test(searchTerm);
+      const ilikeTerm = '%' + searchTerm + '%';
+      const activeFilter = activeOnly ? sql`AND is_active = true` : sql``;
+      const categoryFilter = categoryId ? sql`AND (category_id = ${categoryId} OR subcategory_id = ${categoryId})` : sql``;
+      const brandFilter = brandId ? sql`AND brand_id = ${brandId}` : sql``;
+      
+      try {
+        let result;
+        if (isSkuSearch) {
+          result = await db.execute(sql`
+            SELECT count(*) FROM ${products}
+            WHERE (sku ILIKE ${ilikeTerm} OR ean ILIKE ${ilikeTerm})
+            ${activeFilter} ${categoryFilter} ${brandFilter}
+          `);
+        } else {
+          result = await db.execute(sql`
+            SELECT count(*) FROM ${products}
+            WHERE (
+              LOWER(product_name) LIKE LOWER(${ilikeTerm})
+              OR LOWER(sku) LIKE LOWER(${ilikeTerm})
+              OR LOWER(ean) LIKE LOWER(${ilikeTerm})
+              OR similarity(COALESCE(product_name, ''), ${searchTerm}) > 0.15
+              OR to_tsvector('english', COALESCE(product_name, '') || ' ' || COALESCE(short_description, '')) @@ plainto_tsquery('english', ${searchTerm})
+            )
+            ${activeFilter} ${categoryFilter} ${brandFilter}
+          `);
+        }
+        return Number(result.rows[0]?.count ?? 0);
+      } catch (err) {
+        console.error("Search count failed, falling back to ILIKE:", err);
+        const conditions = [];
+        if (activeOnly) conditions.push(eq(products.isActive, true));
+        if (categoryId) conditions.push(or(eq(products.categoryId, categoryId), eq(products.subcategoryId, categoryId)));
+        if (brandId) conditions.push(eq(products.brandId, brandId));
+        const fallbackTerm = `%${search}%`;
+        conditions.push(or(
+          ilike(products.productName, fallbackTerm),
+          ilike(products.sku, fallbackTerm)
+        ));
+        const fallbackResult = await db.select({ count: sql<number>`count(*)` })
+          .from(products)
+          .where(and(...conditions));
+        return Number(fallbackResult[0]?.count ?? 0);
+      }
+    }
+    
+    const conditions = [];
     if (activeOnly) conditions.push(eq(products.isActive, true));
     if (categoryId) conditions.push(or(eq(products.categoryId, categoryId), eq(products.subcategoryId, categoryId)));
     if (brandId) conditions.push(eq(products.brandId, brandId));
-    if (search) {
-      const searchTerm = `%${search}%`;
-      conditions.push(or(
-        ilike(products.productName, searchTerm),
-        ilike(products.sku, searchTerm)
-      ));
-    }
     
     const result = await db.select({ count: sql<number>`count(*)` })
       .from(products)
