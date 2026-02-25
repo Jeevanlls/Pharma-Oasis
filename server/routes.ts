@@ -3114,6 +3114,89 @@ Apply ONLY the corrections I have requested above. Do not rewrite the entire art
     }
   });
 
+  // ==================== ADMIN - OFFER AI CONTENT GENERATION ====================
+  app.post("/api/admin/offers/generate-content", requireAdmin, async (req, res) => {
+    try {
+      const { prompt } = req.body;
+      if (!prompt || typeof prompt !== "string") {
+        return res.status(400).json({ message: "Prompt is required" });
+      }
+
+      const OpenAI = (await import("openai")).default;
+      const openai = new OpenAI({
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+      });
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: `You are a marketing copywriter for Pharma Oasis, a UK B2B pharmaceutical wholesale platform. Generate promotional offer content based on the user's prompt. Return JSON only, no markdown.
+
+Return this exact JSON structure:
+{
+  "title": "Short catchy offer title (max 60 chars)",
+  "slug": "url-friendly-slug",
+  "description": "2-3 sentence description of the offer for the listing page (max 200 chars)",
+  "heroTitle": "Bold headline for the hero banner (max 50 chars)",
+  "heroSubtitle": "Supporting text for the hero banner (max 100 chars)",
+  "badgeText": "Short badge label like SALE, HOT DEAL, NEW (max 12 chars, uppercase)",
+  "badgeColor": "one of: red, green, blue, orange, purple, yellow",
+  "displayStyle": "one of: grid, featured, list",
+  "heroImagePrompt": "A detailed image generation prompt for a professional pharmaceutical/healthcare themed banner image. Be specific about colors, style, composition. The image should be 1920x720 landscape format, clean and professional."
+}
+
+Keep language professional, compliant with UK pharmaceutical regulations. Never make medical claims. Focus on value, savings, and quality.`
+          },
+          { role: "user", content: prompt }
+        ],
+        temperature: 0.7,
+        response_format: { type: "json_object" },
+      });
+
+      const content = JSON.parse(completion.choices[0].message.content || "{}");
+      res.json(content);
+    } catch (error: any) {
+      console.error("Error generating offer content:", error);
+      res.status(500).json({ message: "Failed to generate content: " + (error.message || "Unknown error") });
+    }
+  });
+
+  app.post("/api/admin/offers/generate-hero-image", requireAdmin, async (req, res) => {
+    try {
+      const { prompt } = req.body;
+      if (!prompt || typeof prompt !== "string") {
+        return res.status(400).json({ message: "Image prompt is required" });
+      }
+
+      const OpenAI = (await import("openai")).default;
+      const openai = new OpenAI({
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+      });
+
+      const imageResponse = await openai.images.generate({
+        model: "dall-e-3",
+        prompt: `Professional pharmaceutical wholesale banner image: ${prompt}. Style: clean, modern, corporate healthcare. No text in the image. High quality product photography style. Wide landscape format suitable for a website hero banner.`,
+        n: 1,
+        size: "1792x1024",
+        quality: "standard",
+      });
+
+      const imageUrl = imageResponse.data[0]?.url;
+      if (!imageUrl) {
+        return res.status(500).json({ message: "No image was generated" });
+      }
+
+      res.json({ imageUrl, revisedPrompt: imageResponse.data[0]?.revised_prompt });
+    } catch (error: any) {
+      console.error("Error generating hero image:", error);
+      res.status(500).json({ message: "Failed to generate image: " + (error.message || "Unknown error") });
+    }
+  });
+
   // ==================== ADMIN - HERO SLIDES ====================
   app.get("/api/admin/hero-slides", requireAdmin, async (req, res) => {
     try {

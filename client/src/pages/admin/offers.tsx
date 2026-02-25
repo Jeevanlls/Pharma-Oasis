@@ -25,6 +25,10 @@ import {
   Upload,
   ImageIcon,
   X,
+  Sparkles,
+  Power,
+  Wand2,
+  RefreshCw,
 } from "lucide-react";
 
 function slugify(text: string): string {
@@ -52,8 +56,67 @@ function OfferForm({
   const [badgeColor, setBadgeColor] = useState(offer?.badgeColor || "red");
   const [startDate, setStartDate] = useState(offer?.startDate ? new Date(offer.startDate).toISOString().slice(0, 16) : "");
   const [endDate, setEndDate] = useState(offer?.endDate ? new Date(offer.endDate).toISOString().slice(0, 16) : "");
-  const [isActive, setIsActive] = useState(offer?.isActive ?? true);
+  const [isActive, setIsActive] = useState(offer?.isActive ?? false);
   const [sortOrder, setSortOrder] = useState(offer?.sortOrder || 0);
+
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [isGeneratingContent, setIsGeneratingContent] = useState(false);
+  const [heroImagePrompt, setHeroImagePrompt] = useState("");
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [showAiPanel, setShowAiPanel] = useState(!offer);
+
+  const { toast } = useToast();
+
+  const generateContent = async () => {
+    if (!aiPrompt.trim()) return;
+    setIsGeneratingContent(true);
+    try {
+      const res = await fetch("/api/admin/offers/generate-content", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: aiPrompt }),
+        credentials: "include",
+      });
+      if (!res.ok) { const err = await res.json(); throw new Error(err.message); }
+      const data = await res.json();
+      if (data.title) { setTitle(data.title); setSlug(data.slug || slugify(data.title)); }
+      if (data.description) setDescription(data.description);
+      if (data.heroTitle) setHeroTitle(data.heroTitle);
+      if (data.heroSubtitle) setHeroSubtitle(data.heroSubtitle);
+      if (data.badgeText) setBadgeText(data.badgeText);
+      if (data.badgeColor) setBadgeColor(data.badgeColor);
+      if (data.displayStyle) setDisplayStyle(data.displayStyle);
+      if (data.heroImagePrompt) setHeroImagePrompt(data.heroImagePrompt);
+      toast({ title: "Content generated! Review and edit as needed." });
+    } catch (err: any) {
+      toast({ title: "Failed to generate content: " + (err.message || "Unknown error"), variant: "destructive" });
+    } finally {
+      setIsGeneratingContent(false);
+    }
+  };
+
+  const generateHeroImage = async (prompt: string) => {
+    if (!prompt.trim()) return;
+    setIsGeneratingImage(true);
+    try {
+      const res = await fetch("/api/admin/offers/generate-hero-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt }),
+        credentials: "include",
+      });
+      if (!res.ok) { const err = await res.json(); throw new Error(err.message); }
+      const data = await res.json();
+      if (data.imageUrl) {
+        setHeroImageUrl(data.imageUrl);
+        toast({ title: "Hero image generated!" });
+      }
+    } catch (err: any) {
+      toast({ title: "Failed to generate image: " + (err.message || "Unknown error"), variant: "destructive" });
+    } finally {
+      setIsGeneratingImage(false);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,6 +139,47 @@ function OfferForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      <Card className="border-dashed border-2 border-primary/30 bg-primary/5">
+        <CardContent className="p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-primary" />
+              <Label className="font-semibold">AI Content Generator</Label>
+            </div>
+            <Button type="button" variant="ghost" size="sm" onClick={() => setShowAiPanel(!showAiPanel)} data-testid="button-toggle-ai-panel">
+              {showAiPanel ? "Hide" : "Show"}
+            </Button>
+          </div>
+          {showAiPanel && (
+            <>
+              <div className="flex gap-2">
+                <Textarea
+                  value={aiPrompt}
+                  onChange={(e) => setAiPrompt(e.target.value)}
+                  placeholder="Describe your offer, e.g. 'Spring clearance on baby nutrition products with 25% off' or 'Weekend flash sale on cold & flu remedies'..."
+                  rows={2}
+                  className="flex-1"
+                  data-testid="input-ai-prompt"
+                />
+                <Button
+                  type="button"
+                  onClick={generateContent}
+                  disabled={isGeneratingContent || !aiPrompt.trim()}
+                  className="shrink-0 self-end"
+                  data-testid="button-generate-content"
+                >
+                  {isGeneratingContent ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Wand2 className="h-4 w-4 mr-2" />}
+                  {isGeneratingContent ? "Generating..." : "Generate Content"}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                AI will fill in all fields below. You can then review and edit before saving.
+              </p>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>Title</Label>
@@ -95,7 +199,7 @@ function OfferForm({
       <div className="space-y-2">
         <Label>Hero Banner Image</Label>
         <p className="text-xs text-muted-foreground">
-          Recommended: 1920×720px, landscape format. Max 10MB. JPG, PNG or WebP. Will be auto-converted to WebP.
+          Recommended: 1920×720px, landscape format. Max 10MB. JPG, PNG or WebP.
         </p>
         {heroImageUrl && (
           <div className="relative rounded-md overflow-hidden border">
@@ -135,7 +239,7 @@ function OfferForm({
                   const asset = await res.json();
                   setHeroImageUrl(asset.url);
                 } catch (err: any) {
-                  alert("Upload failed: " + (err.message || "Unknown error"));
+                  toast({ title: "Upload failed: " + (err.message || "Unknown error"), variant: "destructive" });
                 } finally {
                   setIsUploading(false);
                 }
@@ -155,6 +259,52 @@ function OfferForm({
             data-testid="input-hero-image"
           />
         </div>
+
+        <Card className="border-dashed">
+          <CardContent className="p-3 space-y-2">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-3 w-3 text-primary" />
+              <Label className="text-sm font-medium">AI Image Generator</Label>
+            </div>
+            <div className="flex gap-2">
+              <Textarea
+                value={heroImagePrompt}
+                onChange={(e) => setHeroImagePrompt(e.target.value)}
+                placeholder="Describe the hero image you want, e.g. 'Clean pharmaceutical products on a blue gradient background with soft lighting'..."
+                rows={2}
+                className="flex-1 text-sm"
+                data-testid="input-hero-image-prompt"
+              />
+              <div className="flex flex-col gap-1 shrink-0 self-end">
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => generateHeroImage(heroImagePrompt)}
+                  disabled={isGeneratingImage || !heroImagePrompt.trim()}
+                  data-testid="button-generate-hero-image"
+                >
+                  {isGeneratingImage ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <ImageIcon className="h-3 w-3 mr-1" />}
+                  {isGeneratingImage ? "Creating..." : "Generate"}
+                </Button>
+                {heroImageUrl && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => generateHeroImage(heroImagePrompt)}
+                    disabled={isGeneratingImage || !heroImagePrompt.trim()}
+                    data-testid="button-regenerate-hero-image"
+                  >
+                    <RefreshCw className="h-3 w-3 mr-1" /> Retry
+                  </Button>
+                )}
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              AI will generate a banner image based on your description. Not happy? Edit the prompt and regenerate.
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
@@ -219,17 +369,26 @@ function OfferForm({
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
             <Switch checked={isActive} onCheckedChange={setIsActive} data-testid="switch-offer-active" />
-            <Label>Active</Label>
+            <Label>{isActive ? "Live (visible to customers)" : "Draft (hidden from customers)"}</Label>
           </div>
           <div className="flex items-center gap-2">
             <Label>Sort Order</Label>
             <Input type="number" value={sortOrder} onChange={(e) => setSortOrder(parseInt(e.target.value) || 0)} className="w-20" data-testid="input-sort-order" />
           </div>
         </div>
-        <Button type="submit" disabled={isPending} data-testid="button-save-offer">
-          {isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-          {offer ? "Update Offer" : "Create Offer"}
-        </Button>
+        <div className="flex gap-2">
+          {offer && (
+            <a href={`/offers`} target="_blank" rel="noopener noreferrer">
+              <Button type="button" variant="outline" data-testid="button-preview-offer">
+                <Eye className="h-4 w-4 mr-2" /> Preview
+              </Button>
+            </a>
+          )}
+          <Button type="submit" disabled={isPending} data-testid="button-save-offer">
+            {isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            {offer ? "Update Offer" : "Create as Draft"}
+          </Button>
+        </div>
       </div>
     </form>
   );
@@ -249,7 +408,7 @@ function OfferItemsManager({ offerId }: { offerId: number }) {
     queryKey: ["/api/admin/offers", offerId, "items"],
     queryFn: async () => {
       const res = await fetch(`/api/admin/offers/${offerId}/items`, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed");
+      if (!res.ok) throw new Error("Failed to fetch items");
       return res.json();
     },
   });
@@ -264,13 +423,14 @@ function OfferItemsManager({ offerId }: { offerId: number }) {
       setDiscountLabel("");
       toast({ title: "Product added to offer" });
     },
+    onError: () => toast({ title: "Failed to add product", variant: "destructive" }),
   });
 
   const deleteItemMutation = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/admin/offer-items/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/offers", offerId, "items"] });
-      toast({ title: "Product removed from offer" });
+      toast({ title: "Product removed" });
     },
   });
 
@@ -278,11 +438,11 @@ function OfferItemsManager({ offerId }: { offerId: number }) {
     if (!searchQuery.trim()) return;
     setIsSearching(true);
     try {
-      const res = await fetch(`/api/products?search=${encodeURIComponent(searchQuery)}&limit=20`, { credentials: "include" });
+      const res = await fetch(`/api/products/search?q=${encodeURIComponent(searchQuery)}&limit=10`, { credentials: "include" });
       const data = await res.json();
-      setSearchResults(data.products || data || []);
+      setSearchResults(Array.isArray(data) ? data : data.products || []);
     } catch {
-      toast({ title: "Search failed", variant: "destructive" });
+      setSearchResults([]);
     } finally {
       setIsSearching(false);
     }
@@ -290,12 +450,13 @@ function OfferItemsManager({ offerId }: { offerId: number }) {
 
   const handleAddProduct = (product: Product) => {
     setAddingProductId(product.id);
-    setOfferPrice(product.wholesalePrice || "");
     setOriginalPrice(product.wholesalePrice || "");
+    setOfferPrice("");
+    setDiscountLabel("");
   };
 
   const confirmAdd = () => {
-    if (!addingProductId || !offerPrice) return;
+    if (!offerPrice || !addingProductId) return;
     addItemMutation.mutate({
       productId: addingProductId,
       offerPrice,
@@ -443,7 +604,7 @@ export default function AdminOffersPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/offers"] });
       setCreateDialogOpen(false);
-      toast({ title: "Offer created" });
+      toast({ title: "Offer created as draft. Add products and toggle live when ready." });
     },
     onError: () => toast({ title: "Failed to create offer", variant: "destructive" }),
   });
@@ -456,6 +617,16 @@ export default function AdminOffersPage() {
       toast({ title: "Offer updated" });
     },
     onError: () => toast({ title: "Failed to update offer", variant: "destructive" }),
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: ({ id, isActive }: { id: number; isActive: boolean }) =>
+      apiRequest("PATCH", `/api/admin/offers/${id}`, { isActive }),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/offers"] });
+      toast({ title: variables.isActive ? "Offer is now live!" : "Offer switched off" });
+    },
+    onError: () => toast({ title: "Failed to toggle offer", variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
@@ -471,7 +642,7 @@ export default function AdminOffersPage() {
     const now = new Date();
     const start = new Date(offer.startDate);
     const end = new Date(offer.endDate);
-    if (!offer.isActive) return <Badge variant="secondary">Inactive</Badge>;
+    if (!offer.isActive) return <Badge variant="secondary">Draft</Badge>;
     if (now < start) return <Badge className="bg-blue-500 text-white border-0">Scheduled</Badge>;
     if (now > end) return <Badge variant="secondary">Expired</Badge>;
     return <Badge className="bg-green-500 text-white border-0">Live</Badge>;
@@ -542,12 +713,20 @@ export default function AdminOffersPage() {
       ) : (
         <div className="space-y-4">
           {allOffers.map((offer) => (
-            <Card key={offer.id} data-testid={`card-offer-${offer.id}`}>
+            <Card key={offer.id} className={!offer.isActive ? "opacity-70" : ""} data-testid={`card-offer-${offer.id}`}>
               <CardContent className="p-4">
                 <div className="flex items-center justify-between gap-4">
                   <div className="flex items-center gap-4 flex-1 min-w-0">
+                    <div className="shrink-0">
+                      <Switch
+                        checked={offer.isActive}
+                        onCheckedChange={(checked) => toggleMutation.mutate({ id: offer.id, isActive: checked })}
+                        disabled={toggleMutation.isPending}
+                        data-testid={`switch-toggle-offer-${offer.id}`}
+                      />
+                    </div>
                     {offer.heroImageUrl && (
-                      <img src={offer.heroImageUrl} alt="" className="w-20 h-14 object-cover rounded" />
+                      <img src={offer.heroImageUrl} alt="" className="w-20 h-14 object-cover rounded shrink-0" />
                     )}
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 mb-1">
