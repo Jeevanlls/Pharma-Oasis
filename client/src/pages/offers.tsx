@@ -128,18 +128,16 @@ function OfferProductCard({
           <p className="text-xs text-muted-foreground">{item.product.packSize}</p>
         )}
 
-        {isAuthenticated && (isCustomer || isAdmin) && (
-          <div className="flex items-baseline gap-2" data-testid={`text-pricing-${item.productId}`}>
-            <span className="text-lg font-bold text-green-600">
-              £{offerPrice.toFixed(2)}
+        <div className="flex items-baseline gap-2" data-testid={`text-pricing-${item.productId}`}>
+          <span className="text-lg font-bold text-green-600">
+            £{offerPrice.toFixed(2)}
+          </span>
+          {originalPrice && originalPrice > offerPrice && (
+            <span className="text-sm text-muted-foreground line-through">
+              £{originalPrice.toFixed(2)}
             </span>
-            {originalPrice && originalPrice > offerPrice && (
-              <span className="text-sm text-muted-foreground line-through">
-                £{originalPrice.toFixed(2)}
-              </span>
-            )}
-          </div>
-        )}
+          )}
+        </div>
 
         <div className="flex items-center gap-2">
           <Button
@@ -423,14 +421,12 @@ function OfferSection({
                 {offerItems[0].product.shortDescription && (
                   <p className="text-muted-foreground">{offerItems[0].product.shortDescription}</p>
                 )}
-                {isAuthenticated && (isCustomer || isAdmin) && (
-                  <div className="flex items-baseline gap-3">
-                    <span className="text-3xl font-bold text-green-600">£{parseFloat(offerItems[0].offerPrice).toFixed(2)}</span>
-                    {offerItems[0].originalPrice && (
-                      <span className="text-xl text-muted-foreground line-through">£{parseFloat(offerItems[0].originalPrice).toFixed(2)}</span>
-                    )}
-                  </div>
-                )}
+                <div className="flex items-baseline gap-3">
+                  <span className="text-3xl font-bold text-green-600">£{parseFloat(offerItems[0].offerPrice).toFixed(2)}</span>
+                  {offerItems[0].originalPrice && (
+                    <span className="text-xl text-muted-foreground line-through">£{parseFloat(offerItems[0].originalPrice).toFixed(2)}</span>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -482,14 +478,12 @@ function OfferSection({
                         <h3 className="font-semibold hover:text-primary transition-colors">{item.product.productName}</h3>
                       </Link>
                       <p className="text-xs text-muted-foreground mt-1">SKU: {item.product.sku}</p>
-                      {isAuthenticated && (isCustomer || isAdmin) && (
-                        <div className="flex items-baseline gap-2 mt-2">
-                          <span className="text-lg font-bold text-green-600">£{offerPrice.toFixed(2)}</span>
-                          {originalPrice && originalPrice > offerPrice && (
-                            <span className="text-sm text-muted-foreground line-through">£{originalPrice.toFixed(2)}</span>
-                          )}
-                        </div>
-                      )}
+                      <div className="flex items-baseline gap-2 mt-2">
+                        <span className="text-lg font-bold text-green-600">£{offerPrice.toFixed(2)}</span>
+                        {originalPrice && originalPrice > offerPrice && (
+                          <span className="text-sm text-muted-foreground line-through">£{originalPrice.toFixed(2)}</span>
+                        )}
+                      </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       {(!isAuthenticated || (!isCustomer && !isAdmin)) ? (
