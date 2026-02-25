@@ -30,6 +30,7 @@ import BlogPostPage from "@/pages/blog-post";
 import CompliancePage from "@/pages/compliance";
 import PharmaceuticalWholesalersPage from "@/pages/pharmaceutical-wholesalers";
 import ProductDetailPage from "@/pages/product-detail";
+import OffersPage from "@/pages/offers";
 
 import AdminDashboard from "@/pages/admin/index";
 import AdminUsersPage from "@/pages/admin/users";
@@ -56,6 +57,7 @@ import AdminAiCategoriesPage from "@/pages/admin/ai-categories";
 import AdminSeoAgentPage from "@/pages/admin/seo-agent";
 import AdminBlogPage from "@/pages/admin/blog";
 import AdminProductRotationPage from "@/pages/admin/product-rotation";
+import AdminOffersPage from "@/pages/admin/offers";
 
 function AdminRoute({ component: Component }: { component: React.ComponentType }) {
   const { isAdmin, isLoading } = useAuth();
@@ -104,6 +106,7 @@ function Router() {
       <Route path="/blog" component={BlogPage} />
       <Route path="/blog/:slug" component={BlogPostPage} />
       <Route path="/compliance" component={CompliancePage} />
+      <Route path="/offers" component={OffersPage} />
       <Route path="/pharmaceutical-wholesalers" component={PharmaceuticalWholesalersPage} />
       
       <Route path="/admin">{() => <AdminRoute component={AdminDashboard} />}</Route>
@@ -131,6 +134,7 @@ function Router() {
       <Route path="/admin/seo-agent">{() => <AdminRoute component={AdminSeoAgentPage} />}</Route>
       <Route path="/admin/blog">{() => <AdminRoute component={AdminBlogPage} />}</Route>
       <Route path="/admin/product-rotation">{() => <AdminRoute component={AdminProductRotationPage} />}</Route>
+      <Route path="/admin/offers">{() => <AdminRoute component={AdminOffersPage} />}</Route>
       
       <Route component={NotFound} />
     </Switch>

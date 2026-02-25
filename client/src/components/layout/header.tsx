@@ -19,6 +19,7 @@ import {
   Phone,
   Network,
   BookOpen,
+  Percent,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -30,6 +31,7 @@ import {
 
 const publicNavItems = [
   { href: "/products", label: "Products", icon: Package },
+  { href: "/offers", label: "Offers", icon: Percent },
   { href: "/brands", label: "Brands", icon: Building2 },
   { href: "/distribution-network", label: "Distribution Network", icon: Network },
   { href: "/how-to-order", label: "How to Order", icon: HelpCircle },

@@ -740,6 +740,60 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     }
   });
 
+  // ==================== PUBLIC OFFER ROUTES ====================
+  app.get("/api/offers", async (req, res) => {
+    try {
+      const activeOffers = await storage.getActiveOffers();
+      res.json(activeOffers);
+    } catch (error) {
+      console.error("Error fetching offers:", error);
+      res.status(500).json({ message: "Failed to fetch offers" });
+    }
+  });
+
+  app.get("/api/offers/:idOrSlug", async (req, res) => {
+    try {
+      const param = req.params.idOrSlug;
+      let offer;
+      const id = Number(param);
+      if (!isNaN(id) && id > 0) {
+        offer = await storage.getOffer(id);
+      }
+      if (!offer) {
+        offer = await storage.getOfferBySlug(param);
+      }
+      if (!offer) {
+        return res.status(404).json({ message: "Offer not found" });
+      }
+      res.json(offer);
+    } catch (error) {
+      console.error("Error fetching offer:", error);
+      res.status(500).json({ message: "Failed to fetch offer" });
+    }
+  });
+
+  app.get("/api/offers/:idOrSlug/items", async (req, res) => {
+    try {
+      const param = req.params.idOrSlug;
+      let offer;
+      const id = Number(param);
+      if (!isNaN(id) && id > 0) {
+        offer = await storage.getOffer(id);
+      }
+      if (!offer) {
+        offer = await storage.getOfferBySlug(param);
+      }
+      if (!offer) {
+        return res.status(404).json({ message: "Offer not found" });
+      }
+      const items = await storage.getOfferItems(offer.id);
+      res.json(items);
+    } catch (error) {
+      console.error("Error fetching offer items:", error);
+      res.status(500).json({ message: "Failed to fetch offer items" });
+    }
+  });
+
   // ==================== ADMIN ROUTES ====================
   
   // Admin - Users
@@ -2941,6 +2995,91 @@ Apply ONLY the corrections I have requested above. Do not rewrite the entire art
       res.json(sections);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch home sections" });
+    }
+  });
+
+  // ==================== ADMIN - OFFERS ====================
+  app.get("/api/admin/offers", requireAdmin, async (req, res) => {
+    try {
+      const allOffers = await storage.getAllOffers();
+      res.json(allOffers);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch offers" });
+    }
+  });
+
+  app.post("/api/admin/offers", requireAdmin, async (req, res) => {
+    try {
+      const offer = await storage.createOffer(req.body);
+      res.status(201).json(offer);
+    } catch (error) {
+      console.error("Error creating offer:", error);
+      res.status(500).json({ message: "Failed to create offer" });
+    }
+  });
+
+  app.patch("/api/admin/offers/:id", requireAdmin, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const updated = await storage.updateOffer(id, req.body);
+      if (!updated) return res.status(404).json({ message: "Offer not found" });
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating offer:", error);
+      res.status(500).json({ message: "Failed to update offer" });
+    }
+  });
+
+  app.delete("/api/admin/offers/:id", requireAdmin, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      await storage.deleteOffer(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting offer:", error);
+      res.status(500).json({ message: "Failed to delete offer" });
+    }
+  });
+
+  app.get("/api/admin/offers/:id/items", requireAdmin, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const items = await storage.getOfferItems(id);
+      res.json(items);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch offer items" });
+    }
+  });
+
+  app.post("/api/admin/offers/:id/items", requireAdmin, async (req, res) => {
+    try {
+      const offerId = Number(req.params.id);
+      const item = await storage.createOfferItem({ ...req.body, offerId });
+      res.status(201).json(item);
+    } catch (error) {
+      console.error("Error adding offer item:", error);
+      res.status(500).json({ message: "Failed to add offer item" });
+    }
+  });
+
+  app.patch("/api/admin/offer-items/:id", requireAdmin, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const updated = await storage.updateOfferItem(id, req.body);
+      if (!updated) return res.status(404).json({ message: "Offer item not found" });
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update offer item" });
+    }
+  });
+
+  app.delete("/api/admin/offer-items/:id", requireAdmin, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      await storage.deleteOfferItem(id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete offer item" });
     }
   });
 

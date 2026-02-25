@@ -35,3 +35,38 @@ pool.query('CREATE EXTENSION IF NOT EXISTS pg_trgm')
   .catch((err: Error) => {
     console.warn('pg_trgm setup note (search will use ILIKE fallback):', err.message);
   });
+
+pool.query(`
+  CREATE TABLE IF NOT EXISTS offers (
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    slug VARCHAR(255) NOT NULL UNIQUE,
+    description TEXT,
+    hero_image_url TEXT,
+    hero_title VARCHAR(255),
+    hero_subtitle TEXT,
+    display_style VARCHAR(50) DEFAULT 'grid',
+    badge_text VARCHAR(50) DEFAULT 'OFFER',
+    badge_color VARCHAR(20) DEFAULT 'red',
+    start_date TIMESTAMP NOT NULL,
+    end_date TIMESTAMP NOT NULL,
+    is_active BOOLEAN DEFAULT true,
+    sort_order INTEGER DEFAULT 0,
+    meta_title VARCHAR(255),
+    meta_description TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+  );
+  CREATE TABLE IF NOT EXISTS offer_items (
+    id SERIAL PRIMARY KEY,
+    offer_id INTEGER NOT NULL,
+    product_id INTEGER NOT NULL,
+    offer_price DECIMAL(10,2) NOT NULL,
+    original_price DECIMAL(10,2),
+    discount_label VARCHAR(100),
+    sort_order INTEGER DEFAULT 0,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+  );
+`).then(() => console.log('Offers tables ready'))
+  .catch((err: Error) => console.warn('Offers tables setup:', err.message));

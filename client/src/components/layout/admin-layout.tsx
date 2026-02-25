@@ -37,6 +37,7 @@ import {
   BarChart3,
   Newspaper,
   Shuffle,
+  Percent,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 
@@ -57,6 +58,7 @@ const mainMenuItems = [
   { title: "Suppliers", href: "/admin/suppliers", icon: Globe, staffAccess: false },
   { title: "Messages", href: "/admin/messages", icon: MessageSquare, staffAccess: false },
   { title: "Chat Leads", href: "/admin/chat-leads", icon: Bot, staffAccess: false },
+  { title: "Offers", href: "/admin/offers", icon: Percent, staffAccess: false },
 ];
 
 const homepageMenuItems = [

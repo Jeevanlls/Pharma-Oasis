@@ -1118,6 +1118,60 @@ export const contactFormSchema = z.object({
 export type ContactFormData = z.infer<typeof contactFormSchema>;
 
 // ============================================
+// OFFERS TABLE (Monthly promotional campaigns)
+// ============================================
+export const offers = pgTable("offers", {
+  id: serial("id").primaryKey(),
+  title: varchar("title", { length: 255 }).notNull(),
+  slug: varchar("slug", { length: 255 }).notNull().unique(),
+  description: text("description"),
+  heroImageUrl: text("hero_image_url"),
+  heroTitle: varchar("hero_title", { length: 255 }),
+  heroSubtitle: text("hero_subtitle"),
+  displayStyle: varchar("display_style", { length: 50 }).default("grid"),
+  badgeText: varchar("badge_text", { length: 50 }).default("OFFER"),
+  badgeColor: varchar("badge_color", { length: 20 }).default("red"),
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  isActive: boolean("is_active").default(true),
+  sortOrder: integer("sort_order").default(0),
+  metaTitle: varchar("meta_title", { length: 255 }),
+  metaDescription: text("meta_description"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertOfferSchema = createInsertSchema(offers).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertOffer = z.infer<typeof insertOfferSchema>;
+export type Offer = typeof offers.$inferSelect;
+
+// ============================================
+// OFFER ITEMS TABLE (Products within an offer)
+// ============================================
+export const offerItems = pgTable("offer_items", {
+  id: serial("id").primaryKey(),
+  offerId: integer("offer_id").notNull(),
+  productId: integer("product_id").notNull(),
+  offerPrice: decimal("offer_price", { precision: 10, scale: 2 }).notNull(),
+  originalPrice: decimal("original_price", { precision: 10, scale: 2 }),
+  discountLabel: varchar("discount_label", { length: 100 }),
+  sortOrder: integer("sort_order").default(0),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertOfferItemSchema = createInsertSchema(offerItems).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertOfferItem = z.infer<typeof insertOfferItemSchema>;
+export type OfferItem = typeof offerItems.$inferSelect;
+
+// ============================================
 // PRODUCT POPULARITY TABLE (Analytics for intelligent sorting)
 // ============================================
 export const productPopularity = pgTable("product_popularity", {

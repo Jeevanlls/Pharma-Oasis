@@ -28,7 +28,7 @@ Preferred communication style: Simple, everyday language.
 ### Data Storage
 
 - **ORM & Database:** Drizzle ORM with PostgreSQL.
-- **Schema:** Tables for users, brands, categories, products, quotes, supplier leads, CMS blocks, site settings, and contact messages.
+- **Schema:** Tables for users, brands, categories, products, quotes, supplier leads, CMS blocks, site settings, contact messages, offers, and offer items.
 - **Relationships:** Products linked to brands and categories; quotes linked to users and quote items; categories are self-referential.
 - **Seed Data:** Includes admin user, 37 UK pharmaceutical brands, 78 realistic products with EANs, pricing, descriptions, and images, 25+ subcategories, CMS blocks, site settings, hero banners, and company locations.
 
@@ -39,6 +39,15 @@ Preferred communication style: Simple, everyday language.
 - **AI Blog Generator:** Uses GPT-4o-mini to generate compliance-safe blog articles with structured JSON output, topic classification, source selection, and automatic internal/external linking.
 - **Retroactive Compliance Link Insertion:** Scans existing blog posts to insert compliance links.
 - **Compliance Page:** Public page `/compliance` serving as a central reference for GDP/MHRA.
+
+### Offers System
+
+- **Offers Campaigns:** Admin can create promotional offer campaigns with title, slug, description, hero banners, display style (grid/featured/list), badge customization, start/end dates, and active toggle.
+- **Offer Items:** Products linked to offers with special offer prices alongside original prices, discount labels, and sort ordering.
+- **Public Offers Page:** `/offers` displays active campaigns with countdown timers, hero banners, and product grids. Registered customers can add offer products to quote basket.
+- **Admin Offers Panel:** `/admin/offers` for CRUD management of campaigns and product assignments. Product search with inline pricing entry.
+- **Display Styles:** Grid (default), Featured Spotlight (large hero product + grid), List View (horizontal cards).
+- **Tables:** `offers` (campaigns), `offer_items` (products in offers). Tables auto-created at runtime via db.ts pool queries.
 
 ### Intelligent Product Sorting
 

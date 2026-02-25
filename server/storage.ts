@@ -3,7 +3,7 @@ import {
   supplierLeads, cmsBlocks, siteSettings, contactMessages, heroSlides, companyLocations,
   homeStats, homeFeatures, homeCategories, homeProcessSteps, homeSections,
   footerSections, mediaAssets, chatSessions, chatMessages, chatLeads, pageViews,
-  blogPosts, productPopularity, featuredRotation,
+  blogPosts, productPopularity, featuredRotation, offers, offerItems,
   type User, type InsertUser,
   type Brand, type InsertBrand,
   type Category, type InsertCategory,
@@ -30,6 +30,8 @@ import {
   type BlogPost, type InsertBlogPost,
   type ProductPopularity, type InsertProductPopularity,
   type FeaturedRotation, type InsertFeaturedRotation,
+  type Offer, type InsertOffer,
+  type OfferItem, type InsertOfferItem,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, ilike, desc, asc, sql, isNull, inArray } from "drizzle-orm";
@@ -81,6 +83,20 @@ export interface IStorage {
   createFeaturedRotation(productIds: number[], criteria?: object): Promise<FeaturedRotation>;
   trackProductView(productId: number): Promise<void>;
   getDirectDistributorBrandIds(): Promise<number[]>;
+
+  // Offers
+  getOffer(id: number): Promise<Offer | undefined>;
+  getOfferBySlug(slug: string): Promise<Offer | undefined>;
+  createOffer(offer: InsertOffer): Promise<Offer>;
+  updateOffer(id: number, updates: Partial<InsertOffer>): Promise<Offer | undefined>;
+  deleteOffer(id: number): Promise<void>;
+  getAllOffers(): Promise<Offer[]>;
+  getActiveOffers(): Promise<Offer[]>;
+  getOfferItems(offerId: number): Promise<(OfferItem & { product: Product })[]>;
+  createOfferItem(item: InsertOfferItem): Promise<OfferItem>;
+  updateOfferItem(id: number, updates: Partial<InsertOfferItem>): Promise<OfferItem | undefined>;
+  deleteOfferItem(id: number): Promise<void>;
+  deleteOfferItemsByOffer(offerId: number): Promise<void>;
 
   // Quotes
   getQuote(id: number): Promise<Quote | undefined>;
@@ -1571,6 +1587,73 @@ export class DatabaseStorage implements IStorage {
         eq(brands.isActive, true)
       ));
     return directBrands.map(b => b.id);
+  }
+
+  async getOffer(id: number): Promise<Offer | undefined> {
+    const [offer] = await db.select().from(offers).where(eq(offers.id, id));
+    return offer;
+  }
+
+  async getOfferBySlug(slug: string): Promise<Offer | undefined> {
+    const [offer] = await db.select().from(offers).where(eq(offers.slug, slug));
+    return offer;
+  }
+
+  async createOffer(offer: InsertOffer): Promise<Offer> {
+    const [created] = await db.insert(offers).values(offer).returning();
+    return created;
+  }
+
+  async updateOffer(id: number, updates: Partial<InsertOffer>): Promise<Offer | undefined> {
+    const [updated] = await db.update(offers).set({ ...updates, updatedAt: new Date() }).where(eq(offers.id, id)).returning();
+    return updated;
+  }
+
+  async deleteOffer(id: number): Promise<void> {
+    await db.delete(offerItems).where(eq(offerItems.offerId, id));
+    await db.delete(offers).where(eq(offers.id, id));
+  }
+
+  async getAllOffers(): Promise<Offer[]> {
+    return db.select().from(offers).orderBy(desc(offers.createdAt));
+  }
+
+  async getActiveOffers(): Promise<Offer[]> {
+    const now = new Date();
+    return db.select().from(offers)
+      .where(and(
+        eq(offers.isActive, true),
+        sql`${offers.startDate} <= ${now}`,
+        sql`${offers.endDate} >= ${now}`
+      ))
+      .orderBy(asc(offers.sortOrder), desc(offers.createdAt));
+  }
+
+  async getOfferItems(offerId: number): Promise<(OfferItem & { product: Product })[]> {
+    const items = await db.select()
+      .from(offerItems)
+      .innerJoin(products, eq(offerItems.productId, products.id))
+      .where(and(eq(offerItems.offerId, offerId), eq(offerItems.isActive, true)))
+      .orderBy(asc(offerItems.sortOrder));
+    return items.map(row => ({ ...row.offer_items, product: row.products }));
+  }
+
+  async createOfferItem(item: InsertOfferItem): Promise<OfferItem> {
+    const [created] = await db.insert(offerItems).values(item).returning();
+    return created;
+  }
+
+  async updateOfferItem(id: number, updates: Partial<InsertOfferItem>): Promise<OfferItem | undefined> {
+    const [updated] = await db.update(offerItems).set(updates).where(eq(offerItems.id, id)).returning();
+    return updated;
+  }
+
+  async deleteOfferItem(id: number): Promise<void> {
+    await db.delete(offerItems).where(eq(offerItems.id, id));
+  }
+
+  async deleteOfferItemsByOffer(offerId: number): Promise<void> {
+    await db.delete(offerItems).where(eq(offerItems.offerId, offerId));
   }
 }
 
