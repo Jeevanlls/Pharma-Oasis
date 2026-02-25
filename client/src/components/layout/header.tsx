@@ -56,7 +56,7 @@ export function Header() {
             <img 
               src={logoImage} 
               alt="Pharma Oasis" 
-              className="h-14 w-auto max-w-[200px]"
+              className="h-10 w-auto object-contain"
             />
           </Link>
 
@@ -175,7 +175,7 @@ export function Header() {
                     <img 
                       src={logoImage} 
                       alt="Pharma Oasis" 
-                      className="h-8 w-auto"
+                      className="h-8 w-auto object-contain"
                     />
                   </div>
 
