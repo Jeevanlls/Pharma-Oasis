@@ -66,9 +66,9 @@ export function Header() {
             {publicNavItems.map((item) => (
               <Link key={item.href} href={item.href}>
                 <Button
-                  variant={location === item.href ? "secondary" : "ghost"}
+                  variant={item.href === "/offers" ? "default" : location === item.href ? "secondary" : "ghost"}
                   size="sm"
-                  className="gap-2"
+                  className={`gap-2${item.href === "/offers" ? " font-semibold" : ""}`}
                   data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
                 >
                   <item.icon className="h-4 w-4" />
@@ -185,8 +185,8 @@ export function Header() {
                     {publicNavItems.map((item) => (
                       <Link key={item.href} href={item.href}>
                         <Button
-                          variant={location === item.href ? "secondary" : "ghost"}
-                          className="w-full justify-start gap-2"
+                          variant={item.href === "/offers" ? "default" : location === item.href ? "secondary" : "ghost"}
+                          className={`w-full justify-start gap-2${item.href === "/offers" ? " font-semibold" : ""}`}
                           onClick={() => setMobileMenuOpen(false)}
                         >
                           <item.icon className="h-4 w-4" />
