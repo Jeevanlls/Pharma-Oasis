@@ -22,6 +22,9 @@ import {
   Loader2,
   Eye,
   Search,
+  Upload,
+  ImageIcon,
+  X,
 } from "lucide-react";
 
 function slugify(text: string): string {
@@ -41,6 +44,7 @@ function OfferForm({
   const [slug, setSlug] = useState(offer?.slug || "");
   const [description, setDescription] = useState(offer?.description || "");
   const [heroImageUrl, setHeroImageUrl] = useState(offer?.heroImageUrl || "");
+  const [isUploading, setIsUploading] = useState(false);
   const [heroTitle, setHeroTitle] = useState(offer?.heroTitle || "");
   const [heroSubtitle, setHeroSubtitle] = useState(offer?.heroSubtitle || "");
   const [displayStyle, setDisplayStyle] = useState(offer?.displayStyle || "grid");
@@ -89,8 +93,68 @@ function OfferForm({
       </div>
 
       <div className="space-y-2">
-        <Label>Hero Image URL</Label>
-        <Input value={heroImageUrl} onChange={(e) => setHeroImageUrl(e.target.value)} placeholder="https://..." data-testid="input-hero-image" />
+        <Label>Hero Banner Image</Label>
+        <p className="text-xs text-muted-foreground">
+          Recommended: 1920×720px, landscape format. Max 10MB. JPG, PNG or WebP. Will be auto-converted to WebP.
+        </p>
+        {heroImageUrl && (
+          <div className="relative rounded-md overflow-hidden border">
+            <img src={heroImageUrl} alt="Hero preview" className="w-full h-32 object-cover" />
+            <Button
+              type="button"
+              variant="destructive"
+              size="icon"
+              className="absolute top-2 right-2 h-6 w-6"
+              onClick={() => setHeroImageUrl("")}
+              data-testid="button-remove-hero-image"
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          </div>
+        )}
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            disabled={isUploading}
+            onClick={() => {
+              const input = document.createElement("input");
+              input.type = "file";
+              input.accept = "image/jpeg,image/png,image/webp";
+              input.onchange = async (e) => {
+                const file = (e.target as HTMLInputElement).files?.[0];
+                if (!file) return;
+                setIsUploading(true);
+                try {
+                  const formData = new FormData();
+                  formData.append("image", file);
+                  formData.append("category", "hero");
+                  formData.append("altText", title ? `${title} offer banner` : "Offer banner");
+                  const res = await fetch("/api/admin/uploads", { method: "POST", body: formData, credentials: "include" });
+                  if (!res.ok) { const err = await res.json(); throw new Error(err.message); }
+                  const asset = await res.json();
+                  setHeroImageUrl(asset.url);
+                } catch (err: any) {
+                  alert("Upload failed: " + (err.message || "Unknown error"));
+                } finally {
+                  setIsUploading(false);
+                }
+              };
+              input.click();
+            }}
+            data-testid="button-upload-hero-image"
+          >
+            {isUploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
+            {isUploading ? "Uploading..." : "Upload Image"}
+          </Button>
+          <Input
+            value={heroImageUrl}
+            onChange={(e) => setHeroImageUrl(e.target.value)}
+            placeholder="Or paste image URL..."
+            className="flex-1"
+            data-testid="input-hero-image"
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
