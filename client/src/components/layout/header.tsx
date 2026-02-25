@@ -32,10 +32,8 @@ import {
 const publicNavItems = [
   { href: "/products", label: "Products", icon: Package },
   { href: "/offers", label: "Offers", icon: Percent },
-  { href: "/brands", label: "Brands", icon: Building2 },
   { href: "/distribution-network", label: "Distribution Network", icon: Network },
   { href: "/how-to-order", label: "How to Order", icon: HelpCircle },
-  { href: "/contact", label: "Contact", icon: Phone },
   { href: "/blog", label: "Insights", icon: BookOpen },
 ];
 
@@ -53,12 +51,12 @@ export function Header() {
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex h-16 items-center justify-between gap-4">
+        <div className="flex h-18 items-center justify-between gap-4">
           <Link href="/" className="flex items-center gap-2" data-testid="link-home-logo">
             <img 
               src={logoImage} 
               alt="Pharma Oasis" 
-              className="h-12 w-auto max-w-[180px]"
+              className="h-14 w-auto max-w-[200px]"
             />
           </Link>
 
