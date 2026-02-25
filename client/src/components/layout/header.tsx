@@ -58,7 +58,7 @@ export function Header() {
             <img 
               src={logoImage} 
               alt="Pharma Oasis" 
-              className="h-10 w-auto"
+              className="h-12 w-auto max-w-[180px]"
             />
           </Link>
 
