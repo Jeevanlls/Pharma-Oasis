@@ -363,18 +363,21 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     }
   });
 
-  app.get("/api/products/:id", async (req, res) => {
+  app.get("/api/products/:idOrSlug", async (req, res) => {
     try {
-      const id = Number(req.params.id);
-      if (isNaN(id) || id <= 0) {
-        return res.status(400).json({ message: "Invalid product ID" });
+      const param = req.params.idOrSlug;
+      let product;
+      const id = Number(param);
+      if (!isNaN(id) && id > 0) {
+        product = await storage.getProduct(id);
       }
-      const product = await storage.getProduct(id);
+      if (!product) {
+        product = await storage.getProductBySlug(param);
+      }
       if (!product) {
         return res.status(404).json({ message: "Product not found" });
       }
-      // Track product view for analytics (non-blocking)
-      storage.trackProductView(id).catch(() => {});
+      storage.trackProductView(product.id).catch(() => {});
       res.json(product);
     } catch (error) {
       console.error("Error fetching product:", error);

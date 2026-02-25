@@ -29,6 +29,7 @@ import BlogPage from "@/pages/blog";
 import BlogPostPage from "@/pages/blog-post";
 import CompliancePage from "@/pages/compliance";
 import PharmaceuticalWholesalersPage from "@/pages/pharmaceutical-wholesalers";
+import ProductDetailPage from "@/pages/product-detail";
 
 import AdminDashboard from "@/pages/admin/index";
 import AdminUsersPage from "@/pages/admin/users";
@@ -87,6 +88,7 @@ function Router() {
       <Route path="/login" component={LoginPage} />
       <Route path="/register" component={RegisterPage} />
       <Route path="/products" component={ProductsPage} />
+      <Route path="/products/:idOrSlug" component={ProductDetailPage} />
       <Route path="/brands" component={BrandsPage} />
       <Route path="/distribution-network" component={DistributionNetworkPage} />
       <Route path="/contact" component={ContactPage} />
