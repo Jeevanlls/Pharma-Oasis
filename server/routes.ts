@@ -1021,9 +1021,22 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
       const data = insertProductSchema.parse(req.body);
       const product = await storage.createProduct(data);
       res.status(201).json(product);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      if (error?.code === "23505" || error?.constraint) {
+        const detail = error.detail || "";
+        if (detail.includes("sku")) {
+          return res.status(409).json({ message: `A product with SKU "${req.body.sku}" already exists. Please use a unique SKU.` });
+        }
+        if (detail.includes("ean")) {
+          return res.status(409).json({ message: `A product with EAN "${req.body.ean}" already exists. Please use a unique EAN.` });
+        }
+        if (detail.includes("slug")) {
+          return res.status(409).json({ message: `A product with this URL slug already exists. Please change the product name or slug.` });
+        }
+        return res.status(409).json({ message: "A product with these details already exists. Please check the SKU and EAN are unique." });
       }
       console.error("Error creating product:", error);
       res.status(500).json({ message: "Failed to create product" });
@@ -1062,8 +1075,20 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
       }
       res.json(product);
     } catch (error: any) {
+      if (error?.code === "23505" || error?.constraint) {
+        const detail = error.detail || "";
+        if (detail.includes("sku")) {
+          return res.status(409).json({ message: `A product with SKU "${req.body.sku}" already exists. Please use a unique SKU.` });
+        }
+        if (detail.includes("ean")) {
+          return res.status(409).json({ message: `A product with EAN "${req.body.ean}" already exists. Please use a unique EAN.` });
+        }
+        if (detail.includes("slug")) {
+          return res.status(409).json({ message: `A product with this URL slug already exists. Please change the product name or slug.` });
+        }
+        return res.status(409).json({ message: "A product with these details already exists. Please check the SKU and EAN are unique." });
+      }
       console.error("Error updating product:", error?.message || error);
-      console.error("Error details:", error);
       res.status(500).json({ message: "Failed to update product", error: error?.message });
     }
   });

@@ -103,8 +103,10 @@ export default function AdminProductsPage() {
       setIsDialogOpen(false);
       form.reset();
     },
-    onError: () => {
-      toast({ title: "Failed to create product", variant: "destructive" });
+    onError: (error: Error) => {
+      let msg = "Failed to create product";
+      try { const body = JSON.parse(error.message.replace(/^\d+:\s*/, "")); if (body.message) msg = body.message; } catch {}
+      toast({ title: msg, variant: "destructive" });
     },
   });
 
@@ -119,8 +121,10 @@ export default function AdminProductsPage() {
       setEditingProduct(null);
       form.reset();
     },
-    onError: () => {
-      toast({ title: "Failed to update product", variant: "destructive" });
+    onError: (error: Error) => {
+      let msg = "Failed to update product";
+      try { const body = JSON.parse(error.message.replace(/^\d+:\s*/, "")); if (body.message) msg = body.message; } catch {}
+      toast({ title: msg, variant: "destructive" });
     },
   });
 
