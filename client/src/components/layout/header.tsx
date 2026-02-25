@@ -5,7 +5,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/lib/auth";
 import { useQuoteBasket } from "@/lib/quote-basket";
-import logoImage from "@assets/01_1764977214745.png";
+import logoImage from "@assets/01_1772051902531.png";
 import {
   Menu,
   X,

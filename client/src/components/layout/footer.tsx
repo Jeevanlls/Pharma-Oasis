@@ -2,7 +2,7 @@ import { Link } from "wouter";
 import { Mail, Phone, Truck, Building2, Globe, Shield, Award } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { SiFacebook, SiInstagram, SiX, SiLinkedin, SiYoutube, SiTiktok } from "react-icons/si";
-import logoImage from "@assets/01_1764977214745.png";
+import logoImage from "@assets/01_1772051902531.png";
 import type { CompanyLocation, CmsBlock } from "@shared/schema";
 
 interface SiteSettings {
