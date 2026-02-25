@@ -3177,20 +3177,97 @@ Keep language professional, compliant with UK pharmaceutical regulations. Never 
         baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
       });
 
-      const imageResponse = await openai.images.generate({
-        model: "dall-e-3",
-        prompt: `Professional pharmaceutical wholesale banner image: ${prompt}. Style: clean, modern, corporate healthcare. No text in the image. High quality product photography style. Wide landscape format suitable for a website hero banner.`,
-        n: 1,
-        size: "1792x1024",
-        quality: "standard",
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: `You design professional pharmaceutical banner color schemes. Based on the user's offer description, return a JSON object with these fields:
+{
+  "gradientStart": "#hex color for gradient start (left side)",
+  "gradientEnd": "#hex color for gradient end (right side)", 
+  "accentColor": "#hex color for decorative accent elements",
+  "style": "one of: healthcare, baby, wellness, pharma, seasonal"
+}
+Use professional, clean pharmaceutical colors. For baby products use soft pastels. For wellness use greens. For pharma use blues. For seasonal use warm tones. Return ONLY valid JSON.`
+          },
+          { role: "user", content: prompt }
+        ],
+        temperature: 0.7,
+        response_format: { type: "json_object" },
       });
 
-      const imageUrl = imageResponse.data[0]?.url;
-      if (!imageUrl) {
-        return res.status(500).json({ message: "No image was generated" });
+      const colors = JSON.parse(completion.choices[0].message.content || '{"gradientStart":"#1e40af","gradientEnd":"#3b82f6","accentColor":"#60a5fa","style":"healthcare"}');
+
+      const sharp = (await import("sharp")).default;
+
+      const width = 1920;
+      const height = 720;
+
+      const hexToRgb = (hex: string) => {
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : { r: 30, g: 64, b: 175 };
+      };
+
+      const startRgb = hexToRgb(colors.gradientStart);
+      const endRgb = hexToRgb(colors.gradientEnd);
+      const accentRgb = hexToRgb(colors.accentColor);
+
+      const svgImage = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:rgb(${startRgb.r},${startRgb.g},${startRgb.b});stop-opacity:1" />
+            <stop offset="100%" style="stop-color:rgb(${endRgb.r},${endRgb.g},${endRgb.b});stop-opacity:1" />
+          </linearGradient>
+          <radialGradient id="glow1" cx="80%" cy="30%" r="40%">
+            <stop offset="0%" style="stop-color:rgb(${accentRgb.r},${accentRgb.g},${accentRgb.b});stop-opacity:0.3" />
+            <stop offset="100%" style="stop-color:rgb(${accentRgb.r},${accentRgb.g},${accentRgb.b});stop-opacity:0" />
+          </radialGradient>
+          <radialGradient id="glow2" cx="20%" cy="70%" r="35%">
+            <stop offset="0%" style="stop-color:rgb(255,255,255);stop-opacity:0.15" />
+            <stop offset="100%" style="stop-color:rgb(255,255,255);stop-opacity:0" />
+          </radialGradient>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#bg)" />
+        <rect width="100%" height="100%" fill="url(#glow1)" />
+        <rect width="100%" height="100%" fill="url(#glow2)" />
+        <circle cx="85%" cy="25%" r="120" fill="rgb(255,255,255)" fill-opacity="0.08" />
+        <circle cx="75%" cy="60%" r="80" fill="rgb(255,255,255)" fill-opacity="0.06" />
+        <circle cx="15%" cy="35%" r="60" fill="rgb(255,255,255)" fill-opacity="0.05" />
+        <circle cx="90%" cy="75%" r="40" fill="rgb(${accentRgb.r},${accentRgb.g},${accentRgb.b})" fill-opacity="0.15" />
+        <rect x="0" y="700" width="100%" height="20" fill="rgb(255,255,255)" fill-opacity="0.1" />
+        <line x1="60%" y1="0" x2="90%" y2="100%" stroke="rgb(255,255,255)" stroke-opacity="0.05" stroke-width="2" />
+        <line x1="65%" y1="0" x2="95%" y2="100%" stroke="rgb(255,255,255)" stroke-opacity="0.03" stroke-width="1" />
+      </svg>`;
+
+      const buffer = await sharp(Buffer.from(svgImage))
+        .resize(width, height)
+        .webp({ quality: 85 })
+        .toBuffer();
+
+      const objectStorage = new ObjectStorageService();
+      if (!objectStorage.isConfigured()) {
+        return res.status(503).json({ message: "Object Storage not configured" });
       }
 
-      res.json({ imageUrl, revisedPrompt: imageResponse.data[0]?.revised_prompt });
+      const filename = `hero-offer-${Date.now()}.webp`;
+      const imageUrl = await objectStorage.uploadBuffer(buffer, "hero", filename, "image/webp");
+
+      await storage.createMediaAsset({
+        filename,
+        originalFilename: filename,
+        mimeType: "image/webp",
+        fileSize: buffer.length,
+        width,
+        height,
+        category: "hero",
+        url: imageUrl,
+        thumbnailUrl: null,
+        altText: "AI generated offer banner",
+        uploadedBy: (req as any).user?.id || null,
+      });
+
+      res.json({ imageUrl });
     } catch (error: any) {
       console.error("Error generating hero image:", error);
       res.status(500).json({ message: "Failed to generate image: " + (error.message || "Unknown error") });

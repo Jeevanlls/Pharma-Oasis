@@ -109,7 +109,7 @@ function OfferForm({
       const data = await res.json();
       if (data.imageUrl) {
         setHeroImageUrl(data.imageUrl);
-        toast({ title: "Hero image generated!" });
+        toast({ title: "Banner image generated! You can regenerate or upload your own." });
       }
     } catch (err: any) {
       toast({ title: "Failed to generate image: " + (err.message || "Unknown error"), variant: "destructive" });
