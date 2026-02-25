@@ -368,7 +368,7 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
       const param = req.params.idOrSlug;
       let product;
       const id = Number(param);
-      if (!isNaN(id) && id > 0) {
+      if (!isNaN(id) && Number.isInteger(id) && id > 0 && id <= 2147483647) {
         product = await storage.getProduct(id);
       }
       if (!product) {
@@ -4113,4 +4113,54 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
       res.status(500).json({ success: false, message: `Seed failed: ${error.message}` });
     }
   });
+
+  migrateProductSlugs().catch(err => console.error("Slug migration error:", err));
+}
+
+async function migrateProductSlugs() {
+  try {
+    const { products } = await import("@shared/schema");
+    const { isNull, or, sql: sqlExpr } = await import("drizzle-orm");
+
+    const productsNeedingSlugs = await db
+      .select({ id: products.id, productName: products.productName, slug: products.slug })
+      .from(products)
+      .where(or(isNull(products.slug), sqlExpr`${products.slug} ~ '^[0-9]+$'`));
+
+    if (productsNeedingSlugs.length === 0) {
+      console.log("[Slug Migration] All products have proper slugs");
+      return;
+    }
+
+    console.log(`[Slug Migration] Generating slugs for ${productsNeedingSlugs.length} products...`);
+
+    const existingSlugs = new Set<string>();
+    const allProducts = await db.select({ slug: products.slug }).from(products);
+    allProducts.forEach(p => { if (p.slug) existingSlugs.add(p.slug); });
+
+    let updated = 0;
+    for (const product of productsNeedingSlugs) {
+      let baseSlug = product.productName
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)/g, "")
+        .substring(0, 100);
+
+      let slug = baseSlug;
+      let counter = 2;
+      while (existingSlugs.has(slug)) {
+        slug = `${baseSlug}-${counter}`;
+        counter++;
+      }
+
+      existingSlugs.add(slug);
+      const { eq } = await import("drizzle-orm");
+      await db.update(products).set({ slug }).where(eq(products.id, product.id));
+      updated++;
+    }
+
+    console.log(`[Slug Migration] Updated ${updated} product slugs`);
+  } catch (error) {
+    console.error("[Slug Migration] Error:", error);
+  }
 }
