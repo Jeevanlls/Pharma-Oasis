@@ -3010,7 +3010,10 @@ Apply ONLY the corrections I have requested above. Do not rewrite the entire art
 
   app.post("/api/admin/offers", requireAdmin, async (req, res) => {
     try {
-      const offer = await storage.createOffer(req.body);
+      const data = { ...req.body };
+      if (data.startDate) data.startDate = new Date(data.startDate);
+      if (data.endDate) data.endDate = new Date(data.endDate);
+      const offer = await storage.createOffer(data);
       res.status(201).json(offer);
     } catch (error) {
       console.error("Error creating offer:", error);
@@ -3021,7 +3024,10 @@ Apply ONLY the corrections I have requested above. Do not rewrite the entire art
   app.patch("/api/admin/offers/:id", requireAdmin, async (req, res) => {
     try {
       const id = Number(req.params.id);
-      const updated = await storage.updateOffer(id, req.body);
+      const data = { ...req.body };
+      if (data.startDate) data.startDate = new Date(data.startDate);
+      if (data.endDate) data.endDate = new Date(data.endDate);
+      const updated = await storage.updateOffer(id, data);
       if (!updated) return res.status(404).json({ message: "Offer not found" });
       res.json(updated);
     } catch (error) {
