@@ -1018,7 +1018,20 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
   // Admin - Products (staff and admin can access)
   app.post("/api/admin/products", requireStaffOrAdmin, async (req, res) => {
     try {
-      const data = insertProductSchema.parse(req.body);
+      const body = { ...req.body };
+      const numericFields = ['rrp', 'wholesalePrice', 'vatRate', 'googleFeedPrice'] as const;
+      for (const field of numericFields) {
+        if (body[field] === '' || body[field] === undefined) {
+          body[field] = null;
+        }
+      }
+      const intFields = ['moq', 'brandId', 'categoryId', 'subcategoryId'] as const;
+      for (const field of intFields) {
+        if (body[field] === '' || body[field] === undefined) {
+          body[field] = null;
+        }
+      }
+      const data = insertProductSchema.parse(body);
       const product = await storage.createProduct(data);
       res.status(201).json(product);
     } catch (error: any) {
