@@ -337,7 +337,7 @@ function OfferProductsSection() {
   const offerMap = new Map(offers.map(o => [o.id, o]));
 
   return (
-    <section className="py-12 bg-gradient-to-b from-background to-muted/30" data-testid="offer-products-section">
+    <section className="py-12 bg-muted/50 border-y" data-testid="offer-products-section">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">
