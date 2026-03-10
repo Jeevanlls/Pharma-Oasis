@@ -12,7 +12,7 @@ import {
   CarouselItem,
   type CarouselApi,
 } from "@/components/ui/carousel";
-import type { HeroSlide, Brand, HomeStat, HomeFeature, HomeCategory, HomeProcessStep, HomeSection } from "@shared/schema";
+import type { HeroSlide, Brand, HomeStat, HomeFeature, HomeCategory, HomeProcessStep, HomeSection, Offer, OfferItem, Product } from "@shared/schema";
 import {
   Package,
   Shield,
@@ -38,6 +38,8 @@ import {
   Sparkles,
   Activity,
   Cross,
+  Tag,
+  Flame,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { OrganizationJsonLd, WebsiteJsonLd } from "@/components/seo/product-json-ld";
@@ -300,6 +302,119 @@ function BrandStrip() {
                 </span>
               </div>
             ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function OfferProductsSection() {
+  const placeholderImage = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200' fill='%23f1f5f9'%3E%3Crect width='200' height='200'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%2394a3b8' font-size='14'%3ENo Image%3C/text%3E%3C/svg%3E";
+
+  const { data: offers = [] } = useQuery<Offer[]>({
+    queryKey: ["/api/offers"],
+  });
+
+  const activeOfferIds = offers.filter(o => o.isActive).map(o => o.id);
+
+  const { data: allItems = [] } = useQuery<(OfferItem & { product: Product })[]>({
+    queryKey: ["/api/offers/items/all", activeOfferIds],
+    queryFn: async () => {
+      if (activeOfferIds.length === 0) return [];
+      const results = await Promise.all(
+        activeOfferIds.map(id =>
+          fetch(`/api/offers/${id}/items`).then(r => r.json())
+        )
+      );
+      return results.flat();
+    },
+    enabled: activeOfferIds.length > 0,
+  });
+
+  if (allItems.length === 0) return null;
+
+  const offerMap = new Map(offers.map(o => [o.id, o]));
+
+  return (
+    <section className="py-12 bg-gradient-to-b from-background to-muted/30" data-testid="offer-products-section">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center">
+              <Flame className="h-5 w-5 text-red-500" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold tracking-tight" style={{ fontFamily: "DM Sans, sans-serif" }} data-testid="text-offers-title">
+                Hot Offers
+              </h2>
+              <p className="text-sm text-muted-foreground">Limited time deals — first come, first served</p>
+            </div>
+          </div>
+          <Link href="/offers">
+            <Button variant="outline" size="sm" className="gap-1.5" data-testid="button-view-all-offers">
+              View All Offers <ArrowRight className="h-3.5 w-3.5" />
+            </Button>
+          </Link>
+        </div>
+
+        <div className="relative overflow-hidden">
+          <div
+            className="flex gap-5 animate-offer-scroll"
+            style={{ animation: "offerScroll 45s linear infinite", width: "max-content" }}
+          >
+            {[...allItems, ...allItems].map((item, index) => {
+              const offer = offerMap.get(item.offerId);
+              const offerPrice = item.offerPrice ? parseFloat(item.offerPrice) : null;
+              const originalPrice = item.originalPrice ? parseFloat(item.originalPrice) : null;
+              const discount = originalPrice && offerPrice ? Math.round(((originalPrice - offerPrice) / originalPrice) * 100) : null;
+
+              return (
+                <Link key={`${item.id}-${index}`} href={`/products/${item.product?.slug || item.product?.id}`}>
+                  <Card
+                    className="w-[200px] shrink-0 overflow-hidden group cursor-pointer border"
+                    data-testid={`card-home-offer-${item.productId}-${index}`}
+                  >
+                    <div className="relative aspect-square bg-muted overflow-hidden">
+                      <img
+                        src={item.product?.imageUrl || placeholderImage}
+                        alt={item.product?.productName}
+                        className="w-full h-full object-contain p-3 transition-transform duration-300 group-hover:scale-105"
+                        loading="lazy"
+                      />
+                      {discount && discount > 0 && (
+                        <Badge className="absolute top-2 left-2 bg-red-500 text-white border-0 text-xs px-1.5 py-0.5">
+                          -{discount}%
+                        </Badge>
+                      )}
+                      {offer && (
+                        <Badge variant="secondary" className="absolute top-2 right-2 text-[10px] px-1.5 py-0.5 max-w-[100px] truncate">
+                          <Tag className="h-2.5 w-2.5 mr-0.5 shrink-0" />
+                          {offer.title?.split(' ').slice(0, 2).join(' ')}
+                        </Badge>
+                      )}
+                    </div>
+                    <CardContent className="p-3 space-y-1.5">
+                      <h3 className="text-xs font-semibold line-clamp-2 leading-tight group-hover:text-primary transition-colors">
+                        {item.product?.productName}
+                      </h3>
+                      <div className="flex items-baseline gap-1.5">
+                        {offerPrice ? (
+                          <>
+                            <span className="text-sm font-bold text-green-600">£{offerPrice.toFixed(2)}</span>
+                            {originalPrice && originalPrice > offerPrice && (
+                              <span className="text-xs text-muted-foreground line-through">£{originalPrice.toFixed(2)}</span>
+                            )}
+                          </>
+                        ) : (
+                          <span className="text-sm font-bold text-amber-600">POA</span>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -820,10 +935,18 @@ export default function HomePage() {
         .animate-marquee {
           width: max-content;
         }
+        @keyframes offerScroll {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
+        .animate-offer-scroll:hover {
+          animation-play-state: paused !important;
+        }
       `}</style>
 
       <HeroCarousel />
       <BrandStrip />
+      <OfferProductsSection />
       <StatsBar />
       <HomeSectionsRenderer />
       <FeaturesSection />
