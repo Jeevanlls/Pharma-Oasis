@@ -363,6 +363,21 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     }
   });
 
+  app.get("/api/products/search", async (req, res) => {
+    try {
+      const query = (req.query.q as string || "").trim();
+      const limit = Math.min(Number(req.query.limit) || 10, 50);
+      if (!query) {
+        return res.json([]);
+      }
+      const results = await storage.searchProductsFullText(query, { limit, offset: 0 });
+      res.json(results);
+    } catch (error) {
+      console.error("Error searching products:", error);
+      res.status(500).json({ message: "Failed to search products" });
+    }
+  });
+
   app.get("/api/products/:idOrSlug", async (req, res) => {
     try {
       const param = req.params.idOrSlug;
