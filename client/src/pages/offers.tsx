@@ -84,8 +84,8 @@ function OfferProductCard({
   isAdmin: boolean;
 }) {
   const originalPrice = item.originalPrice ? parseFloat(item.originalPrice) : null;
-  const offerPrice = parseFloat(item.offerPrice);
-  const discount = originalPrice ? Math.round(((originalPrice - offerPrice) / originalPrice) * 100) : null;
+  const offerPrice = item.offerPrice ? parseFloat(item.offerPrice) : null;
+  const discount = originalPrice && offerPrice ? Math.round(((originalPrice - offerPrice) / originalPrice) * 100) : null;
 
   return (
     <Card className="overflow-hidden group relative" data-testid={`card-offer-product-${item.productId}`}>
@@ -129,13 +129,19 @@ function OfferProductCard({
         )}
 
         <div className="flex items-baseline gap-2" data-testid={`text-pricing-${item.productId}`}>
-          <span className="text-lg font-bold text-green-600">
-            £{offerPrice.toFixed(2)}
-          </span>
-          {originalPrice && originalPrice > offerPrice && (
-            <span className="text-sm text-muted-foreground line-through">
-              £{originalPrice.toFixed(2)}
-            </span>
+          {offerPrice ? (
+            <>
+              <span className="text-lg font-bold text-green-600">
+                £{offerPrice.toFixed(2)}
+              </span>
+              {originalPrice && originalPrice > offerPrice && (
+                <span className="text-sm text-muted-foreground line-through">
+                  £{originalPrice.toFixed(2)}
+                </span>
+              )}
+            </>
+          ) : (
+            <span className="text-lg font-bold text-amber-600">POA</span>
           )}
         </div>
 
@@ -422,9 +428,15 @@ function OfferSection({
                   <p className="text-muted-foreground">{offerItems[0].product.shortDescription}</p>
                 )}
                 <div className="flex items-baseline gap-3">
-                  <span className="text-3xl font-bold text-green-600">£{parseFloat(offerItems[0].offerPrice).toFixed(2)}</span>
-                  {offerItems[0].originalPrice && (
-                    <span className="text-xl text-muted-foreground line-through">£{parseFloat(offerItems[0].originalPrice).toFixed(2)}</span>
+                  {offerItems[0].offerPrice ? (
+                    <>
+                      <span className="text-3xl font-bold text-green-600">£{parseFloat(offerItems[0].offerPrice).toFixed(2)}</span>
+                      {offerItems[0].originalPrice && (
+                        <span className="text-xl text-muted-foreground line-through">£{parseFloat(offerItems[0].originalPrice).toFixed(2)}</span>
+                      )}
+                    </>
+                  ) : (
+                    <span className="text-3xl font-bold text-amber-600">POA</span>
                   )}
                 </div>
               </div>
@@ -451,8 +463,8 @@ function OfferSection({
         <div className="space-y-4">
           {offerItems.map((item) => {
             const originalPrice = item.originalPrice ? parseFloat(item.originalPrice) : null;
-            const offerPrice = parseFloat(item.offerPrice);
-            const discount = originalPrice ? Math.round(((originalPrice - offerPrice) / originalPrice) * 100) : null;
+            const offerPrice = item.offerPrice ? parseFloat(item.offerPrice) : null;
+            const discount = originalPrice && offerPrice ? Math.round(((originalPrice - offerPrice) / originalPrice) * 100) : null;
             return (
               <Card key={item.id} className="overflow-hidden" data-testid={`card-offer-list-${item.productId}`}>
                 <div className="flex flex-col sm:flex-row">
@@ -479,9 +491,15 @@ function OfferSection({
                       </Link>
                       <p className="text-xs text-muted-foreground mt-1">SKU: {item.product.sku}</p>
                       <div className="flex items-baseline gap-2 mt-2">
-                        <span className="text-lg font-bold text-green-600">£{offerPrice.toFixed(2)}</span>
-                        {originalPrice && originalPrice > offerPrice && (
-                          <span className="text-sm text-muted-foreground line-through">£{originalPrice.toFixed(2)}</span>
+                        {offerPrice ? (
+                          <>
+                            <span className="text-lg font-bold text-green-600">£{offerPrice.toFixed(2)}</span>
+                            {originalPrice && originalPrice > offerPrice && (
+                              <span className="text-sm text-muted-foreground line-through">£{originalPrice.toFixed(2)}</span>
+                            )}
+                          </>
+                        ) : (
+                          <span className="text-lg font-bold text-amber-600">POA</span>
                         )}
                       </div>
                     </div>

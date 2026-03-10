@@ -3113,7 +3113,10 @@ Apply ONLY the corrections I have requested above. Do not rewrite the entire art
   app.post("/api/admin/offers/:id/items", requireAdmin, async (req, res) => {
     try {
       const offerId = Number(req.params.id);
-      const item = await storage.createOfferItem({ ...req.body, offerId });
+      const body = { ...req.body };
+      if (body.offerPrice === '' || body.offerPrice === undefined) body.offerPrice = null;
+      if (body.originalPrice === '' || body.originalPrice === undefined) body.originalPrice = null;
+      const item = await storage.createOfferItem({ ...body, offerId });
       res.status(201).json(item);
     } catch (error) {
       console.error("Error adding offer item:", error);

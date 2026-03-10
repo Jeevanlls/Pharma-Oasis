@@ -1156,7 +1156,7 @@ export const offerItems = pgTable("offer_items", {
   id: serial("id").primaryKey(),
   offerId: integer("offer_id").notNull(),
   productId: integer("product_id").notNull(),
-  offerPrice: decimal("offer_price", { precision: 10, scale: 2 }).notNull(),
+  offerPrice: decimal("offer_price", { precision: 10, scale: 2 }),
   originalPrice: decimal("original_price", { precision: 10, scale: 2 }),
   discountLabel: varchar("discount_label", { length: 100 }),
   sortOrder: integer("sort_order").default(0),

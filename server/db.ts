@@ -61,12 +61,13 @@ pool.query(`
     id SERIAL PRIMARY KEY,
     offer_id INTEGER NOT NULL,
     product_id INTEGER NOT NULL,
-    offer_price DECIMAL(10,2) NOT NULL,
+    offer_price DECIMAL(10,2),
     original_price DECIMAL(10,2),
     discount_label VARCHAR(100),
     sort_order INTEGER DEFAULT 0,
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMP NOT NULL DEFAULT NOW()
   );
+  ALTER TABLE offer_items ALTER COLUMN offer_price DROP NOT NULL;
 `).then(() => console.log('Offers tables ready'))
   .catch((err: Error) => console.warn('Offers tables setup:', err.message));

@@ -456,12 +456,12 @@ function OfferItemsManager({ offerId }: { offerId: number }) {
   };
 
   const confirmAdd = () => {
-    if (!offerPrice || !addingProductId) return;
+    if (!addingProductId) return;
     addItemMutation.mutate({
       productId: addingProductId,
-      offerPrice,
+      offerPrice: offerPrice || null,
       originalPrice: originalPrice || null,
-      discountLabel: discountLabel || null,
+      discountLabel: discountLabel || (!offerPrice ? "POA" : null),
       sortOrder: items.length,
     });
   };
@@ -500,10 +500,10 @@ function OfferItemsManager({ offerId }: { offerId: number }) {
                       <Input
                         type="number"
                         step="0.01"
-                        placeholder="Offer £"
+                        placeholder="Offer £ (blank=POA)"
                         value={offerPrice}
                         onChange={(e) => setOfferPrice(e.target.value)}
-                        className="w-24"
+                        className="w-28"
                         data-testid="input-offer-price"
                       />
                       <Input
@@ -566,7 +566,9 @@ function OfferItemsManager({ offerId }: { offerId: number }) {
               </div>
               <div className="flex items-center gap-4 shrink-0">
                 <div className="text-right">
-                  <div className="font-semibold text-green-600">£{parseFloat(item.offerPrice).toFixed(2)}</div>
+                  <div className="font-semibold text-green-600">
+                    {item.offerPrice ? `£${parseFloat(item.offerPrice).toFixed(2)}` : "POA"}
+                  </div>
                   {item.originalPrice && (
                     <div className="text-xs text-muted-foreground line-through">£{parseFloat(item.originalPrice).toFixed(2)}</div>
                   )}
