@@ -186,6 +186,7 @@ export interface IStorage {
   getAllChatSessions(): Promise<ChatSession[]>;
   createChatLead(lead: InsertChatLead): Promise<ChatLead>;
   getAllChatLeads(): Promise<ChatLead[]>;
+  getChatLeadByEmailSince(email: string, since: Date): Promise<ChatLead | undefined>;
   updateChatLead(id: number, updates: Partial<InsertChatLead>): Promise<ChatLead | undefined>;
 
   // Blog Posts
@@ -1421,6 +1422,14 @@ export class DatabaseStorage implements IStorage {
 
   async getAllChatLeads(): Promise<ChatLead[]> {
     return db.select().from(chatLeads).orderBy(desc(chatLeads.createdAt));
+  }
+
+  async getChatLeadByEmailSince(email: string, since: Date): Promise<ChatLead | undefined> {
+    const { gte, ilike } = await import("drizzle-orm");
+    const [lead] = await db.select().from(chatLeads)
+      .where(sql`LOWER(email) = LOWER(${email}) AND created_at >= ${since}`)
+      .limit(1);
+    return lead;
   }
 
   async updateChatLead(id: number, updates: Partial<InsertChatLead>): Promise<ChatLead | undefined> {

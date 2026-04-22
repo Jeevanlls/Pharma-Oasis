@@ -1,6 +1,7 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import type { Server } from "http";
 import multer from "multer";
+import rateLimit from "express-rate-limit";
 import { storage } from "./storage";
 import { db } from "./db";
 import { 
@@ -49,12 +50,36 @@ declare module "express-session" {
 
 export async function registerRoutes(server: Server, app: Express): Promise<void> {
   // Trust proxy for production (required behind reverse proxies like Replit)
-  if (process.env.NODE_ENV === "production") {
-    app.set("trust proxy", 1);
-  }
+  app.set("trust proxy", 1);
 
   // Session middleware with PostgreSQL store
   app.use(sessionMiddleware);
+
+  // ==================== RATE LIMITERS ====================
+  const chatSessionLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000, // 1 hour
+    max: 5,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { message: "Too many chat sessions created from this IP. Please try again later." },
+  });
+
+  const chatMessageLimiter = rateLimit({
+    windowMs: 10 * 60 * 1000, // 10 minutes
+    max: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { message: "Too many messages sent from this IP. Please wait a few minutes before sending more." },
+  });
+
+  // Helper: extract real visitor IP (handles proxies)
+  const getVisitorIp = (req: any): string => {
+    const forwarded = req.headers["x-forwarded-for"];
+    if (forwarded) {
+      return (typeof forwarded === "string" ? forwarded : forwarded[0]).split(",")[0].trim();
+    }
+    return req.ip || req.socket?.remoteAddress || "unknown";
+  };
 
   // Root-level SEO routes (for Googlebot compliance)
   app.get("/robots.txt", (req, res, next) => {
@@ -3769,9 +3794,10 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
   });
 
   // ==================== AI CHAT ENDPOINTS ====================
-  app.post("/api/chat/session", async (req, res) => {
+  app.post("/api/chat/session", chatSessionLimiter, async (req, res) => {
     try {
       const { visitorName, visitorEmail, visitorCompany } = req.body || {};
+      const visitorIp = getVisitorIp(req);
       const sessionId = `chat_${Date.now()}_${Math.random().toString(36).substring(7)}`;
       const session = await storage.createChatSession({ 
         sessionId, 
@@ -3783,21 +3809,29 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
       });
       
       if (visitorName && visitorEmail) {
-        await storage.createChatLead({
-          sessionId,
-          name: visitorName,
-          email: visitorEmail,
-          company: visitorCompany || null,
-          status: "new",
-        });
-        
-        const { sendChatLeadNotification } = await import("./email");
-        sendChatLeadNotification({
-          name: visitorName,
-          email: visitorEmail,
-          company: visitorCompany,
-          sessionId,
-        }).catch(console.error);
+        // Check for duplicate email within 24 hours
+        const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        const existingLead = await storage.getChatLeadByEmailSince(visitorEmail, since24h);
+        if (existingLead) {
+          console.log(`[Chat] Duplicate lead suppressed for email ${visitorEmail} (IP: ${visitorIp})`);
+        } else {
+          await storage.createChatLead({
+            sessionId,
+            name: visitorName,
+            email: visitorEmail,
+            company: visitorCompany || null,
+            status: "new",
+          });
+
+          const { sendChatLeadNotification } = await import("./email");
+          sendChatLeadNotification({
+            name: visitorName,
+            email: visitorEmail,
+            company: visitorCompany,
+            sessionId,
+            visitorIp,
+          }).catch(console.error);
+        }
       }
       
       res.json({ sessionId: session.sessionId });
@@ -3807,9 +3841,10 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
     }
   });
 
-  app.post("/api/chat/message", async (req, res) => {
+  app.post("/api/chat/message", chatMessageLimiter, async (req, res) => {
     try {
       const { sessionId, message } = req.body;
+      const visitorIp = getVisitorIp(req);
       
       if (!sessionId || !message) {
         return res.status(400).json({ message: "Session ID and message are required" });
@@ -3837,13 +3872,27 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
       if (leadInfo.email || leadInfo.phone) {
         const existingSession = await storage.getChatSession(sessionId);
         if (existingSession && !existingSession.leadCaptured) {
-          await storage.createChatLead({
-            sessionId,
-            email: leadInfo.email,
-            phone: leadInfo.phone,
-            interest: leadInfo.interest,
-            status: "new",
-          });
+          // Check for duplicate email within 24 hours
+          let isDuplicate = false;
+          if (leadInfo.email) {
+            const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
+            const existingLead = await storage.getChatLeadByEmailSince(leadInfo.email, since24h);
+            if (existingLead) {
+              isDuplicate = true;
+              console.log(`[Chat] Duplicate lead suppressed for email ${leadInfo.email} (IP: ${visitorIp})`);
+            }
+          }
+
+          if (!isDuplicate) {
+            await storage.createChatLead({
+              sessionId,
+              email: leadInfo.email,
+              phone: leadInfo.phone,
+              interest: leadInfo.interest,
+              status: "new",
+            });
+          }
+
           await storage.updateChatSession(sessionId, { 
             leadCaptured: true,
             visitorEmail: leadInfo.email,
@@ -3851,16 +3900,19 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
           });
 
           // Send notification email for new lead
-          try {
-            const { sendChatLeadNotification } = await import("./email");
-            await sendChatLeadNotification({
-              email: leadInfo.email,
-              phone: leadInfo.phone,
-              interest: leadInfo.interest,
-              sessionId,
-            });
-          } catch (emailError) {
-            console.error("Failed to send lead notification:", emailError);
+          if (!isDuplicate) {
+            try {
+              const { sendChatLeadNotification } = await import("./email");
+              await sendChatLeadNotification({
+                email: leadInfo.email,
+                phone: leadInfo.phone,
+                interest: leadInfo.interest,
+                sessionId,
+                visitorIp,
+              });
+            } catch (emailError) {
+              console.error("Failed to send lead notification:", emailError);
+            }
           }
         }
       }
@@ -3881,10 +3933,21 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
     }
   });
 
-  app.post("/api/chat/lead", async (req, res) => {
+  app.post("/api/chat/lead", chatMessageLimiter, async (req, res) => {
     try {
       const { sessionId, name, email, phone, company, interest } = req.body;
-      
+      const visitorIp = getVisitorIp(req);
+
+      // Check for duplicate email within 24 hours
+      if (email) {
+        const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        const existingLead = await storage.getChatLeadByEmailSince(email, since24h);
+        if (existingLead) {
+          console.log(`[Chat] Duplicate lead suppressed for email ${email} (IP: ${visitorIp})`);
+          return res.json({ success: true, duplicate: true });
+        }
+      }
+
       const lead = await storage.createChatLead({
         sessionId,
         name,
@@ -3907,7 +3970,7 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
       // Send notification email
       try {
         const { sendChatLeadNotification } = await import("./email");
-        await sendChatLeadNotification({ name, email, phone, company, interest, sessionId });
+        await sendChatLeadNotification({ name, email, phone, company, interest, sessionId, visitorIp });
       } catch (emailError) {
         console.error("Failed to send lead notification:", emailError);
       }

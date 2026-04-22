@@ -471,6 +471,7 @@ export async function sendChatLeadNotification(data: {
   company?: string;
   interest?: string;
   sessionId: string;
+  visitorIp?: string;
 }): Promise<EmailResult> {
   const notificationEmail = process.env.NOTIFICATION_EMAIL;
   if (!notificationEmail) {
@@ -495,6 +496,7 @@ export async function sendChatLeadNotification(data: {
             ${data.phone ? `<tr><td style="padding: 8px 0; font-weight: bold;">Phone:</td><td><a href="tel:${data.phone}">${data.phone}</a></td></tr>` : ''}
             ${data.interest ? `<tr><td style="padding: 8px 0; font-weight: bold;">Interest:</td><td>${data.interest}</td></tr>` : ''}
             <tr><td style="padding: 8px 0; font-weight: bold;">Session ID:</td><td style="font-size: 12px; color: #666;">${data.sessionId}</td></tr>
+            ${data.visitorIp ? `<tr><td style="padding: 8px 0; font-weight: bold;">Visitor IP:</td><td style="font-family: monospace; background: #f1f5f9; padding: 2px 6px; border-radius: 4px;">${data.visitorIp}</td></tr>` : ''}
           </table>
         </div>
         <p><strong>Recommended Action:</strong></p>
@@ -502,6 +504,7 @@ export async function sendChatLeadNotification(data: {
           <li>Contact this lead within 24 hours</li>
           <li>Review the chat history in the admin panel</li>
           <li>Follow up on their specific interests</li>
+          ${data.visitorIp ? `<li>IP address recorded for security — report abuse to your hosting provider if needed</li>` : ''}
         </ul>
       </div>
       <div style="padding: 15px; background: #e2e8f0; text-align: center; font-size: 12px; color: #64748b;">
