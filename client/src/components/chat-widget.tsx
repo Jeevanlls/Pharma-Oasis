@@ -205,6 +205,7 @@ export function ChatWidget() {
                 handleClose();
               }}
               className="h-6 w-6 text-primary-foreground"
+              aria-label="Close chat"
               data-testid="button-close-chat-minimized"
             >
               <X className="h-4 w-4" />
@@ -232,6 +233,7 @@ export function ChatWidget() {
             variant="ghost"
             onClick={handleMinimize}
             className="h-6 w-6 text-primary-foreground"
+            aria-label="Minimise chat"
             data-testid="button-minimize-chat"
           >
             <Minimize2 className="h-4 w-4" />
@@ -241,6 +243,7 @@ export function ChatWidget() {
             variant="ghost"
             onClick={handleClose}
             className="h-6 w-6 text-primary-foreground"
+            aria-label="Close chat"
             data-testid="button-close-chat"
           >
             <X className="h-4 w-4" />
@@ -360,6 +363,7 @@ export function ChatWidget() {
               size="icon"
               onClick={sendMessage}
               disabled={!input.trim() || isLoading}
+              aria-label="Send message"
               data-testid="button-send-message"
             >
               <Send className="h-4 w-4" />

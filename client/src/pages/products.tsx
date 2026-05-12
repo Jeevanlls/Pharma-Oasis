@@ -432,7 +432,7 @@ export default function ProductsPage() {
               <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {products.map((product) => (
                   <Card key={product.id} className="overflow-hidden" data-testid={`card-product-${product.id}`}>
-                    <Link href={`/products/${product.slug || product.id}`}>
+                    <Link href={`/products/${product.slug || product.id}`} aria-label={product.productName}>
                       <div className="aspect-square bg-muted overflow-hidden">
                         <LazyImage
                           src={product.imageUrl || placeholderImage}
