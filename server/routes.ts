@@ -1484,8 +1484,7 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
 
       const OpenAI = (await import("openai")).default;
       const openai = new OpenAI({
-        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+        apiKey: process.env.OPENAI_API_KEY,
       });
 
       const response = await openai.chat.completions.create({
@@ -1522,8 +1521,7 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
 
       const OpenAI = (await import("openai")).default;
       const openai = new OpenAI({
-        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+        apiKey: process.env.OPENAI_API_KEY,
       });
 
       let prompt = `Product: "${productName}"`;
@@ -2348,8 +2346,7 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
       
       const OpenAI = (await import("openai")).default;
       const openai = new OpenAI({
-        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY,
-        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+        apiKey: process.env.OPENAI_API_KEY,
       });
 
       // Dynamic internal linking instructions based on topic relevance
@@ -2600,8 +2597,7 @@ ${includeComplianceLink ? '- MUST include exactly ONE compliance link (/complian
 
       const OpenAI = (await import("openai")).default;
       const openai = new OpenAI({
-        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY,
-        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+        apiKey: process.env.OPENAI_API_KEY,
       });
 
       const systemPrompt = `You are the Pharma Oasis compliance editor. Your role is to review and correct existing blog articles based on specific user instructions.
@@ -3180,8 +3176,7 @@ Apply ONLY the corrections I have requested above. Do not rewrite the entire art
 
       const OpenAI = (await import("openai")).default;
       const openai = new OpenAI({
-        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+        apiKey: process.env.OPENAI_API_KEY,
       });
 
       const completion = await openai.chat.completions.create({
@@ -3229,8 +3224,7 @@ Keep language professional, compliant with UK pharmaceutical regulations. Never 
 
       const OpenAI = (await import("openai")).default;
       const openai = new OpenAI({
-        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+        apiKey: process.env.OPENAI_API_KEY,
       });
 
       const completion = await openai.chat.completions.create({
