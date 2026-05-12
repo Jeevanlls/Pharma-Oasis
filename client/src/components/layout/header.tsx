@@ -78,11 +78,12 @@ export function Header() {
 
           <div className="flex items-center gap-2">
             {isAuthenticated && (
-              <Link href="/quote">
+              <Link href="/quote" aria-label="View quote basket">
                 <Button
                   variant="ghost"
                   size="icon"
                   className="relative"
+                  aria-label="View quote basket"
                   data-testid="button-quote-basket"
                 >
                   <ShoppingCart className="h-5 w-5" />
@@ -165,7 +166,7 @@ export function Header() {
 
             <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
               <SheetTrigger asChild className="md:hidden">
-                <Button variant="ghost" size="icon" data-testid="button-mobile-menu">
+                <Button variant="ghost" size="icon" aria-label="Open navigation menu" data-testid="button-mobile-menu">
                   <Menu className="h-5 w-5" />
                 </Button>
               </SheetTrigger>

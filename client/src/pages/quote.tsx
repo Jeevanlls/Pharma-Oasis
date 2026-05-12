@@ -187,6 +187,7 @@ export default function QuotePage() {
                               size="icon"
                               className="text-muted-foreground hover:text-destructive flex-shrink-0"
                               onClick={() => removeItem(item.product.id)}
+                              aria-label={`Remove ${item.product.productName} from quote`}
                               data-testid={`button-remove-${item.product.id}`}
                             >
                               <Trash2 className="h-4 w-4" />

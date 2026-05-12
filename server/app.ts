@@ -153,6 +153,14 @@ app.use(
 );
 app.use(express.urlencoded({ extended: false, limit: '50mb' }));
 
+// Allow search engine indexing for all public (non-admin, non-API) routes
+app.use((req, res, next) => {
+  if (!req.path.startsWith("/api") && !req.path.startsWith("/admin")) {
+    res.setHeader("X-Robots-Tag", "index, follow");
+  }
+  next();
+});
+
 // Request logging middleware (lightweight, no DB)
 app.use((req, res, next) => {
   const start = Date.now();

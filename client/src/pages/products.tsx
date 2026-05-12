@@ -225,6 +225,7 @@ export default function ProductsPage() {
             size="icon"
             disabled={page === 1}
             onClick={() => goToPage(page - 1)}
+            aria-label="Previous page"
             data-testid="button-prev-page"
           >
             <ChevronLeft className="h-4 w-4" />
@@ -249,6 +250,7 @@ export default function ProductsPage() {
             size="icon"
             disabled={page === totalPages}
             onClick={() => goToPage(page + 1)}
+            aria-label="Next page"
             data-testid="button-next-page"
           >
             <ChevronRight className="h-4 w-4" />

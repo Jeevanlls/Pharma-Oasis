@@ -220,6 +220,7 @@ function HeroCarousel() {
             size="icon"
             className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/30 text-white backdrop-blur-sm z-10"
             onClick={() => api?.scrollPrev()}
+            aria-label="Previous slide"
             data-testid="button-hero-prev"
           >
             <ChevronLeft className="h-6 w-6" />
@@ -229,6 +230,7 @@ function HeroCarousel() {
             size="icon"
             className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/30 text-white backdrop-blur-sm z-10"
             onClick={() => api?.scrollNext()}
+            aria-label="Next slide"
             data-testid="button-hero-next"
           >
             <ChevronRight className="h-6 w-6" />
