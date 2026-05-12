@@ -314,7 +314,7 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
         return res.json({ message: "If an account exists, a reset link has been sent." });
       }
 
-      const crypto = await import("crypto");
+      const crypto = await import("node:crypto");
       const token = crypto.randomBytes(32).toString("hex");
       const expiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
@@ -362,7 +362,6 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
         return res.status(400).json({ message: "This reset link has expired. Please request a new one." });
       }
 
-      const bcrypt = await import("bcrypt");
       const passwordHash = await bcrypt.hash(password, 12);
 
       await storage.updateUser(user.id, {
