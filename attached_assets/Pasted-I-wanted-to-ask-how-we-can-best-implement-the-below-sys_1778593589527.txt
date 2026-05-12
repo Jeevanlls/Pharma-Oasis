@@ -1,0 +1,38 @@
+I wanted to ask how we can best implement the below system with some new changes and improvements I have in mind.
+We currently work closely with around 50 brands that we distribute regularly. I want to create a professional customer portal where our sales team can easily update product prices and offers via Excel upload.
+Main requirements:
+We already have EAN numbers for products, which should be used as the unique identifier.
+We have over 50,000 products and many brands already, but initially I want to focus mainly on the key brands we are strongest with.
+I want the system to allow bulk product/price updates through Excel uploads by our internal staff.
+Our uploaded prices will also feed Google Shopping data.
+Customer Portal Features:
+Customers must have secure login accounts.
+Once logged in, customers should:
+Search products by brand, product name, SKU, or EAN.
+View their pricing.
+See weekly offers/promotions clearly displayed on the dashboard.
+Build their basket/order online.
+Submit orders directly through the portal.
+Backend/Admin Features:
+Once an order is submitted:
+Email notifications should be sent automatically.
+Admin staff should receive the order in the backend.
+Orders should be downloadable/exportable to Excel.
+We should then process orders through our existing inventory/accounting system.
+What I’m looking for:
+I don’t just want a basic website — I want something professional, innovative, customer-friendly, and easy for our internal sales team to manage.
+Before building, I would like you to:
+Study our current setup and architecture.
+Review the best long-term structure.
+Advise the best frontend and backend solution.
+Suggest how to keep the system scalable and stable as products and customers grow.
+Recommend the best database structure and import/update process for large Excel product updates.
+Suggest the best UX/UI flow for customers and admins.
+The portal needs to feel modern, fast, and simple to use, especially for trade customers placing repeat orders.
+I would also like your recommendation on:
+Best tech stack for this
+Best approach for Google Shopping integration
+Customer-specific pricing logic
+Role permissions for staff/admin/customers
+Future expansion possibilities (mobile app, API access, automated stock sync, AI product search, etc.)
+Please first analyse and advise the best architecture and implementation approach before starting development.

@@ -3,6 +3,8 @@ import { createServer } from "http";
 import path from "path"; 
 import compression from "compression"; 
 import helmet from "helmet";
+import cors from "cors";
+import rateLimit from "express-rate-limit";
 
 // ============================================================================
 // FULL APPLICATION ENTRY POINT (server/app.ts)
@@ -65,6 +67,50 @@ declare module "http" {
     rawBody: unknown;
   }
 }
+
+// CORS - restrict to known origins
+const allowedOrigins = [
+  "https://pharmaoasis.com",
+  "https://www.pharmaoasis.com",
+  "https://pharma-oasis--jeevan.replit.app",
+];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (same-origin, health probes, server-to-server)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    // In development also allow localhost on any port
+    if (!IS_PRODUCTION && /^https?:\/\/localhost(:\d+)?$/.test(origin)) return callback(null, true);
+    // Reject all other origins with a clear 403
+    return callback(null, false);
+  },
+  credentials: true,
+}));
+
+// Explicitly return 403 for requests whose origin was rejected by CORS
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (!origin) return next();
+  const isAllowed =
+    allowedOrigins.includes(origin) ||
+    (!IS_PRODUCTION && /^https?:\/\/localhost(:\d+)?$/.test(origin));
+  if (!isAllowed) {
+    return res.status(403).json({ message: "Origin not allowed" });
+  }
+  next();
+});
+
+// Global API rate limiter — 100 requests per minute per IP across all /api/ routes
+const globalApiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many requests. Please slow down and try again in a minute." },
+  skip: (req) => req.path === "/api/health" || req.path === "/health" || req.path === "/healthz",
+});
+app.use("/api", globalApiLimiter);
 
 // Compression middleware
 app.use(compression());

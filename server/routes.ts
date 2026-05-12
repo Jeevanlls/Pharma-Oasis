@@ -3850,6 +3850,10 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
         return res.status(400).json({ message: "Session ID and message are required" });
       }
 
+      if (message.length > 500) {
+        return res.status(400).json({ message: "Message is too long. Please keep messages under 500 characters." });
+      }
+
       // Save user message
       await storage.createChatMessage({ sessionId, role: "user", content: message });
 
