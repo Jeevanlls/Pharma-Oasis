@@ -31,6 +31,8 @@ import CompliancePage from "@/pages/compliance";
 import PharmaceuticalWholesalersPage from "@/pages/pharmaceutical-wholesalers";
 import ProductDetailPage from "@/pages/product-detail";
 import OffersPage from "@/pages/offers";
+import ForgotPasswordPage from "@/pages/forgot-password";
+import ResetPasswordPage from "@/pages/reset-password";
 
 import AdminDashboard from "@/pages/admin/index";
 import AdminUsersPage from "@/pages/admin/users";
@@ -88,6 +90,8 @@ function Router() {
     <Switch>
       <Route path="/" component={HomePage} />
       <Route path="/login" component={LoginPage} />
+      <Route path="/forgot-password" component={ForgotPasswordPage} />
+      <Route path="/reset-password" component={ResetPasswordPage} />
       <Route path="/register" component={RegisterPage} />
       <Route path="/products" component={ProductsPage} />
       <Route path="/products/:idOrSlug" component={ProductDetailPage} />

@@ -53,7 +53,10 @@ export const users = pgTable("users", {
   howDidYouHear: varchar("how_did_you_hear", { length: 100 }),
   notes: text("notes"),
   marketingConsent: boolean("marketing_consent").default(false),
-  
+
+  passwordResetToken: varchar("password_reset_token", { length: 128 }),
+  passwordResetExpiry: timestamp("password_reset_expiry"),
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

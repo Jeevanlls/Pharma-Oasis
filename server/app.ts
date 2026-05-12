@@ -359,6 +359,17 @@ async function initializeFullApplication() {
       log(`Chat tables warning: ${err.message}`);
     }
 
+    // Add password reset columns to users table if not present
+    try {
+      await db.execute(`
+        ALTER TABLE users
+          ADD COLUMN IF NOT EXISTS password_reset_token VARCHAR(128),
+          ADD COLUMN IF NOT EXISTS password_reset_expiry TIMESTAMP;
+      `);
+    } catch (err: any) {
+      log(`Password reset columns warning: ${err.message}`);
+    }
+
     // Auto-seed check
     try {
       const adminUser = await db.select().from(users).where(eq(users.email, "admin@pharmaoasis.com"));

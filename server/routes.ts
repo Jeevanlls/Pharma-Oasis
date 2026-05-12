@@ -300,6 +300,85 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     });
   });
 
+  // Forgot password — generate token and send email
+  app.post("/api/auth/forgot-password", async (req, res) => {
+    try {
+      const { email } = req.body;
+      if (!email || typeof email !== "string") {
+        return res.status(400).json({ message: "Email is required" });
+      }
+
+      // Always return 200 to avoid revealing whether an account exists
+      const user = await storage.getUserByEmail(email.toLowerCase().trim());
+      if (!user) {
+        return res.json({ message: "If an account exists, a reset link has been sent." });
+      }
+
+      const crypto = await import("crypto");
+      const token = crypto.randomBytes(32).toString("hex");
+      const expiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+      await storage.updateUser(user.id, {
+        passwordResetToken: token,
+        passwordResetExpiry: expiry,
+      } as any);
+
+      const SITE_URL = process.env.SITE_URL || "https://pharmaoasis.co.uk";
+      const resetUrl = `${SITE_URL}/reset-password?token=${token}`;
+
+      const { sendPasswordResetEmail } = await import("./email");
+      await sendPasswordResetEmail({
+        email: user.email,
+        contactName: user.primaryContactName || user.companyName || "Customer",
+        resetUrl,
+      });
+
+      console.log(`[Password Reset] Token generated for ${user.email}, expires ${expiry.toISOString()}`);
+      res.json({ message: "If an account exists, a reset link has been sent." });
+    } catch (error) {
+      console.error("Forgot password error:", error);
+      res.status(500).json({ message: "Failed to process request. Please try again." });
+    }
+  });
+
+  // Reset password — validate token and update password
+  app.post("/api/auth/reset-password", async (req, res) => {
+    try {
+      const { token, password } = req.body;
+      if (!token || !password) {
+        return res.status(400).json({ message: "Token and password are required" });
+      }
+      if (typeof password !== "string" || password.length < 8) {
+        return res.status(400).json({ message: "Password must be at least 8 characters" });
+      }
+
+      const user = await storage.getUserByResetToken(token);
+      if (!user) {
+        return res.status(400).json({ message: "This reset link is invalid or has already been used." });
+      }
+
+      const expiry = (user as any).passwordResetExpiry;
+      if (!expiry || new Date(expiry) < new Date()) {
+        return res.status(400).json({ message: "This reset link has expired. Please request a new one." });
+      }
+
+      const bcrypt = await import("bcrypt");
+      const passwordHash = await bcrypt.hash(password, 12);
+
+      await storage.updateUser(user.id, {
+        passwordHash,
+        passwordResetToken: null,
+        passwordResetExpiry: null,
+      } as any);
+
+      console.log(`[Password Reset] Password updated for ${user.email}`);
+      res.json({ message: "Password updated successfully." });
+    } catch (error) {
+      console.error("Reset password error:", error);
+      res.status(500).json({ message: "Failed to reset password. Please try again." });
+    }
+  });
+
   // Profile update endpoint for customers
   app.patch("/api/profile", requireAuth, async (req, res) => {
     try {

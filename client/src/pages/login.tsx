@@ -132,7 +132,13 @@ export default function LoginPage() {
               </form>
             </Form>
 
-            <div className="mt-6 text-center text-sm text-muted-foreground">
+            <div className="mt-4 text-center">
+              <Link href="/forgot-password" className="text-sm text-muted-foreground hover:text-primary" data-testid="link-forgot-password">
+                Forgot your password?
+              </Link>
+            </div>
+
+            <div className="mt-4 text-center text-sm text-muted-foreground">
               Don't have an account?{" "}
               <Link href="/register" className="font-medium text-primary hover:underline">
                 Register as a Customer

@@ -464,6 +464,45 @@ export async function sendSupplierConfirmation(data: {
   return sendEmail(data.email, subject, html);
 }
 
+export async function sendPasswordResetEmail(data: {
+  email: string;
+  contactName: string;
+  resetUrl: string;
+}): Promise<EmailResult> {
+  const subject = `Reset Your Pharma Oasis Password`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background: #1e40af; color: white; padding: 20px; text-align: center;">
+        <h1 style="margin: 0;">Password Reset Request</h1>
+      </div>
+      <div style="padding: 20px; background: #f8fafc;">
+        <p style="font-size: 16px;">Dear ${data.contactName || "Customer"},</p>
+        <p>We received a request to reset the password for your Pharma Oasis account associated with <strong>${data.email}</strong>.</p>
+        <p>Click the button below to set a new password. This link is valid for <strong>1 hour</strong>.</p>
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${data.resetUrl}"
+             style="display: inline-block; background: #1e40af; color: white; padding: 14px 32px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">
+            Reset My Password
+          </a>
+        </div>
+        <div style="padding: 15px; background: #fef3c7; border-radius: 8px; margin: 20px 0;">
+          <p style="margin: 0; color: #92400e; font-size: 13px;">
+            <strong>Security notice:</strong> If you did not request a password reset, please ignore this email. Your password will not change unless you click the link above.
+          </p>
+        </div>
+        <p style="font-size: 13px; color: #6b7280;">
+          If the button doesn't work, copy and paste this link into your browser:<br/>
+          <a href="${data.resetUrl}" style="color: #1e40af; word-break: break-all;">${data.resetUrl}</a>
+        </p>
+      </div>
+      <div style="padding: 15px; background: #e2e8f0; text-align: center; font-size: 12px; color: #64748b;">
+        Pharma Oasis &mdash; Your Trusted Wholesale Partner
+      </div>
+    </div>
+  `;
+  return sendEmail(data.email, subject, html);
+}
+
 export async function sendChatLeadNotification(data: {
   name?: string;
   email?: string;
