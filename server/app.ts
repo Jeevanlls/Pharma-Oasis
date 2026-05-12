@@ -70,6 +70,8 @@ declare module "http" {
 
 // CORS - restrict to known origins
 const allowedOrigins = [
+  "https://pharmaoasis.co.uk",
+  "https://www.pharmaoasis.co.uk",
   "https://pharmaoasis.com",
   "https://www.pharmaoasis.com",
   "https://pharma-oasis--jeevan.replit.app",
