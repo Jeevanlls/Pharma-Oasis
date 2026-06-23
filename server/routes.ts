@@ -3939,6 +3939,79 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
     res.json({ success: true });
   });
 
+  // ==================== CUSTOMER PORTAL ====================
+  // Catalogue priced for the logged-in customer (cost/margin never sent).
+  app.get("/api/portal/products", requireActiveCustomer, async (req: any, res) => {
+    try {
+      const search = (req.query.search as string) || "";
+      const brand = req.query.brand ? Number(req.query.brand) : undefined;
+      const category = req.query.category ? Number(req.query.category) : undefined;
+      const sort = (req.query.sort as string) || "name";
+      const availability = (req.query.availability as string) || "";
+      const pageSize = Math.min(Number(req.query.limit) || 24, 100);
+      const pageNum = Math.max(Number(req.query.page) || 1, 1);
+      const opts = { activeOnly: true, limit: pageSize, offset: (pageNum - 1) * pageSize };
+
+      let productList: any[];
+      let total: number;
+      if (search.trim()) {
+        productList = await storage.searchProductsFullText(search, opts);
+        total = await storage.getProductCount({ activeOnly: true, search });
+      } else if (brand) {
+        productList = await storage.getProductsByBrand(brand, opts);
+        total = await storage.getProductCount({ activeOnly: true, brandId: brand });
+      } else if (category) {
+        productList = await storage.getProductsByCategory(category, opts);
+        total = await storage.getProductCount({ activeOnly: true, categoryId: category });
+      } else {
+        productList = await storage.getAllProducts({ activeOnly: true, limit: pageSize, offset: opts.offset });
+        total = await storage.getProductCount({ activeOnly: true });
+      }
+
+      const resolved = await resolveForList(req.user.priceListId, productList);
+      let items = productList.map((p) => {
+        const cp = toCustomerPrice(resolved.get(p.id)!);
+        return {
+          id: p.id,
+          productName: p.productName,
+          sku: p.sku,
+          ean: p.ean,
+          brandId: p.brandId,
+          categoryId: p.categoryId,
+          imageUrl: p.imageUrl,
+          packSize: p.packSize,
+          caseSize: p.caseSize,
+          uom: p.uom,
+          slug: p.slug,
+          rrp: p.rrp,
+          price: cp.price,
+          availability: cp.availability,
+          availableQty: cp.availableQty,
+        };
+      });
+
+      // Availability filter + price sort applied within the page.
+      if (availability) items = items.filter((i) => i.availability === availability);
+      if (sort === "price-asc") items.sort((a, b) => (a.price ?? Infinity) - (b.price ?? Infinity));
+      else if (sort === "price-desc") items.sort((a, b) => (b.price ?? -Infinity) - (a.price ?? -Infinity));
+
+      res.json({ products: items, total, page: pageNum, pageSize, hasPriceList: !!req.user.priceListId });
+    } catch (error: any) {
+      console.error("Portal products error:", error);
+      res.status(500).json({ message: "Failed to load products" });
+    }
+  });
+
+  // Single product priced for the customer (for a detail view).
+  app.get("/api/portal/products/:id", requireActiveCustomer, async (req: any, res) => {
+    const product = await storage.getProduct(Number(req.params.id));
+    if (!product || !product.isActive) return res.status(404).json({ message: "Product not found" });
+    const resolved = await resolveForList(req.user.priceListId, [product]);
+    const cp = toCustomerPrice(resolved.get(product.id)!);
+    const { activeCostPrice, activeCostUploadId, costEffectiveDate, costExpiryDate, costStatus, wholesalePrice, googleFeedPrice, notesInternal, ...safe } = product as any;
+    res.json({ ...safe, ...cp });
+  });
+
   app.get("/api/admin/uploads/categories", requireAdmin, (req, res) => {
     res.json(getImageCategories());
   });

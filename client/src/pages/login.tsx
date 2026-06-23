@@ -41,7 +41,8 @@ export default function LoginPage() {
         title: "Welcome back!",
         description: "You have successfully logged in.",
       });
-      setLocation("/products");
+      const redirect = new URLSearchParams(window.location.search).get("redirect");
+      setLocation(redirect || "/products");
     } else {
       setError(result.error || "Login failed. Please check your credentials.");
     }

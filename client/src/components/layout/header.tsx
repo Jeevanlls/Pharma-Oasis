@@ -20,6 +20,7 @@ import {
   Network,
   BookOpen,
   Percent,
+  Store,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -77,6 +78,13 @@ export function Header() {
           </nav>
 
           <div className="flex items-center gap-2">
+            <Link href="/portal" className="hidden sm:block">
+              <Button variant="default" size="sm" className="gap-2" data-testid="button-customer-portal">
+                <Store className="h-4 w-4" />
+                Customer Portal
+              </Button>
+            </Link>
+
             {isAuthenticated && (
               <Link href="/quote" aria-label="View quote basket">
                 <Button
@@ -196,6 +204,12 @@ export function Header() {
                   </nav>
 
                   <div className="border-t pt-4">
+                    <Link href="/portal">
+                      <Button className="w-full justify-start gap-2 mb-2" onClick={() => setMobileMenuOpen(false)}>
+                        <Store className="h-4 w-4" />
+                        Customer Portal
+                      </Button>
+                    </Link>
                     {isAuthenticated ? (
                       <div className="flex flex-col gap-1">
                         <Link href="/quote">

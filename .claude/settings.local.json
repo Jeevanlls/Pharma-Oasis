@@ -5,7 +5,16 @@
       "Bash(git stash *)",
       "Bash(npx tsc *)",
       "Bash(node *)",
-      "Bash(npx tsx *)"
+      "Bash(npx tsx *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5000/api/brands)",
+      "Bash(npm run *)",
+      "Bash(curl -s -o /dev/null -w \"brands:%{http_code} \" http://localhost:5000/api/brands)",
+      "Bash(curl -s -o /dev/null -w \"template:%{http_code}\" http://localhost:5000/api/admin/cost-template)",
+      "Bash(pkill -f \"tsx server/index.ts\")",
+      "Bash(curl -s -o /dev/null -w \"home:%{http_code} \" http://localhost:5000/)",
+      "Bash(curl -s -o /dev/null -w \"portal-api\\(no auth\\):%{http_code}\" http://localhost:5000/api/portal/products)",
+      "Bash(curl -s -c jar.txt -X POST http://localhost:5000/api/auth/login -H \"Content-Type: application/json\" -d '{\"email\":\"admin@pharmaoasis.com\",\"password\":\"Admin!234\"}' -o /dev/null -w \"login:%{http_code}\\\\n\")",
+      "Bash(curl -s -b jar.txt \"http://localhost:5000/api/portal/products?limit=3\")"
     ]
   }
 }

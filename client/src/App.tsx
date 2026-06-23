@@ -5,7 +5,9 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { QuoteBasketProvider } from "@/lib/quote-basket";
+import { PortalBasketProvider } from "@/lib/portal-basket";
 import { AdminLayout } from "@/components/layout/admin-layout";
+import { PortalLayout } from "@/components/layout/portal-layout";
 import { CookieConsentBanner } from "@/components/cookie-consent";
 
 import NotFound from "@/pages/not-found";
@@ -60,6 +62,13 @@ import AdminSeoAgentPage from "@/pages/admin/seo-agent";
 import AdminBlogPage from "@/pages/admin/blog";
 import AdminProductRotationPage from "@/pages/admin/product-rotation";
 import AdminOffersPage from "@/pages/admin/offers";
+import AdminCostUploadsPage from "@/pages/admin/cost-uploads";
+import AdminPriceListsPage from "@/pages/admin/price-lists";
+
+import PortalCataloguePage from "@/pages/portal/catalogue";
+import PortalBasketPage from "@/pages/portal/basket";
+import PortalOrdersPage from "@/pages/portal/orders";
+import PortalQuotesPage from "@/pages/portal/quotes";
 
 function AdminRoute({ component: Component }: { component: React.ComponentType }) {
   const { isAdmin, isLoading } = useAuth();
@@ -82,6 +91,36 @@ function AdminRoute({ component: Component }: { component: React.ComponentType }
     <AdminLayout>
       <Component />
     </AdminLayout>
+  );
+}
+
+function PortalRoute({ component: Component }: { component: React.ComponentType }) {
+  const { isCustomer, isAdmin, isAuthenticated, isLoading } = useAuth();
+  const [, setLocation] = useLocation();
+
+  if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    setLocation("/login?redirect=/portal");
+    return null;
+  }
+
+  if (!isCustomer && !isAdmin) {
+    // Authenticated but not an active customer (e.g. pending approval).
+    setLocation("/dashboard");
+    return null;
+  }
+
+  return (
+    <PortalLayout>
+      <Component />
+    </PortalLayout>
   );
 }
 
@@ -139,7 +178,14 @@ function Router() {
       <Route path="/admin/blog">{() => <AdminRoute component={AdminBlogPage} />}</Route>
       <Route path="/admin/product-rotation">{() => <AdminRoute component={AdminProductRotationPage} />}</Route>
       <Route path="/admin/offers">{() => <AdminRoute component={AdminOffersPage} />}</Route>
-      
+      <Route path="/admin/cost-uploads">{() => <AdminRoute component={AdminCostUploadsPage} />}</Route>
+      <Route path="/admin/price-lists">{() => <AdminRoute component={AdminPriceListsPage} />}</Route>
+
+      <Route path="/portal">{() => <PortalRoute component={PortalCataloguePage} />}</Route>
+      <Route path="/portal/basket">{() => <PortalRoute component={PortalBasketPage} />}</Route>
+      <Route path="/portal/orders">{() => <PortalRoute component={PortalOrdersPage} />}</Route>
+      <Route path="/portal/quotes">{() => <PortalRoute component={PortalQuotesPage} />}</Route>
+
       <Route component={NotFound} />
     </Switch>
   );
@@ -150,11 +196,13 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <QuoteBasketProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Router />
-            <CookieConsentBanner />
-          </TooltipProvider>
+          <PortalBasketProvider>
+            <TooltipProvider>
+              <Toaster />
+              <Router />
+              <CookieConsentBanner />
+            </TooltipProvider>
+          </PortalBasketProvider>
         </QuoteBasketProvider>
       </AuthProvider>
     </QueryClientProvider>

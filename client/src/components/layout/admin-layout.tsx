@@ -38,6 +38,8 @@ import {
   Newspaper,
   Shuffle,
   Percent,
+  FileUp,
+  Coins,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 
@@ -59,6 +61,11 @@ const mainMenuItems = [
   { title: "Messages", href: "/admin/messages", icon: MessageSquare, staffAccess: false },
   { title: "Chat Leads", href: "/admin/chat-leads", icon: Bot, staffAccess: false },
   { title: "Offers", href: "/admin/offers", icon: Percent, staffAccess: false },
+];
+
+const pricingMenuItems = [
+  { title: "Cost Uploads", href: "/admin/cost-uploads", icon: FileUp, staffAccess: false },
+  { title: "Price Lists", href: "/admin/price-lists", icon: Coins, staffAccess: false },
 ];
 
 const homepageMenuItems = [
@@ -87,6 +94,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
   const isAdmin = user?.role === "admin";
   
   const filteredMainMenuItems = mainMenuItems.filter(item => isAdmin || item.staffAccess);
+  const filteredPricingMenuItems = pricingMenuItems.filter(item => isAdmin || item.staffAccess);
   const filteredHomepageMenuItems = homepageMenuItems.filter(item => isAdmin || item.staffAccess);
   const filteredSiteMenuItems = siteMenuItems.filter(item => isAdmin || item.staffAccess);
 
@@ -134,6 +142,26 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
+
+            {filteredPricingMenuItems.length > 0 && (
+              <SidebarGroup>
+                <SidebarGroupLabel>Customer Pricing</SidebarGroupLabel>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    {filteredPricingMenuItems.map((item) => (
+                      <SidebarMenuItem key={item.href}>
+                        <SidebarMenuButton asChild isActive={location === item.href}>
+                          <Link href={item.href}>
+                            <item.icon className="h-4 w-4" />
+                            <span>{item.title}</span>
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    ))}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            )}
 
             {filteredHomepageMenuItems.length > 0 && (
               <SidebarGroup>
