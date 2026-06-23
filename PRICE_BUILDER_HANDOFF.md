@@ -12,6 +12,27 @@ Working on branch **`feature/price-list-builder`** (off `main`, NOT yet merged).
 
 > Context: a previous session built the Price List Builder but the workspace reset before committing, so it looked like "nothing happened." It was all recovered and is now safely committed. **Commit work promptly.**
 
+## 🐞 KNOWN BUG — investigate FIRST (reported by user 2026-06-23)
+
+User re-uploaded the same cost file with ~20 lines removed and saw: (a) the **missing 20 lines were not identified** by reconciliation, and (b) **every row flagged "No matching product (EAN not found)"**.
+
+**Symptom (b) — root cause FOUND (real bug):**
+- Cost Uploads page picks the brand from `pricing_brands` (`/api/admin/pricing-brands`) and passes that **pricingBrand id** to `buildPreview()` in `server/cost-importer.ts` (~line 149).
+- `buildPreview` matches uploaded EANs against the **catalogue `products`** table: `db.select().from(products).where(eq(products.brandId, brandId))`.
+- But `products.brandId` references the **catalogue `brands`** table — a DIFFERENT id namespace from `pricing_brands`. So the lookup returns ~nothing → every row is "unmatched" → "EAN not found" for all.
+- This "match against catalogue products" is a legacy v1 concern (caching cost onto catalogue products). The v2 price-list reconciliation does NOT need it — `reconcilePreview` matches `cost_upload_rows.ean` vs `price_list_items.ean` directly.
+- **Likely proper fix:** for v2, "previous cost"/matching should come from the brand's *prior published cost upload* (same `pricing_brands` id), not the catalogue `products` table. Decide with the user whether to (i) make `buildPreview` match against the previous cost upload's rows for that pricing brand, and/or (ii) just stop flagging "EAN not found" when running in the v2/pricing-brand flow. This is a design choice — confirm before changing.
+
+**Symptom (a) — missing not detected — TOP HYPOTHESES to check:**
+1. **Was the new upload PUBLISHED?** `reconcilePreview` (in `server/pricing-v2.ts`) only compares against the brand's *latest **published*** cost upload (`getBaseCostForBrand`). If the new file is still a **draft**, it compares the list to the OLD published cost → no missing/changes detected. CHECK THIS FIRST.
+2. **EAN format mismatch.** `price_list_items.ean` was stored from the original build; `cost_upload_rows.ean` is stored raw (`r.ean || null` in `pricing-store.ts createDraftUpload`) — NOT normalized, while `buildPreview` uses `normEan()` for catalogue matching. If raw EANs differ in whitespace/leading-zero format between the two uploads, reconcile won't match them. Consider normalizing EAN consistently on store + in `reconcilePreview`.
+
+**Debug steps for tomorrow:**
+- Reproduce: note the exact pricingBrand, whether the new upload was published, and row counts.
+- Query the DB: compare `cost_upload_rows.ean` for the brand's latest published upload vs `price_list_items.ean` for the list — are they present and same format?
+- Confirm `reconcilePreview` is reading the new upload (check `getBaseCostForBrand` returns the new uploadId).
+- Backend reconcile logic itself is unit-tested and works on matching EANs (see test history) — so the bug is almost certainly in EAN storage/format or the publish step, not the reconcile maths.
+
 ## What's built (all working)
 
 **Price List Builder** — `/admin/price-builder` (Admin sidebar → Pricing → Price List Builder)
