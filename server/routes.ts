@@ -3974,6 +3974,32 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
     res.json(await pricingV2.refreshFromBaseCost(parseInt(req.params.id, 10)));
   });
 
+  // Reconcile a new base cost against the saved list — preview the changed /
+  // new / missing products before applying anything.
+  app.get("/api/admin/v2/price-lists/:id/reconcile", requireAdmin, async (req, res) => {
+    try {
+      res.json(await pricingV2.reconcilePreview(parseInt(req.params.id, 10)));
+    } catch (e: any) {
+      res.status(500).json({ message: e.message || "Failed to build reconciliation" });
+    }
+  });
+
+  // Apply the admin's reviewed reconciliation decisions.
+  app.post("/api/admin/v2/price-lists/:id/reconcile", requireAdmin, async (req, res) => {
+    try {
+      const result = await pricingV2.reconcileApply(parseInt(req.params.id, 10), {
+        applyChangedItemIds: Array.isArray(req.body.applyChangedItemIds) ? req.body.applyChangedItemIds : [],
+        addNewEans: Array.isArray(req.body.addNewEans) ? req.body.addNewEans : [],
+        newMarginPercent: req.body.newMarginPercent ?? null,
+        removeMissingItemIds: Array.isArray(req.body.removeMissingItemIds) ? req.body.removeMissingItemIds : [],
+      });
+      const found = await pricingV2.getPriceListFull(parseInt(req.params.id, 10));
+      res.json({ ...result, ...found });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message || "Failed to apply reconciliation" });
+    }
+  });
+
   app.delete("/api/admin/v2/price-lists/:id", requireAdmin, async (req, res) => {
     await pricingV2.deletePriceListV2(parseInt(req.params.id, 10));
     res.json({ success: true });

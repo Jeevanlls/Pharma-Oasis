@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { AdminLayout } from "@/components/layout/admin-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -64,6 +64,7 @@ export default function PriceBuilderPage() {
 
   // Bulk pricing dialog (tiered cost bands / cost + £)
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [reconcileOpen, setReconcileOpen] = useState(false);
   const [bulkStrategy, setBulkStrategy] = useState<"tiered" | "cost_plus">("tiered");
   const [bulkPlus, setBulkPlus] = useState("");
   const [bands, setBands] = useState<{ upTo: string; margin: string }[]>([
@@ -203,16 +204,6 @@ export default function PriceBuilderPage() {
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
-  const refreshCost = useMutation({
-    mutationFn: async () => (await apiRequest("POST", `/api/admin/v2/price-lists/${selectedId}/refresh-cost`)).json(),
-    onSuccess: (res: any) => {
-      queryClient.invalidateQueries({ queryKey: [`/api/admin/v2/price-lists/${selectedId}`] });
-      setEdits({});
-      toast({ title: "Refreshed from base cost", description: `${res.updated} recomputed, ${res.fixedToReview} fixed prices to review.` });
-    },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
-
   const setStatus = useMutation({
     mutationFn: async (status: string) => apiRequest("PUT", `/api/admin/v2/price-lists/${selectedId}`, { status }),
     onSuccess: () => {
@@ -299,8 +290,8 @@ export default function PriceBuilderPage() {
                       <Button size="sm" variant="outline" onClick={() => setAssignOpen(true)} data-testid="button-assign">
                         <Users className="h-4 w-4 mr-1" /> Assign ({selected.customerCount})
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => refreshCost.mutate()} title="Re-pull the latest base cost">
-                        <RefreshCw className="h-4 w-4" />
+                      <Button size="sm" variant="outline" onClick={() => setReconcileOpen(true)} title="Review a new supplier cost before applying" data-testid="button-reconcile">
+                        <RefreshCw className="h-4 w-4 mr-1" /> Review new cost
                       </Button>
                       {selected.status === "published" ? (
                         <Button size="sm" variant="outline" onClick={() => setStatus.mutate("draft")}>Unpublish</Button>
@@ -588,6 +579,11 @@ export default function PriceBuilderPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Reconcile (review new cost) dialog */}
+      {selected && (
+        <ReconcileDialog open={reconcileOpen} onOpenChange={setReconcileOpen} listId={selected.id} listName={selected.name} />
+      )}
+
       {/* Assign dialog */}
       {selected && (
         <AssignDialog open={assignOpen} onOpenChange={setAssignOpen} listId={selected.id} listName={selected.name} brandName={selected.brandName} />
@@ -698,6 +694,239 @@ function AssignDialog({ open, onOpenChange, listId, listName, brandName }: {
           <Button onClick={() => assign.mutate({ replace: false })}
             disabled={Object.values(checked).every((v) => !v) || assign.isPending} data-testid="button-confirm-assign">
             {assign.isPending ? "Assigning…" : "Assign selected"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ============================================================
+// RECONCILE — review a new supplier cost before applying it to the list.
+// Buckets: price changed (confirm), new products (add), missing (keep/delete).
+// ============================================================
+interface ReconcileChanged {
+  itemId: number; ean: string | null; description: string | null; method: string;
+  oldCost: number | null; newCost: number | null; changePercent: number | null; big: boolean;
+}
+interface ReconcileNew { ean: string | null; description: string | null; cost: number | null; costRowId: number; }
+interface ReconcileMissing { itemId: number; ean: string | null; description: string | null; oldCost: number | null; preparedPrice: number | null; }
+interface ReconcilePreview {
+  hasBaseCost: boolean; defaultMarginPercent: number | null;
+  changed: ReconcileChanged[]; unchangedCount: number;
+  newProducts: ReconcileNew[]; missing: ReconcileMissing[];
+}
+
+function ReconcileDialog({ open, onOpenChange, listId, listName }: {
+  open: boolean; onOpenChange: (v: boolean) => void; listId: number; listName: string;
+}) {
+  const { toast } = useToast();
+  const [rejectChanged, setRejectChanged] = useState<Set<number>>(new Set());
+  const [skipNew, setSkipNew] = useState<Set<string>>(new Set());
+  const [deleteMissing, setDeleteMissing] = useState<Set<number>>(new Set());
+  const [newMargin, setNewMargin] = useState("");
+
+  const { data, isLoading } = useQuery<ReconcilePreview>({
+    queryKey: [`/api/admin/v2/price-lists/${listId}/reconcile`],
+    enabled: open,
+  });
+
+  // Fresh selections each time the dialog opens.
+  useEffect(() => {
+    if (open) { setRejectChanged(new Set()); setSkipNew(new Set()); setDeleteMissing(new Set()); setNewMargin(""); }
+  }, [open, listId]);
+
+  const toggle = <T,>(set: React.Dispatch<React.SetStateAction<Set<T>>>, v: T) =>
+    set((prev) => { const n = new Set(prev); n.has(v) ? n.delete(v) : n.add(v); return n; });
+
+  const changed = data?.changed ?? [];
+  const newProducts = data?.newProducts ?? [];
+  const missing = data?.missing ?? [];
+  const marginForNew = newMargin !== "" ? newMargin : (data?.defaultMarginPercent != null ? String(data.defaultMarginPercent) : "20");
+
+  const applyCount = changed.length - rejectChanged.size;
+  const addCount = newProducts.filter((p) => p.ean && !skipNew.has(p.ean)).length;
+  const deleteCount = deleteMissing.size;
+  const keepCount = missing.length - deleteCount;
+  const nothingToDo = !data?.hasBaseCost || (changed.length === 0 && newProducts.length === 0 && missing.length === 0);
+
+  const apply = useMutation({
+    mutationFn: async () =>
+      apiRequest("POST", `/api/admin/v2/price-lists/${listId}/reconcile`, {
+        applyChangedItemIds: changed.filter((c) => !rejectChanged.has(c.itemId)).map((c) => c.itemId),
+        addNewEans: newProducts.filter((p) => p.ean && !skipNew.has(p.ean)).map((p) => p.ean),
+        newMarginPercent: Number(marginForNew) || 0,
+        removeMissingItemIds: Array.from(deleteMissing),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/admin/v2/price-lists/${listId}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/v2/price-lists"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/admin/v2/price-lists/${listId}/reconcile`] });
+      onOpenChange(false);
+      toast({
+        title: "List updated from new cost",
+        description: `${applyCount} price change(s) applied · ${addCount} added · ${deleteCount} removed · ${keepCount} kept at old price.`,
+      });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>Review new supplier cost — {listName}</DialogTitle>
+          <DialogDescription>
+            Compared against the latest published cost for this brand. Nothing changes until you click Apply.
+          </DialogDescription>
+        </DialogHeader>
+
+        {isLoading ? (
+          <div className="py-10 text-center text-muted-foreground">Loading…</div>
+        ) : !data?.hasBaseCost ? (
+          <div className="rounded-md border border-dashed p-6 text-center space-y-1">
+            <AlertTriangle className="h-6 w-6 mx-auto text-amber-500" />
+            <p className="font-medium">No published base cost for this brand yet.</p>
+            <p className="text-sm text-muted-foreground">Upload &amp; publish a supplier cost in <b>Cost Uploads</b> first.</p>
+          </div>
+        ) : (
+          <div className="max-h-[60vh] overflow-y-auto space-y-5 pr-1">
+            {/* Summary chips */}
+            <div className="flex flex-wrap gap-2 text-xs">
+              <Badge variant="secondary">{changed.length} price change(s)</Badge>
+              <Badge variant="secondary">{data.unchangedCount} unchanged</Badge>
+              <Badge variant="secondary">{newProducts.length} new</Badge>
+              <Badge variant="secondary">{missing.length} missing</Badge>
+            </div>
+
+            {/* CHANGED */}
+            {changed.length > 0 && (
+              <section className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-sm">🟡 Price changed — tick to apply (untick to keep old cost)</h3>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="ghost" onClick={() => setRejectChanged(new Set())}>Apply all</Button>
+                    <Button size="sm" variant="ghost" onClick={() => setRejectChanged(new Set(changed.map((c) => c.itemId)))}>Keep all old</Button>
+                  </div>
+                </div>
+                <div className="border rounded-md overflow-hidden">
+                  <Table>
+                    <TableHeader><TableRow>
+                      <TableHead className="w-12">Apply</TableHead>
+                      <TableHead>Product</TableHead>
+                      <TableHead className="text-right">Old cost</TableHead>
+                      <TableHead className="text-right">New cost</TableHead>
+                      <TableHead className="text-right">Change</TableHead>
+                    </TableRow></TableHeader>
+                    <TableBody>
+                      {changed.map((c) => {
+                        const apply = !rejectChanged.has(c.itemId);
+                        return (
+                          <TableRow key={c.itemId} className={c.big ? "bg-destructive/5" : ""} data-testid={`reconcile-changed-${c.itemId}`}>
+                            <TableCell><Checkbox checked={apply} onCheckedChange={() => toggle(setRejectChanged, c.itemId)} /></TableCell>
+                            <TableCell>
+                              <div className="font-medium">{c.description || "—"}</div>
+                              <div className="text-xs text-muted-foreground">{c.ean}</div>
+                            </TableCell>
+                            <TableCell className="text-right tabular-nums text-muted-foreground">{money(c.oldCost)}</TableCell>
+                            <TableCell className="text-right tabular-nums font-semibold">{money(c.newCost)}</TableCell>
+                            <TableCell className="text-right tabular-nums">
+                              <span className={c.big ? "text-destructive font-bold" : ""}>
+                                {c.changePercent == null ? "—" : `${c.changePercent > 0 ? "+" : ""}${c.changePercent.toFixed(1)}%`}
+                              </span>
+                              {c.big && <div className="text-xs text-destructive font-medium">are you sure?</div>}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </section>
+            )}
+
+            {/* NEW */}
+            {newProducts.length > 0 && (
+              <section className="space-y-2">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <h3 className="font-semibold text-sm">🟢 New products — added at margin</h3>
+                  <div className="flex items-center gap-1">
+                    <Label htmlFor="recon-new-margin" className="text-xs">margin %</Label>
+                    <Input id="recon-new-margin" className="w-20" type="number" value={marginForNew}
+                      onChange={(e) => setNewMargin(e.target.value)} data-testid="input-reconcile-new-margin" />
+                  </div>
+                </div>
+                <div className="border rounded-md overflow-hidden">
+                  <Table>
+                    <TableHeader><TableRow>
+                      <TableHead className="w-12">Add</TableHead>
+                      <TableHead>Product</TableHead>
+                      <TableHead className="text-right">Cost</TableHead>
+                    </TableRow></TableHeader>
+                    <TableBody>
+                      {newProducts.map((p) => (
+                        <TableRow key={p.costRowId} data-testid={`reconcile-new-${p.costRowId}`}>
+                          <TableCell><Checkbox checked={!!p.ean && !skipNew.has(p.ean)} disabled={!p.ean} onCheckedChange={() => p.ean && toggle(setSkipNew, p.ean)} /></TableCell>
+                          <TableCell>
+                            <div className="font-medium">{p.description || "—"}</div>
+                            <div className="text-xs text-muted-foreground">{p.ean}</div>
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">{money(p.cost)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </section>
+            )}
+
+            {/* MISSING */}
+            {missing.length > 0 && (
+              <section className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-sm">🔴 Not in this upload — kept at old price unless you delete</h3>
+                  <Button size="sm" variant="ghost" className="text-destructive" onClick={() => setDeleteMissing(new Set(missing.map((m) => m.itemId)))}>Delete all</Button>
+                </div>
+                <p className="text-xs text-muted-foreground">{missing.length} product(s) from this list aren't in the new cost file. By default they keep last month's price.</p>
+                <div className="border rounded-md overflow-hidden">
+                  <Table>
+                    <TableHeader><TableRow>
+                      <TableHead className="w-16">Delete</TableHead>
+                      <TableHead>Product</TableHead>
+                      <TableHead className="text-right">Old cost</TableHead>
+                      <TableHead className="text-right">Current price</TableHead>
+                    </TableRow></TableHeader>
+                    <TableBody>
+                      {missing.map((m) => (
+                        <TableRow key={m.itemId} className={deleteMissing.has(m.itemId) ? "bg-destructive/5 line-through opacity-60" : ""} data-testid={`reconcile-missing-${m.itemId}`}>
+                          <TableCell><Checkbox checked={deleteMissing.has(m.itemId)} onCheckedChange={() => toggle(setDeleteMissing, m.itemId)} /></TableCell>
+                          <TableCell>
+                            <div className="font-medium">{m.description || "—"}</div>
+                            <div className="text-xs text-muted-foreground">{m.ean}</div>
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums text-muted-foreground">{money(m.oldCost)}</TableCell>
+                          <TableCell className="text-right tabular-nums">{money(m.preparedPrice)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </section>
+            )}
+
+            {nothingToDo && (
+              <div className="py-6 text-center text-muted-foreground">Everything is already up to date — no changes to review.</div>
+            )}
+          </div>
+        )}
+
+        <DialogFooter className="flex-wrap gap-2">
+          <div className="text-xs text-muted-foreground mr-auto">
+            {data?.hasBaseCost && `${applyCount} apply · ${addCount} add · ${deleteCount} delete · ${keepCount} keep`}
+          </div>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={() => apply.mutate()} disabled={nothingToDo || apply.isPending} data-testid="button-apply-reconcile">
+            {apply.isPending ? "Applying…" : "Apply to list"}
           </Button>
         </DialogFooter>
       </DialogContent>

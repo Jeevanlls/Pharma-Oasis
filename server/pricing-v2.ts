@@ -374,6 +374,225 @@ export async function refreshFromBaseCost(id: number): Promise<{ updated: number
 }
 
 // ---------------------------------------------------------------
+// COST RECONCILIATION — review a new base cost against the saved list
+// before applying. Buckets: changed / unchanged / new / missing.
+// ---------------------------------------------------------------
+export const BIG_CHANGE_PCT = 25; // |change%| above this is flagged "are you sure?"
+
+export interface ReconcileChanged {
+  itemId: number;
+  ean: string | null;
+  description: string | null;
+  method: string;
+  oldCost: number | null;
+  newCost: number | null;
+  changePercent: number | null;
+  big: boolean; // exceeds BIG_CHANGE_PCT — needs explicit confirmation
+}
+export interface ReconcileNew {
+  ean: string | null;
+  description: string | null;
+  cost: number | null;
+  costRowId: number;
+  pricingCategoryId: number | null;
+  caseSize: string | null;
+  supplierQty: number | null;
+}
+export interface ReconcileMissing {
+  itemId: number;
+  ean: string | null;
+  description: string | null;
+  oldCost: number | null;
+  preparedPrice: number | null;
+}
+export interface ReconcilePreview {
+  hasBaseCost: boolean;
+  defaultMarginPercent: number | null;
+  changed: ReconcileChanged[];
+  unchangedCount: number;
+  newProducts: ReconcileNew[];
+  missing: ReconcileMissing[];
+}
+
+const pctChange = (oldC: number | null, newC: number | null): number | null =>
+  oldC === null || newC === null || oldC === 0 ? null : round2(((newC - oldC) / oldC) * 100);
+
+/** Compare a list's saved items against the brand's latest published base cost. */
+export async function reconcilePreview(listId: number): Promise<ReconcilePreview> {
+  const [list] = await db.select().from(priceLists).where(eq(priceLists.id, listId));
+  const empty: ReconcilePreview = {
+    hasBaseCost: false,
+    defaultMarginPercent: list ? num(list.defaultMarginPercent) : null,
+    changed: [],
+    unchangedCount: 0,
+    newProducts: [],
+    missing: [],
+  };
+  if (!list || !list.brandId) return empty;
+  const base = await getBaseCostForBrand(list.brandId);
+  if (!base) return empty;
+
+  const items = await db.select().from(priceListItems).where(eq(priceListItems.priceListId, listId));
+  const baseByEan = new Map<string, typeof base.rows[number]>();
+  for (const r of base.rows) if (r.ean) baseByEan.set(r.ean, r);
+  const itemEans = new Set(items.map((it) => it.ean).filter(Boolean) as string[]);
+
+  const changed: ReconcileChanged[] = [];
+  const missing: ReconcileMissing[] = [];
+  let unchangedCount = 0;
+
+  for (const it of items) {
+    const baseRow = it.ean ? baseByEan.get(it.ean) : undefined;
+    if (!baseRow) {
+      missing.push({
+        itemId: it.id,
+        ean: it.ean,
+        description: it.description,
+        oldCost: num(it.costPrice),
+        preparedPrice: num(it.preparedPrice),
+      });
+      continue;
+    }
+    const oldCost = num(it.costPrice);
+    const newCost = num(baseRow.costPrice);
+    if (oldCost === newCost) {
+      unchangedCount++;
+      continue;
+    }
+    const cp = pctChange(oldCost, newCost);
+    changed.push({
+      itemId: it.id,
+      ean: it.ean,
+      description: it.description,
+      method: it.method,
+      oldCost,
+      newCost,
+      changePercent: cp,
+      big: cp !== null && Math.abs(cp) > BIG_CHANGE_PCT,
+    });
+  }
+
+  const newProducts: ReconcileNew[] = base.rows
+    .filter((r) => r.ean && !itemEans.has(r.ean))
+    .map((r) => ({
+      ean: r.ean,
+      description: r.description,
+      cost: num(r.costPrice),
+      costRowId: r.id,
+      pricingCategoryId: r.pricingCategoryId ?? null,
+      caseSize: r.caseSize,
+      supplierQty: r.supplierQty ?? null,
+    }));
+
+  return {
+    hasBaseCost: true,
+    defaultMarginPercent: num(list.defaultMarginPercent),
+    changed,
+    unchangedCount,
+    newProducts,
+    missing,
+  };
+}
+
+export interface ReconcileDecisions {
+  applyChangedItemIds: number[]; // changed lines to accept the new cost for (recompute price)
+  addNewEans: string[]; // new products to add to the list
+  newMarginPercent?: number | null; // margin for added products (defaults to list default)
+  removeMissingItemIds: number[]; // missing lines to DELETE (others are kept at last price)
+}
+
+export interface ReconcileResult {
+  costsUpdated: number;
+  added: number;
+  removed: number;
+  keptMissing: number;
+}
+
+/** Apply the admin's reviewed decisions from reconcilePreview. */
+export async function reconcileApply(listId: number, d: ReconcileDecisions): Promise<ReconcileResult> {
+  const [list] = await db.select().from(priceLists).where(eq(priceLists.id, listId));
+  if (!list || !list.brandId) throw new Error("Price list has no brand");
+  const base = await getBaseCostForBrand(list.brandId);
+  if (!base) throw new Error("No published base cost for this brand");
+
+  const baseByEan = new Map<string, typeof base.rows[number]>();
+  for (const r of base.rows) if (r.ean) baseByEan.set(r.ean, r);
+
+  const applyChanged = new Set(d.applyChangedItemIds ?? []);
+  const removeMissing = new Set(d.removeMissingItemIds ?? []);
+  const addEans = new Set(d.addNewEans ?? []);
+  const newMargin = d.newMarginPercent ?? num(list.defaultMarginPercent) ?? 0;
+
+  let costsUpdated = 0;
+  let added = 0;
+  let removed = 0;
+
+  // 1) Accepted cost changes — update cost + recompute (and refresh availability).
+  for (const itemId of Array.from(applyChanged)) {
+    const [it] = await db.select().from(priceListItems).where(eq(priceListItems.id, itemId));
+    if (!it || it.priceListId !== listId || !it.ean) continue;
+    const baseRow = baseByEan.get(it.ean);
+    if (!baseRow) continue;
+    const cost = num(baseRow.costPrice);
+    await db
+      .update(priceListItems)
+      .set({
+        costPrice: toStr(cost),
+        supplierQty: baseRow.supplierQty ?? null,
+        preparedPrice: toStr(
+          computePrepared(it.method as PriceMethod, cost, num(it.marginPercent), num(it.fixedPrice), num(it.plusAmount)),
+        ),
+        updatedAt: new Date(),
+      })
+      .where(eq(priceListItems.id, it.id));
+    costsUpdated++;
+  }
+
+  // 2) New products — add at the chosen margin.
+  if (addEans.size) {
+    const toAdd = base.rows.filter((r) => r.ean && addEans.has(r.ean));
+    if (toAdd.length) {
+      await db.insert(priceListItems).values(
+        toAdd.map((row) => {
+          const cost = num(row.costPrice);
+          return {
+            priceListId: listId,
+            costRowId: row.id,
+            ean: row.ean,
+            description: row.description,
+            pricingCategoryId: row.pricingCategoryId ?? null,
+            caseSize: row.caseSize,
+            costPrice: row.costPrice,
+            method: "margin" as const,
+            marginPercent: toStr(newMargin),
+            fixedPrice: null,
+            plusAmount: null,
+            preparedPrice: toStr(computePrepared("margin", cost, newMargin, null, null)),
+            supplierQty: row.supplierQty ?? null,
+            isActive: true,
+          };
+        }),
+      );
+      added = toAdd.length;
+    }
+  }
+
+  // 3) Missing — delete only the ones the admin ticked; the rest keep last price.
+  if (removeMissing.size) {
+    await db
+      .delete(priceListItems)
+      .where(and(eq(priceListItems.priceListId, listId), inArray(priceListItems.id, Array.from(removeMissing))));
+    removed = removeMissing.size;
+  }
+
+  await db.update(priceLists).set({ baseCostUploadId: base.uploadId, updatedAt: new Date() }).where(eq(priceLists.id, listId));
+
+  const preview = await reconcilePreview(listId);
+  const keptMissing = preview.missing.length; // still-missing lines that were kept
+  return { costsUpdated, added, removed, keptMissing };
+}
+
+// ---------------------------------------------------------------
 // CUSTOMER ASSIGNMENT — one list per customer PER BRAND (enforced)
 // ---------------------------------------------------------------
 export class AssignmentConflict extends Error {
