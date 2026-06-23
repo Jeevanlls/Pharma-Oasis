@@ -23,7 +23,13 @@
       "Bash(curl -s -b jar.txt \"http://localhost:5000/api/portal/price-list/download?format=xlsx&brands=7\" -o pl.xlsx -w \"http:%{http_code} type:%{content_type} size:%{size_download}\\\\n\")",
       "Bash(xxd)",
       "Bash(curl -s -b jar.txt \"http://localhost:5000/api/portal/price-list/download?format=pdf&brands=7\" -o pl.pdf -w \"http:%{http_code} type:%{content_type} size:%{size_download}\\\\n\")",
-      "Bash(curl -s -b jar.txt \"http://localhost:5000/api/admin/price-lists\")"
+      "Bash(curl -s -b jar.txt \"http://localhost:5000/api/admin/price-lists\")",
+      "Bash(curl -s -o /dev/null -w \"root:%{http_code} size:%{size_download}\\\\n\" http://localhost:5000/)",
+      "Bash(curl -s -o /dev/null -w \"api:%{http_code}\\\\n\" http://localhost:5000/api/brands)",
+      "Bash(curl -s http://localhost:5000/)",
+      "Bash(curl -s http://localhost:5000/portal)",
+      "Bash(curl -s -I http://localhost:5000/)",
+      "Bash(curl -s -o /dev/null -w \"port5000:%{http_code}\\\\n\" --max-time 3 http://localhost:5000/)"
     ]
   }
 }
