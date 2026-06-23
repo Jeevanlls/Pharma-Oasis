@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Coins, Users, RefreshCw, Trash2, Save, CheckCircle2, Search, Eye, AlertTriangle } from "lucide-react";
+import { Plus, Coins, Users, RefreshCw, Trash2, Save, CheckCircle2, Search, Eye, AlertTriangle, SlidersHorizontal } from "lucide-react";
 
 interface PricingBrand { id: number; name: string; }
 interface PriceListSummary {
@@ -59,6 +59,20 @@ export default function PriceBuilderPage() {
   const [bulkMargin, setBulkMargin] = useState("");
   const [search, setSearch] = useState("");
 
+  // lines the user hand-edited this session — bulk pricing leaves these alone
+  const [manualIds, setManualIds] = useState<Set<number>>(new Set());
+
+  // Bulk pricing dialog (tiered cost bands / cost + £)
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkStrategy, setBulkStrategy] = useState<"tiered" | "cost_plus">("tiered");
+  const [bulkPlus, setBulkPlus] = useState("");
+  const [bands, setBands] = useState<{ upTo: string; margin: string }[]>([
+    { upTo: "5", margin: "25" },
+    { upTo: "10", margin: "20" },
+    { upTo: "20", margin: "12" },
+    { upTo: "", margin: "10" }, // empty "up to" = and above
+  ]);
+
   const { data: brands = [] } = useQuery<PricingBrand[]>({ queryKey: ["/api/admin/pricing-brands"] });
   const { data: lists = [] } = useQuery<PriceListSummary[]>({ queryKey: ["/api/admin/v2/price-lists"] });
   const { data: detail } = useQuery<{ list: PriceListSummary; brandName: string | null; items: PriceListItem[] }>({
@@ -89,8 +103,57 @@ export default function PriceBuilderPage() {
     return { min: Math.min(...ps), max: Math.max(...ps) };
   }, [items, edits]);
 
-  const editItem = (id: number, patch: Partial<PriceListItem>) =>
+  const editItem = (id: number, patch: Partial<PriceListItem>) => {
+    setManualIds((prev) => { const n = new Set(prev); n.add(id); return n; });
     setEdits((prev) => ({ ...prev, [id]: { ...prev[id], ...patch } }));
+  };
+
+  // Pick the margin % for a given COST from the tiered bands (cost-based, per the user's choice).
+  const bandMarginFor = (cost: number | null): number | null => {
+    if (cost == null) return null;
+    const finite = bands
+      .filter((b) => b.upTo !== "" && b.margin !== "")
+      .map((b) => ({ upTo: Number(b.upTo), margin: Number(b.margin) }))
+      .sort((a, b) => a.upTo - b.upTo);
+    for (const b of finite) if (cost <= b.upTo) return b.margin;
+    const open = bands.find((b) => b.upTo === "" && b.margin !== "");
+    if (open) return Number(open.margin);
+    return finite.length ? finite[finite.length - 1].margin : null;
+  };
+
+  // How many lines a bulk action will touch (skips manual edits + saved fixed prices).
+  const bulkEligible = useMemo(
+    () => items.filter((raw) => !manualIds.has(raw.id) && raw.method !== "fixed").length,
+    [items, manualIds],
+  );
+
+  // Stage bulk pricing into `edits` so prices update live; user reviews then Saves.
+  const applyBulk = () => {
+    if (bulkStrategy === "cost_plus" && bulkPlus === "") return;
+    setEdits((prev) => {
+      const next = { ...prev };
+      for (const raw of items) {
+        if (manualIds.has(raw.id) || raw.method === "fixed") continue; // keep manual overrides
+        const cost = num(raw.costPrice);
+        if (bulkStrategy === "cost_plus") {
+          next[raw.id] = { ...next[raw.id], method: "cost_plus", plusAmount: bulkPlus };
+        } else {
+          const mg = bandMarginFor(cost);
+          if (mg == null) continue;
+          next[raw.id] = { ...next[raw.id], method: "margin", marginPercent: String(mg) };
+        }
+      }
+      return next;
+    });
+    setBulkOpen(false);
+    toast({
+      title: "Applied to list",
+      description:
+        bulkStrategy === "cost_plus"
+          ? `Cost + £${bulkPlus} applied to ${bulkEligible} line(s) — review, then Save.`
+          : `Tiered margins applied to ${bulkEligible} line(s) — review, then Save.`,
+    });
+  };
 
   // Apply a margin to ALL margin-method rows locally so every price updates live (save persists).
   const previewMarginAll = () => {
@@ -134,7 +197,7 @@ export default function PriceBuilderPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/admin/v2/price-lists/${selectedId}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/v2/price-lists"] });
-      setEdits({}); setBulkMargin("");
+      setEdits({}); setBulkMargin(""); setManualIds(new Set());
       toast({ title: "Prices saved" });
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
@@ -196,7 +259,7 @@ export default function PriceBuilderPage() {
               {lists.map((l) => (
                 <button
                   key={l.id}
-                  onClick={() => { setSelectedId(l.id); setEdits({}); setSearch(""); setBulkMargin(""); }}
+                  onClick={() => { setSelectedId(l.id); setEdits({}); setSearch(""); setBulkMargin(""); setManualIds(new Set()); }}
                   className={`w-full text-left rounded-md border p-3 hover-elevate ${selectedId === l.id ? "border-primary bg-accent" : ""}`}
                   data-testid={`list-item-${l.id}`}
                 >
@@ -282,6 +345,12 @@ export default function PriceBuilderPage() {
                               onChange={(e) => setBulkMargin(e.target.value)} placeholder="e.g. 20" data-testid="input-bulk-margin" />
                             <Button variant="secondary" onClick={previewMarginAll} disabled={bulkMargin === ""}>Apply to all</Button>
                           </div>
+                        </div>
+                        <div>
+                          <Label className="text-xs">Or price by cost band / cost+£</Label>
+                          <Button variant="outline" className="w-full" onClick={() => setBulkOpen(true)} data-testid="button-bulk-pricing">
+                            <SlidersHorizontal className="h-4 w-4 mr-1" /> Bands &amp; Cost+£
+                          </Button>
                         </div>
                         <Button onClick={() => saveItems.mutate()} disabled={!dirtyCount || saveItems.isPending} data-testid="button-save-items">
                           <Save className="h-4 w-4 mr-1" />
@@ -449,6 +518,73 @@ export default function PriceBuilderPage() {
             </Table>
           </div>
           <DialogFooter><Button onClick={() => setPreviewOpen(false)}>Close</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk pricing dialog: tiered cost bands / cost + £ */}
+      <Dialog open={bulkOpen} onOpenChange={setBulkOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Bulk pricing</DialogTitle>
+            <DialogDescription>
+              Set prices for the whole list at once. Applies to {bulkEligible} line(s) — your manual line edits and fixed £ prices are kept.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex gap-2">
+            <Button variant={bulkStrategy === "tiered" ? "default" : "outline"} size="sm" onClick={() => setBulkStrategy("tiered")} data-testid="button-strategy-tiered">
+              Tiered by cost
+            </Button>
+            <Button variant={bulkStrategy === "cost_plus" ? "default" : "outline"} size="sm" onClick={() => setBulkStrategy("cost_plus")} data-testid="button-strategy-costplus">
+              Cost + £
+            </Button>
+          </div>
+
+          {bulkStrategy === "tiered" ? (
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">
+                Each product gets a margin based on its <b>cost</b>. Cheaper products usually take a higher margin.
+              </p>
+              {bands.map((b, i) => (
+                <div className="flex items-center gap-2" key={i}>
+                  <span className="text-sm whitespace-nowrap">Cost up to £</span>
+                  <Input className="w-24" type="number" value={b.upTo}
+                    placeholder="and above"
+                    onChange={(e) => setBands((bs) => bs.map((x, j) => (j === i ? { ...x, upTo: e.target.value } : x)))}
+                    data-testid={`input-band-upto-${i}`} />
+                  <span className="text-sm whitespace-nowrap">→ margin</span>
+                  <Input className="w-20" type="number" value={b.margin}
+                    onChange={(e) => setBands((bs) => bs.map((x, j) => (j === i ? { ...x, margin: e.target.value } : x)))}
+                    data-testid={`input-band-margin-${i}`} />
+                  <span className="text-sm">%</span>
+                  <Button variant="ghost" size="sm" onClick={() => setBands((bs) => bs.filter((_, j) => j !== i))}>
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                </div>
+              ))}
+              <Button variant="outline" size="sm" onClick={() => setBands((bs) => [...bs, { upTo: "", margin: "" }])}>
+                <Plus className="h-4 w-4 mr-1" /> Add band
+              </Button>
+              <p className="text-xs text-muted-foreground">Leave “up to £” blank for the top band (everything above the last value).</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Label htmlFor="bulk-plus" className="text-xs">Add a fixed amount to every product's cost</Label>
+              <div className="flex items-center gap-2">
+                <span className="text-sm">Cost + £</span>
+                <Input id="bulk-plus" className="w-28" type="number" value={bulkPlus}
+                  onChange={(e) => setBulkPlus(e.target.value)} placeholder="e.g. 3.00" data-testid="input-bulk-plus" />
+              </div>
+              <p className="text-xs text-muted-foreground">e.g. Cost + £3 makes a £4.00 product sell at £7.00.</p>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkOpen(false)}>Cancel</Button>
+            <Button onClick={applyBulk} disabled={bulkStrategy === "cost_plus" && bulkPlus === ""} data-testid="button-apply-bulk">
+              Apply to {bulkEligible} line(s)
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
