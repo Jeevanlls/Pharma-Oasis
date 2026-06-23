@@ -57,6 +57,8 @@ export const users = pgTable("users", {
   passwordResetToken: varchar("password_reset_token", { length: 128 }),
   passwordResetExpiry: timestamp("password_reset_expiry"),
 
+  priceListId: integer("price_list_id"), // assigned customer price list
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -127,6 +129,13 @@ export const products = pgTable("products", {
   metaTitle: varchar("meta_title", { length: 255 }),
   metaDescription: text("meta_description"),
   googleFeedPrice: decimal("google_feed_price", { precision: 10, scale: 2 }),
+  // --- Customer-pricing cost cache (populated when a cost upload is published) ---
+  activeCostPrice: decimal("active_cost_price", { precision: 10, scale: 2 }),
+  activeCostUploadId: integer("active_cost_upload_id"),
+  costEffectiveDate: timestamp("cost_effective_date"),
+  costExpiryDate: timestamp("cost_expiry_date"),
+  costStatus: varchar("cost_status", { length: 20 }).default("none"), // none | active | expired
+  availableQty: integer("available_qty"), // supplier stock (QTY); null = "on request"
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -157,6 +166,8 @@ export const quoteItems = pgTable("quote_items", {
   productId: integer("product_id").notNull(),
   quantity: integer("quantity").notNull(),
   unitPrice: decimal("unit_price", { precision: 10, scale: 2 }),
+  unitCost: decimal("unit_cost", { precision: 10, scale: 2 }), // snapshot of cost at submission
+  marginApplied: decimal("margin_applied", { precision: 6, scale: 2 }), // snapshot of margin %
   lineTotal: decimal("line_total", { precision: 12, scale: 2 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -1213,3 +1224,156 @@ export const insertFeaturedRotationSchema = createInsertSchema(featuredRotation)
 });
 export type InsertFeaturedRotation = z.infer<typeof insertFeaturedRotationSchema>;
 export type FeaturedRotation = typeof featuredRotation.$inferSelect;
+
+// ============================================
+// CUSTOMER PRICING — COST UPLOADS (per-brand supplier cost batches)
+// ============================================
+export const costUploads = pgTable("cost_uploads", {
+  id: serial("id").primaryKey(),
+  brandId: integer("brand_id").notNull(),
+  supplierName: varchar("supplier_name", { length: 255 }),
+  validFrom: timestamp("valid_from"),
+  validUntil: timestamp("valid_until"),
+  comment: text("comment"),
+  fileName: varchar("file_name", { length: 255 }),
+  uploadedBy: integer("uploaded_by"),
+  status: varchar("status", { length: 20 }).notNull().default("draft"), // draft | published | superseded | archived
+  rowCount: integer("row_count").default(0),
+  matchedCount: integer("matched_count").default(0),
+  unmatchedCount: integer("unmatched_count").default(0),
+  publishedAt: timestamp("published_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(), // upload date
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertCostUploadSchema = createInsertSchema(costUploads).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertCostUpload = z.infer<typeof insertCostUploadSchema>;
+export type CostUpload = typeof costUploads.$inferSelect;
+
+// ============================================
+// CUSTOMER PRICING — COST UPLOAD ROWS (one per product line in a batch)
+// ============================================
+export const costUploadRows = pgTable("cost_upload_rows", {
+  id: serial("id").primaryKey(),
+  uploadId: integer("upload_id").notNull(),
+  productId: integer("product_id"), // null when unmatched
+  ean: varchar("ean", { length: 50 }),
+  description: varchar("description", { length: 500 }),
+  categoryName: varchar("category_name", { length: 255 }), // from "Category:" section in file
+  caseSize: varchar("case_size", { length: 100 }),
+  costPrice: decimal("cost_price", { precision: 10, scale: 2 }),
+  supplierQty: integer("supplier_qty"), // QTY column; null = blank = "on request"
+  supplierName: varchar("supplier_name", { length: 255 }), // optional per-row override
+  validUntil: timestamp("valid_until"), // optional per-row override
+  comment: text("comment"), // optional per-row note
+  matchStatus: varchar("match_status", { length: 20 }).default("unmatched"), // matched | unmatched | new
+  previousCost: decimal("previous_cost", { precision: 10, scale: 2 }), // for change% preview
+  changePercent: decimal("change_percent", { precision: 7, scale: 2 }),
+  flagged: boolean("flagged").default(false), // suspicious value needing confirmation
+  flagReason: varchar("flag_reason", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertCostUploadRowSchema = createInsertSchema(costUploadRows).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertCostUploadRow = z.infer<typeof insertCostUploadRowSchema>;
+export type CostUploadRow = typeof costUploadRows.$inferSelect;
+
+// ============================================
+// CUSTOMER PRICING — PRICE LISTS (reusable tiers OR per-customer)
+// ============================================
+export const priceLists = pgTable("price_lists", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  type: varchar("type", { length: 20 }).notNull().default("tier"), // tier | customer
+  isActive: boolean("is_active").default(true),
+  isDefault: boolean("is_default").default(false), // baseline list for new customers
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertPriceListSchema = createInsertSchema(priceLists).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertPriceList = z.infer<typeof insertPriceListSchema>;
+export type PriceList = typeof priceLists.$inferSelect;
+
+// ============================================
+// CUSTOMER PRICING — PRICE LIST RULES (layered margins)
+// ============================================
+export const priceListRules = pgTable("price_list_rules", {
+  id: serial("id").primaryKey(),
+  priceListId: integer("price_list_id").notNull(),
+  level: varchar("level", { length: 20 }).notNull(), // overall | brand | category | product
+  targetId: integer("target_id"), // brandId / categoryId / productId; null for overall
+  marginPercent: decimal("margin_percent", { precision: 6, scale: 2 }), // margin on cost
+  fixedPrice: decimal("fixed_price", { precision: 10, scale: 2 }), // overrides margin when set
+  isActive: boolean("is_active").default(true),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertPriceListRuleSchema = createInsertSchema(priceListRules).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertPriceListRule = z.infer<typeof insertPriceListRuleSchema>;
+export type PriceListRule = typeof priceListRules.$inferSelect;
+
+// ============================================
+// CUSTOMER PRICING — ORDERS (placed from the portal)
+// ============================================
+export const orders = pgTable("orders", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  status: varchar("status", { length: 20 }).notNull().default("submitted"), // submitted | confirmed | processing | completed | cancelled
+  priceListId: integer("price_list_id"), // snapshot of which list priced it
+  totalAmount: decimal("total_amount", { precision: 12, scale: 2 }),
+  customerNotes: text("customer_notes"),
+  adminNotes: text("admin_notes"),
+  adminResponse: text("admin_response"), // reply shown in portal
+  respondedAt: timestamp("responded_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertOrderSchema = createInsertSchema(orders).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertOrder = z.infer<typeof insertOrderSchema>;
+export type Order = typeof orders.$inferSelect;
+
+// ============================================
+// CUSTOMER PRICING — ORDER ITEMS (snapshots at submission)
+// ============================================
+export const orderItems = pgTable("order_items", {
+  id: serial("id").primaryKey(),
+  orderId: integer("order_id").notNull(),
+  productId: integer("product_id").notNull(),
+  quantity: integer("quantity").notNull(),
+  unitCost: decimal("unit_cost", { precision: 10, scale: 2 }), // snapshot
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }), // snapshot (customer price)
+  marginApplied: decimal("margin_applied", { precision: 6, scale: 2 }), // snapshot
+  lineTotal: decimal("line_total", { precision: 12, scale: 2 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertOrderItemSchema = createInsertSchema(orderItems).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertOrderItem = z.infer<typeof insertOrderItemSchema>;
+export type OrderItem = typeof orderItems.$inferSelect;

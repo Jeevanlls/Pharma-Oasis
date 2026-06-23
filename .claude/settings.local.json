@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:salesoffer2026.netlify.app)",
+      "Bash(git stash *)",
+      "Bash(npx tsc *)",
+      "Bash(node *)",
+      "Bash(npx tsx *)"
+    ]
+  }
+}

@@ -1,0 +1,255 @@
+// ============================================================
+// Persistence for customer pricing: cost uploads, price lists & rules.
+// Kept separate from the large storage.ts for clarity.
+// ============================================================
+import { db } from "./db";
+import {
+  costUploads,
+  costUploadRows,
+  priceLists,
+  priceListRules,
+  products,
+  brands,
+  users,
+} from "@shared/schema";
+import { eq, and, desc, ne, lt, sql } from "drizzle-orm";
+import type {
+  CostUpload,
+  CostUploadRow,
+  InsertPriceList,
+  PriceList,
+  PriceListRule,
+} from "@shared/schema";
+import type { PreviewRow } from "./cost-importer";
+
+const toStr = (n: number | null | undefined): string | null =>
+  n === null || n === undefined ? null : String(n);
+
+// ---------- COST UPLOADS ----------
+
+export interface CreateUploadInput {
+  brandId: number;
+  supplierName?: string | null;
+  validFrom?: Date | null;
+  validUntil?: Date | null;
+  comment?: string | null;
+  fileName?: string | null;
+  uploadedBy?: number | null;
+  rows: PreviewRow[];
+}
+
+export async function createDraftUpload(input: CreateUploadInput): Promise<CostUpload> {
+  const matched = input.rows.filter((r) => r.matchStatus === "matched").length;
+  const [upload] = await db
+    .insert(costUploads)
+    .values({
+      brandId: input.brandId,
+      supplierName: input.supplierName ?? null,
+      validFrom: input.validFrom ?? null,
+      validUntil: input.validUntil ?? null,
+      comment: input.comment ?? null,
+      fileName: input.fileName ?? null,
+      uploadedBy: input.uploadedBy ?? null,
+      status: "draft",
+      rowCount: input.rows.length,
+      matchedCount: matched,
+      unmatchedCount: input.rows.length - matched,
+    })
+    .returning();
+
+  if (input.rows.length) {
+    await db.insert(costUploadRows).values(
+      input.rows.map((r) => ({
+        uploadId: upload.id,
+        productId: r.productId,
+        ean: r.ean || null,
+        description: r.description || null,
+        categoryName: r.categoryName || null,
+        caseSize: r.caseSize || null,
+        costPrice: toStr(r.costPrice),
+        supplierQty: r.supplierQty,
+        supplierName: null,
+        validUntil: null,
+        comment: null,
+        matchStatus: r.matchStatus,
+        previousCost: toStr(r.previousCost),
+        changePercent: toStr(r.changePercent),
+        flagged: r.flagged,
+        flagReason: r.flagReason || null,
+      })),
+    );
+  }
+  return upload;
+}
+
+export async function listUploads(brandId?: number): Promise<(CostUpload & { brandName: string | null })[]> {
+  const rows = await db
+    .select({ upload: costUploads, brandName: brands.name })
+    .from(costUploads)
+    .leftJoin(brands, eq(costUploads.brandId, brands.id))
+    .where(brandId ? eq(costUploads.brandId, brandId) : sql`true`)
+    .orderBy(desc(costUploads.createdAt));
+  return rows.map((r) => ({ ...r.upload, brandName: r.brandName }));
+}
+
+export async function getUpload(id: number): Promise<{ upload: CostUpload; rows: CostUploadRow[] } | null> {
+  const [upload] = await db.select().from(costUploads).where(eq(costUploads.id, id));
+  if (!upload) return null;
+  const rows = await db.select().from(costUploadRows).where(eq(costUploadRows.uploadId, id));
+  return { upload, rows };
+}
+
+export async function deleteUpload(id: number): Promise<void> {
+  await db.delete(costUploadRows).where(eq(costUploadRows.uploadId, id));
+  await db.delete(costUploads).where(eq(costUploads.id, id));
+}
+
+/** Publish a draft: supersede the brand's previous published batch, then push
+ *  matched costs onto products (active cost cache). */
+export async function publishUpload(id: number): Promise<{ updated: number }> {
+  const found = await getUpload(id);
+  if (!found) throw new Error("Upload not found");
+  const { upload, rows } = found;
+  if (upload.status === "published") return { updated: 0 };
+
+  // Supersede prior published uploads for the same brand.
+  await db
+    .update(costUploads)
+    .set({ status: "superseded", updatedAt: new Date() })
+    .where(and(eq(costUploads.brandId, upload.brandId), eq(costUploads.status, "published"), ne(costUploads.id, id)));
+
+  const now = new Date();
+  let updated = 0;
+  for (const row of rows) {
+    if (!row.productId || row.costPrice === null) continue;
+    const expiry = row.validUntil ?? upload.validUntil ?? null;
+    const status = expiry && expiry < now ? "expired" : "active";
+    await db
+      .update(products)
+      .set({
+        activeCostPrice: row.costPrice,
+        activeCostUploadId: upload.id,
+        costEffectiveDate: now,
+        costExpiryDate: expiry,
+        costStatus: status,
+        availableQty: row.supplierQty,
+        updatedAt: now,
+      })
+      .where(eq(products.id, row.productId));
+    updated++;
+  }
+
+  await db
+    .update(costUploads)
+    .set({ status: "published", publishedAt: now, updatedAt: now })
+    .where(eq(costUploads.id, id));
+
+  return { updated };
+}
+
+/** Mark products whose cost validity has passed as expired (price still shown). */
+export async function refreshExpiredCosts(): Promise<number> {
+  const res = await db
+    .update(products)
+    .set({ costStatus: "expired" })
+    .where(and(eq(products.costStatus, "active"), lt(products.costExpiryDate, new Date())))
+    .returning({ id: products.id });
+  return res.length;
+}
+
+/** Brands that currently have at least one expired cost (for the admin alert). */
+export async function expiredCostBrands(): Promise<{ brandId: number; brandName: string | null; count: number }[]> {
+  const rows = await db
+    .select({ brandId: products.brandId, brandName: brands.name, count: sql<number>`count(*)::int` })
+    .from(products)
+    .leftJoin(brands, eq(products.brandId, brands.id))
+    .where(eq(products.costStatus, "expired"))
+    .groupBy(products.brandId, brands.name);
+  return rows;
+}
+
+// ---------- PRICE LISTS & RULES ----------
+
+export async function listPriceLists(): Promise<PriceList[]> {
+  return db.select().from(priceLists).orderBy(desc(priceLists.type), priceLists.name);
+}
+
+export async function getPriceListWithRules(
+  id: number,
+): Promise<{ list: PriceList; rules: PriceListRule[] } | null> {
+  const [list] = await db.select().from(priceLists).where(eq(priceLists.id, id));
+  if (!list) return null;
+  const rules = await db.select().from(priceListRules).where(eq(priceListRules.priceListId, id));
+  return { list, rules };
+}
+
+export async function createPriceList(data: InsertPriceList): Promise<PriceList> {
+  const [list] = await db.insert(priceLists).values(data).returning();
+  return list;
+}
+
+export async function updatePriceList(id: number, data: Partial<InsertPriceList>): Promise<PriceList> {
+  const [list] = await db
+    .update(priceLists)
+    .set({ ...data, updatedAt: new Date() })
+    .where(eq(priceLists.id, id))
+    .returning();
+  return list;
+}
+
+export async function deletePriceList(id: number): Promise<void> {
+  await db.delete(priceListRules).where(eq(priceListRules.priceListId, id));
+  await db.delete(priceLists).where(eq(priceLists.id, id));
+  // Unassign any customers pointing at it.
+  await db.update(users).set({ priceListId: null }).where(eq(users.priceListId, id));
+}
+
+export interface RuleInput {
+  level: "overall" | "brand" | "category" | "product";
+  targetId?: number | null;
+  marginPercent?: number | null;
+  fixedPrice?: number | null;
+  notes?: string | null;
+}
+
+/** Replace the full rule set for a price list (transactional-ish: delete + insert). */
+export async function setRules(priceListId: number, rules: RuleInput[]): Promise<PriceListRule[]> {
+  await db.delete(priceListRules).where(eq(priceListRules.priceListId, priceListId));
+  if (rules.length) {
+    await db.insert(priceListRules).values(
+      rules.map((r) => ({
+        priceListId,
+        level: r.level,
+        targetId: r.level === "overall" ? null : r.targetId ?? null,
+        marginPercent: toStr(r.marginPercent),
+        fixedPrice: toStr(r.fixedPrice),
+        isActive: true,
+        notes: r.notes ?? null,
+      })),
+    );
+  }
+  return db.select().from(priceListRules).where(eq(priceListRules.priceListId, priceListId));
+}
+
+/** Assign (or clear) a customer's price list. */
+export async function assignCustomerPriceList(userId: number, priceListId: number | null): Promise<void> {
+  await db.update(users).set({ priceListId, updatedAt: new Date() }).where(eq(users.id, userId));
+}
+
+/** Ensure a baseline default list exists; returns its id. */
+export async function ensureDefaultPriceList(): Promise<number> {
+  const [existing] = await db.select().from(priceLists).where(eq(priceLists.isDefault, true));
+  if (existing) return existing.id;
+  const [created] = await db
+    .insert(priceLists)
+    .values({ name: "Standard", type: "tier", isDefault: true, isActive: true, notes: "Baseline list for new customers" })
+    .returning();
+  await db.insert(priceListRules).values({
+    priceListId: created.id,
+    level: "overall",
+    targetId: null,
+    marginPercent: "20",
+    isActive: true,
+  });
+  return created.id;
+}

@@ -71,3 +71,110 @@ pool.query(`
   ALTER TABLE offer_items ALTER COLUMN offer_price DROP NOT NULL;
 `).then(() => console.log('Offers tables ready'))
   .catch((err: Error) => console.warn('Offers tables setup:', err.message));
+
+// ============================================================
+// Customer Pricing & Portal tables (cost uploads, price lists, orders)
+// ============================================================
+pool.query(`
+  CREATE TABLE IF NOT EXISTS cost_uploads (
+    id SERIAL PRIMARY KEY,
+    brand_id INTEGER NOT NULL,
+    supplier_name VARCHAR(255),
+    valid_from TIMESTAMP,
+    valid_until TIMESTAMP,
+    comment TEXT,
+    file_name VARCHAR(255),
+    uploaded_by INTEGER,
+    status VARCHAR(20) NOT NULL DEFAULT 'draft',
+    row_count INTEGER DEFAULT 0,
+    matched_count INTEGER DEFAULT 0,
+    unmatched_count INTEGER DEFAULT 0,
+    published_at TIMESTAMP,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+  );
+  CREATE TABLE IF NOT EXISTS cost_upload_rows (
+    id SERIAL PRIMARY KEY,
+    upload_id INTEGER NOT NULL,
+    product_id INTEGER,
+    ean VARCHAR(50),
+    description VARCHAR(500),
+    category_name VARCHAR(255),
+    case_size VARCHAR(100),
+    cost_price DECIMAL(10,2),
+    supplier_qty INTEGER,
+    supplier_name VARCHAR(255),
+    valid_until TIMESTAMP,
+    comment TEXT,
+    match_status VARCHAR(20) DEFAULT 'unmatched',
+    previous_cost DECIMAL(10,2),
+    change_percent DECIMAL(7,2),
+    flagged BOOLEAN DEFAULT false,
+    flag_reason VARCHAR(255),
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+  );
+  CREATE INDEX IF NOT EXISTS idx_cost_upload_rows_upload ON cost_upload_rows (upload_id);
+  CREATE INDEX IF NOT EXISTS idx_cost_upload_rows_product ON cost_upload_rows (product_id);
+
+  CREATE TABLE IF NOT EXISTS price_lists (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    type VARCHAR(20) NOT NULL DEFAULT 'tier',
+    is_active BOOLEAN DEFAULT true,
+    is_default BOOLEAN DEFAULT false,
+    notes TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+  );
+  CREATE TABLE IF NOT EXISTS price_list_rules (
+    id SERIAL PRIMARY KEY,
+    price_list_id INTEGER NOT NULL,
+    level VARCHAR(20) NOT NULL,
+    target_id INTEGER,
+    margin_percent DECIMAL(6,2),
+    fixed_price DECIMAL(10,2),
+    is_active BOOLEAN DEFAULT true,
+    notes TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+  );
+  CREATE INDEX IF NOT EXISTS idx_price_list_rules_list ON price_list_rules (price_list_id);
+
+  CREATE TABLE IF NOT EXISTS orders (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'submitted',
+    price_list_id INTEGER,
+    total_amount DECIMAL(12,2),
+    customer_notes TEXT,
+    admin_notes TEXT,
+    admin_response TEXT,
+    responded_at TIMESTAMP,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+  );
+  CREATE TABLE IF NOT EXISTS order_items (
+    id SERIAL PRIMARY KEY,
+    order_id INTEGER NOT NULL,
+    product_id INTEGER NOT NULL,
+    quantity INTEGER NOT NULL,
+    unit_cost DECIMAL(10,2),
+    unit_price DECIMAL(10,2),
+    margin_applied DECIMAL(6,2),
+    line_total DECIMAL(12,2),
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+  );
+  CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items (order_id);
+
+  -- New columns on existing tables
+  ALTER TABLE products ADD COLUMN IF NOT EXISTS active_cost_price DECIMAL(10,2);
+  ALTER TABLE products ADD COLUMN IF NOT EXISTS active_cost_upload_id INTEGER;
+  ALTER TABLE products ADD COLUMN IF NOT EXISTS cost_effective_date TIMESTAMP;
+  ALTER TABLE products ADD COLUMN IF NOT EXISTS cost_expiry_date TIMESTAMP;
+  ALTER TABLE products ADD COLUMN IF NOT EXISTS cost_status VARCHAR(20) DEFAULT 'none';
+  ALTER TABLE products ADD COLUMN IF NOT EXISTS available_qty INTEGER;
+  ALTER TABLE users ADD COLUMN IF NOT EXISTS price_list_id INTEGER;
+  ALTER TABLE quote_items ADD COLUMN IF NOT EXISTS unit_cost DECIMAL(10,2);
+  ALTER TABLE quote_items ADD COLUMN IF NOT EXISTS margin_applied DECIMAL(6,2);
+`).then(() => console.log('Customer pricing & portal tables ready'))
+  .catch((err: Error) => console.warn('Customer pricing tables setup:', err.message));

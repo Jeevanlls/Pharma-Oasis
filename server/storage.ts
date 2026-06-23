@@ -601,6 +601,12 @@ export class DatabaseStorage implements IStorage {
       metaTitle: row.meta_title,
       metaDescription: row.meta_description,
       googleFeedPrice: row.google_feed_price,
+      activeCostPrice: row.active_cost_price,
+      activeCostUploadId: row.active_cost_upload_id,
+      costEffectiveDate: row.cost_effective_date,
+      costExpiryDate: row.cost_expiry_date,
+      costStatus: row.cost_status,
+      availableQty: row.available_qty,
     });
     
     try {

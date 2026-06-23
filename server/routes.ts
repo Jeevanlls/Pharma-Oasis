@@ -33,7 +33,10 @@ import {
 } from "./email";
 import { sessionMiddleware } from "./session-store";
 import feedsRouter from "./feeds";
-import { 
+import { parseCostFile, buildPreview, buildTemplateWorkbook } from "./cost-importer";
+import * as pricingStore from "./pricing-store";
+import { resolveForList, toCustomerPrice } from "./pricing";
+import {
   createImportJob, 
   getImportJob, 
   getImportJobs, 
@@ -3778,6 +3781,162 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
   const upload = multer({
     storage: multer.memoryStorage(),
     limits: { fileSize: 10 * 1024 * 1024 },
+  });
+
+  // ==================== CUSTOMER PRICING — COST UPLOADS ====================
+  const COST_THRESHOLD_KEY = "cost_change_threshold";
+
+  async function getCostThreshold(): Promise<number> {
+    const settings = await storage.getSiteSettings();
+    const v = parseFloat(settings[COST_THRESHOLD_KEY] ?? "");
+    return Number.isFinite(v) && v > 0 ? v : 30;
+  }
+
+  const parseDate = (v: any): Date | null => {
+    if (!v) return null;
+    const d = new Date(v);
+    return isNaN(d.getTime()) ? null : d;
+  };
+
+  // Download a blank cost-upload template (xlsx)
+  app.get("/api/admin/cost-template", requireAdmin, (req, res) => {
+    const buf = buildTemplateWorkbook();
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", 'attachment; filename="cost-upload-template.xlsx"');
+    res.send(buf);
+  });
+
+  // Upload a brand cost file -> parse, match, flag, save as DRAFT (not yet live)
+  app.post("/api/admin/cost-uploads", requireAdmin, upload.single("file"), async (req: any, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+      const brandId = parseInt(req.body.brandId, 10);
+      if (!brandId) return res.status(400).json({ message: "brandId is required" });
+
+      const parsed = parseCostFile(req.file.buffer);
+      if (!parsed.rows.length) {
+        return res.status(400).json({ message: "No data rows found. Check the file matches the template format." });
+      }
+      const threshold = await getCostThreshold();
+      const summary = await buildPreview(parsed, brandId, threshold);
+
+      const upload = await pricingStore.createDraftUpload({
+        brandId,
+        supplierName: req.body.supplierName || null,
+        validFrom: parseDate(req.body.validFrom),
+        validUntil: parseDate(req.body.validUntil),
+        comment: req.body.comment || null,
+        fileName: req.file.originalname || null,
+        uploadedBy: req.session.userId,
+        rows: summary.rows,
+      });
+
+      res.json({ upload, summary: { ...summary, threshold } });
+    } catch (error: any) {
+      console.error("Cost upload error:", error);
+      res.status(500).json({ message: error.message || "Failed to process cost upload" });
+    }
+  });
+
+  app.get("/api/admin/cost-uploads", requireAdmin, async (req, res) => {
+    const brandId = req.query.brandId ? parseInt(req.query.brandId as string, 10) : undefined;
+    res.json(await pricingStore.listUploads(brandId));
+  });
+
+  app.get("/api/admin/cost-uploads/:id", requireAdmin, async (req, res) => {
+    const found = await pricingStore.getUpload(parseInt(req.params.id, 10));
+    if (!found) return res.status(404).json({ message: "Upload not found" });
+    res.json(found);
+  });
+
+  app.post("/api/admin/cost-uploads/:id/publish", requireAdmin, async (req, res) => {
+    try {
+      const result = await pricingStore.publishUpload(parseInt(req.params.id, 10));
+      res.json({ success: true, ...result });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to publish" });
+    }
+  });
+
+  app.delete("/api/admin/cost-uploads/:id", requireAdmin, async (req, res) => {
+    await pricingStore.deleteUpload(parseInt(req.params.id, 10));
+    res.json({ success: true });
+  });
+
+  // Expired-cost alert for the admin dashboard
+  app.get("/api/admin/cost-alerts", requireAdmin, async (req, res) => {
+    await pricingStore.refreshExpiredCosts();
+    res.json(await pricingStore.expiredCostBrands());
+  });
+
+  // ==================== CUSTOMER PRICING — PRICE LISTS ====================
+  app.get("/api/admin/price-lists", requireAdmin, async (req, res) => {
+    res.json(await pricingStore.listPriceLists());
+  });
+
+  app.get("/api/admin/price-lists/:id", requireAdmin, async (req, res) => {
+    const found = await pricingStore.getPriceListWithRules(parseInt(req.params.id, 10));
+    if (!found) return res.status(404).json({ message: "Price list not found" });
+    res.json(found);
+  });
+
+  app.post("/api/admin/price-lists", requireAdmin, async (req, res) => {
+    try {
+      const list = await pricingStore.createPriceList({
+        name: req.body.name,
+        type: req.body.type === "customer" ? "customer" : "tier",
+        isActive: req.body.isActive ?? true,
+        notes: req.body.notes || null,
+      });
+      res.json(list);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to create price list" });
+    }
+  });
+
+  app.put("/api/admin/price-lists/:id", requireAdmin, async (req, res) => {
+    const list = await pricingStore.updatePriceList(parseInt(req.params.id, 10), {
+      name: req.body.name,
+      isActive: req.body.isActive,
+      notes: req.body.notes,
+    });
+    res.json(list);
+  });
+
+  app.delete("/api/admin/price-lists/:id", requireAdmin, async (req, res) => {
+    await pricingStore.deletePriceList(parseInt(req.params.id, 10));
+    res.json({ success: true });
+  });
+
+  // Replace the full rule set for a price list
+  app.put("/api/admin/price-lists/:id/rules", requireAdmin, async (req, res) => {
+    try {
+      const rules = Array.isArray(req.body.rules) ? req.body.rules : [];
+      const saved = await pricingStore.setRules(parseInt(req.params.id, 10), rules);
+      res.json(saved);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to save rules" });
+    }
+  });
+
+  // Live price preview: resolve given products under a price list (ADMIN view, includes cost)
+  app.post("/api/admin/price-lists/:id/preview-prices", requireAdmin, async (req, res) => {
+    try {
+      const listId = parseInt(req.params.id, 10);
+      const ids: number[] = Array.isArray(req.body.productIds) ? req.body.productIds : [];
+      const prods = (await Promise.all(ids.map((id) => storage.getProduct(id)))).filter(Boolean) as any[];
+      const resolved = await resolveForList(listId, prods);
+      res.json(Array.from(resolved.values()));
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to preview prices" });
+    }
+  });
+
+  // Assign a price list to a customer
+  app.post("/api/admin/customers/:id/price-list", requireAdmin, async (req, res) => {
+    const priceListId = req.body.priceListId === null ? null : parseInt(req.body.priceListId, 10);
+    await pricingStore.assignCustomerPriceList(parseInt(req.params.id, 10), priceListId);
+    res.json({ success: true });
   });
 
   app.get("/api/admin/uploads/categories", requireAdmin, (req, res) => {
