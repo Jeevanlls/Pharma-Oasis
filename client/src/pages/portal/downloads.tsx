@@ -38,8 +38,8 @@ function CheckList({ title, items, selected, onToggle, onAll, onClear }: {
 }
 
 export default function PortalDownloadsPage() {
-  const { data: brands = [] } = useQuery<Brand[]>({ queryKey: ["/api/brands"] });
-  const { data: categories = [] } = useQuery<Category[]>({ queryKey: ["/api/categories"] });
+  const { data: brands = [] } = useQuery<Brand[]>({ queryKey: ["/api/portal/brands"] });
+  const { data: categories = [] } = useQuery<Category[]>({ queryKey: ["/api/portal/categories"] });
   const [brandSel, setBrandSel] = useState<Set<number>>(new Set());
   const [catSel, setCatSel] = useState<Set<number>>(new Set());
 

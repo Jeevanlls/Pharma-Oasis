@@ -13,9 +13,9 @@ import { Search, ShoppingCart, Loader2, Info, ChevronLeft, ChevronRight, Package
 interface Brand { id: number; name: string; }
 interface Category { id: number; name: string; }
 interface PortalProductRow {
-  id: number; productName: string; sku: string; ean: string | null;
-  imageUrl: string | null; packSize: string | null; caseSize: string | null;
-  rrp: string | null; price: number | null; availability: string; availableQty: number | null;
+  itemId: number; brandId: number | null; brandName: string | null;
+  description: string | null; ean: string | null; caseSize: string | null;
+  price: number | null; availability: string; availableQty: number | null;
 }
 interface PortalResponse { products: PortalProductRow[]; total: number; page: number; pageSize: number; hasPriceList: boolean; }
 
@@ -37,8 +37,8 @@ export default function PortalCataloguePage() {
   const [page, setPage] = useState(1);
   const [qty, setQty] = useState<Record<number, number>>({});
 
-  const { data: brands = [] } = useQuery<Brand[]>({ queryKey: ["/api/brands"] });
-  const { data: categories = [] } = useQuery<Category[]>({ queryKey: ["/api/categories"] });
+  const { data: brands = [] } = useQuery<Brand[]>({ queryKey: ["/api/portal/brands"] });
+  const { data: categories = [] } = useQuery<Category[]>({ queryKey: ["/api/portal/categories"] });
 
   const params = new URLSearchParams();
   if (search) params.set("search", search);
@@ -66,9 +66,9 @@ export default function PortalCataloguePage() {
   const money = (n: number | null) => (n === null ? null : `£${n.toFixed(2)}`);
 
   const add = (p: PortalProductRow) => {
-    const q = qty[p.id] || 1;
-    addItem({ id: p.id, productName: p.productName, sku: p.sku, imageUrl: p.imageUrl, price: p.price, availability: p.availability, availableQty: p.availableQty, packSize: p.packSize, caseSize: p.caseSize }, q);
-    toast({ title: "Added to basket", description: `${q} × ${p.productName}` });
+    const q = qty[p.itemId] || 1;
+    addItem({ id: p.itemId, productName: p.description ?? "Item", sku: p.ean ?? "", imageUrl: null, price: p.price, availability: p.availability, availableQty: p.availableQty, caseSize: p.caseSize }, q);
+    toast({ title: "Added to basket", description: `${q} × ${p.description ?? "item"}` });
   };
 
   return (
@@ -138,15 +138,11 @@ export default function PortalCataloguePage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {products.map((p) => (
-            <Card key={p.id} className="flex flex-col overflow-hidden">
-              <div className="aspect-square bg-muted/40 flex items-center justify-center overflow-hidden">
-                {p.imageUrl ? <img src={p.imageUrl} alt={p.productName} className="object-contain h-full w-full" />
-                  : <Package className="h-10 w-10 text-muted-foreground/40" />}
-              </div>
+            <Card key={p.itemId} className="flex flex-col overflow-hidden">
               <CardContent className="p-3 flex flex-col gap-2 flex-1">
-                <div className="text-sm font-medium line-clamp-2 min-h-[2.5rem]">{p.productName}</div>
+                <div className="text-sm font-medium line-clamp-2 min-h-[2.5rem]">{p.description}</div>
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>{p.packSize || p.sku}</span>
+                  <span>{p.brandName || p.caseSize || p.ean}</span>
                   {availabilityBadge(p.availability, p.availableQty)}
                 </div>
                 <div className="mt-auto">
@@ -155,11 +151,11 @@ export default function PortalCataloguePage() {
                   ) : (
                     <div className="text-lg font-bold">{money(p.price)}</div>
                   )}
-                  {p.rrp && <div className="text-xs text-muted-foreground">RRP £{Number(p.rrp).toFixed(2)}</div>}
+                  {p.caseSize && <div className="text-xs text-muted-foreground">Case: {p.caseSize}</div>}
                 </div>
                 <div className="flex gap-2">
-                  <Input type="number" min={1} className="w-16 h-9" value={qty[p.id] ?? 1}
-                    onChange={(e) => setQty({ ...qty, [p.id]: Math.max(1, Number(e.target.value)) })} />
+                  <Input type="number" min={1} className="w-16 h-9" value={qty[p.itemId] ?? 1}
+                    onChange={(e) => setQty({ ...qty, [p.itemId]: Math.max(1, Number(e.target.value)) })} />
                   <Button size="sm" className="flex-1" onClick={() => add(p)} disabled={p.availability === "out_of_stock"}>
                     <ShoppingCart className="h-4 w-4 mr-1" /> Add
                   </Button>

@@ -836,16 +836,16 @@ export class DatabaseStorage implements IStorage {
 
   async getQuoteItems(quoteId: number): Promise<(QuoteItem & { product: Product })[]> {
     const items = await db.select().from(quoteItems).where(eq(quoteItems.quoteId, quoteId));
-    const productIds = items.map(item => item.productId);
-    
-    if (productIds.length === 0) return [];
-    
+    const productIds = items.map(item => item.productId).filter((id): id is number => id != null);
+
+    if (productIds.length === 0) return items.map(item => ({ ...item, product: undefined as any }));
+
     const productList = await db.select().from(products).where(inArray(products.id, productIds));
     const productMap = new Map(productList.map(p => [p.id, p]));
-    
+
     return items.map(item => ({
       ...item,
-      product: productMap.get(item.productId)!,
+      product: item.productId != null ? productMap.get(item.productId)! : (undefined as any),
     }));
   }
 

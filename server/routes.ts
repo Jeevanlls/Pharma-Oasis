@@ -38,8 +38,9 @@ import { sessionMiddleware } from "./session-store";
 import feedsRouter from "./feeds";
 import { parseCostFile, buildPreview, buildTemplateWorkbook } from "./cost-importer";
 import * as pricingStore from "./pricing-store";
+import * as pricingV2 from "./pricing-v2";
 import { resolveForList, toCustomerPrice } from "./pricing";
-import { buildPriceListData, buildPriceListXlsx, buildPriceListPdf } from "./price-export";
+import { buildPriceListData, buildCustomerPriceListData, buildPriceListXlsx, buildPriceListPdf } from "./price-export";
 import {
   createImportJob, 
   getImportJob, 
@@ -3873,7 +3874,150 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
     res.json(await pricingStore.expiredCostBrands());
   });
 
-  // ==================== CUSTOMER PRICING — PRICE LISTS ====================
+  // ==================== PRICING v2 — STANDALONE BRANDS ====================
+  app.get("/api/admin/pricing-brands", requireAdmin, async (req, res) => {
+    res.json(await pricingV2.listPricingBrands());
+  });
+  app.post("/api/admin/pricing-brands", requireAdmin, async (req, res) => {
+    try {
+      if (!req.body.name?.trim()) return res.status(400).json({ message: "Name is required" });
+      res.json(await pricingV2.createPricingBrand(req.body));
+    } catch (e: any) {
+      res.status(500).json({ message: e.message || "Failed to create brand" });
+    }
+  });
+  app.put("/api/admin/pricing-brands/:id", requireAdmin, async (req, res) => {
+    res.json(await pricingV2.updatePricingBrand(parseInt(req.params.id, 10), req.body));
+  });
+  app.delete("/api/admin/pricing-brands/:id", requireAdmin, async (req, res) => {
+    await pricingV2.deletePricingBrand(parseInt(req.params.id, 10));
+    res.json({ success: true });
+  });
+
+  // ==================== PRICING v2 — STANDALONE CATEGORIES ====================
+  app.get("/api/admin/pricing-categories", requireAdmin, async (req, res) => {
+    res.json(await pricingV2.listPricingCategories());
+  });
+  app.post("/api/admin/pricing-categories", requireAdmin, async (req, res) => {
+    try {
+      if (!req.body.name?.trim()) return res.status(400).json({ message: "Name is required" });
+      res.json(await pricingV2.createPricingCategory(req.body));
+    } catch (e: any) {
+      res.status(500).json({ message: e.message || "Failed to create category" });
+    }
+  });
+  app.put("/api/admin/pricing-categories/:id", requireAdmin, async (req, res) => {
+    res.json(await pricingV2.updatePricingCategory(parseInt(req.params.id, 10), req.body));
+  });
+  app.delete("/api/admin/pricing-categories/:id", requireAdmin, async (req, res) => {
+    await pricingV2.deletePricingCategory(parseInt(req.params.id, 10));
+    res.json({ success: true });
+  });
+
+  // ==================== PRICING v2 — PRICE LIST BUILDER ====================
+  // List all saved price lists (optionally for one brand), with item & customer counts.
+  app.get("/api/admin/v2/price-lists", requireAdmin, async (req, res) => {
+    const brandId = req.query.brandId ? parseInt(req.query.brandId as string, 10) : undefined;
+    res.json(await pricingV2.listPriceListsV2(brandId));
+  });
+
+  // Full list with its prepared items (ADMIN view — includes cost).
+  app.get("/api/admin/v2/price-lists/:id", requireAdmin, async (req, res) => {
+    const found = await pricingV2.getPriceListFull(parseInt(req.params.id, 10));
+    if (!found) return res.status(404).json({ message: "Price list not found" });
+    res.json(found);
+  });
+
+  // Create + auto-fill from the brand's base cost at a default margin.
+  app.post("/api/admin/v2/price-lists", requireAdmin, async (req, res) => {
+    try {
+      const brandId = parseInt(req.body.brandId, 10);
+      const name = (req.body.name || "").trim();
+      const defaultMarginPercent = Number(req.body.defaultMarginPercent) || 0;
+      if (!brandId) return res.status(400).json({ message: "brandId is required" });
+      if (!name) return res.status(400).json({ message: "name is required" });
+      const result = await pricingV2.buildPriceList({ brandId, name, defaultMarginPercent });
+      if (result.itemCount === 0) {
+        return res.json({ ...result, warning: "No published base cost found for this brand yet — the list was created empty. Upload & publish a cost first." });
+      }
+      res.json(result);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message || "Failed to build price list" });
+    }
+  });
+
+  app.put("/api/admin/v2/price-lists/:id", requireAdmin, async (req, res) => {
+    res.json(await pricingV2.updatePriceListMeta(parseInt(req.params.id, 10), req.body));
+  });
+
+  // Apply a default margin to all margin-method items at once.
+  app.post("/api/admin/v2/price-lists/:id/apply-margin", requireAdmin, async (req, res) => {
+    const margin = Number(req.body.marginPercent) || 0;
+    const n = await pricingV2.applyDefaultMargin(parseInt(req.params.id, 10), margin);
+    res.json({ updated: n });
+  });
+
+  // Save per-item overrides (method / margin / fixed / cost_plus); recomputes prices.
+  app.put("/api/admin/v2/price-lists/:id/items", requireAdmin, async (req, res) => {
+    try {
+      const patches = Array.isArray(req.body.items) ? req.body.items : [];
+      const n = await pricingV2.updatePriceListItems(parseInt(req.params.id, 10), patches);
+      const found = await pricingV2.getPriceListFull(parseInt(req.params.id, 10));
+      res.json({ updated: n, ...found });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message || "Failed to update items" });
+    }
+  });
+
+  // Re-pull base cost into the list (margins recompute; fixed kept for review).
+  app.post("/api/admin/v2/price-lists/:id/refresh-cost", requireAdmin, async (req, res) => {
+    res.json(await pricingV2.refreshFromBaseCost(parseInt(req.params.id, 10)));
+  });
+
+  app.delete("/api/admin/v2/price-lists/:id", requireAdmin, async (req, res) => {
+    await pricingV2.deletePriceListV2(parseInt(req.params.id, 10));
+    res.json({ success: true });
+  });
+
+  // ----- Assignment (one list per customer PER BRAND, enforced) -----
+  app.get("/api/admin/v2/price-lists/:id/customers", requireAdmin, async (req, res) => {
+    res.json(await pricingV2.customersForList(parseInt(req.params.id, 10)));
+  });
+
+  app.post("/api/admin/v2/price-lists/:id/assign", requireAdmin, async (req: any, res) => {
+    try {
+      const listId = parseInt(req.params.id, 10);
+      const replace = !!req.body.replace;
+      const assignedBy = req.session?.userId ?? null;
+      if (req.body.all === true) {
+        const assigned = await pricingV2.assignAllCustomers(listId, assignedBy);
+        return res.json({ assigned, conflicts: [] });
+      }
+      const customerIds: number[] = (Array.isArray(req.body.customerIds) ? req.body.customerIds : []).map(Number);
+      const result = await pricingV2.assignCustomers(listId, customerIds, { replace, assignedBy });
+      if (result.conflicts.length && !replace) {
+        return res.status(409).json({
+          message: "Some customers already have a different list for this brand.",
+          ...result,
+        });
+      }
+      res.json(result);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message || "Failed to assign" });
+    }
+  });
+
+  app.post("/api/admin/v2/price-lists/:id/unassign", requireAdmin, async (req, res) => {
+    await pricingV2.unassignCustomer(parseInt(req.params.id, 10), Number(req.body.customerId));
+    res.json({ success: true });
+  });
+
+  // A customer's current assignments (one per brand) — for the admin customer view.
+  app.get("/api/admin/v2/customers/:id/assignments", requireAdmin, async (req, res) => {
+    res.json(await pricingV2.assignmentsForCustomer(parseInt(req.params.id, 10)));
+  });
+
+  // ==================== CUSTOMER PRICING — PRICE LISTS (legacy v1) ====================
   app.get("/api/admin/price-lists", requireAdmin, async (req, res) => {
     res.json(await pricingStore.listPriceLists());
   });
@@ -3943,97 +4087,84 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
     res.json({ success: true });
   });
 
-  // ==================== CUSTOMER PORTAL ====================
+  // ==================== CUSTOMER PORTAL (v2: prepared prices) ====================
+  // Brands the customer has a nominated list for (drives portal brand filter).
+  app.get("/api/portal/brands", requireActiveCustomer, async (req: any, res) => {
+    const assignments = await pricingV2.assignmentsForCustomer(req.user.id);
+    const seen = new Map<number, string | null>();
+    for (const a of assignments) if (a.brandId != null) seen.set(a.brandId, a.brandName);
+    res.json(Array.from(seen.entries()).map(([id, name]) => ({ id, name })));
+  });
+
+  // Pricing categories for the portal filter (active only).
+  app.get("/api/portal/categories", requireActiveCustomer, async (req: any, res) => {
+    const cats = await pricingV2.listPricingCategories();
+    res.json(cats.filter((c) => c.isActive).map((c) => ({ id: c.id, name: c.name })));
+  });
+
   // Catalogue priced for the logged-in customer (cost/margin never sent).
   app.get("/api/portal/products", requireActiveCustomer, async (req: any, res) => {
     try {
-      const search = (req.query.search as string) || "";
-      const brand = req.query.brand ? Number(req.query.brand) : undefined;
-      const category = req.query.category ? Number(req.query.category) : undefined;
-      const sort = (req.query.sort as string) || "name";
-      const availability = (req.query.availability as string) || "";
       const pageSize = Math.min(Number(req.query.limit) || 24, 100);
       const pageNum = Math.max(Number(req.query.page) || 1, 1);
-      const opts = { activeOnly: true, limit: pageSize, offset: (pageNum - 1) * pageSize };
-
-      let productList: any[];
-      let total: number;
-      if (search.trim()) {
-        productList = await storage.searchProductsFullText(search, opts);
-        total = await storage.getProductCount({ activeOnly: true, search });
-      } else if (brand) {
-        productList = await storage.getProductsByBrand(brand, opts);
-        total = await storage.getProductCount({ activeOnly: true, brandId: brand });
-      } else if (category) {
-        productList = await storage.getProductsByCategory(category, opts);
-        total = await storage.getProductCount({ activeOnly: true, categoryId: category });
-      } else {
-        productList = await storage.getAllProducts({ activeOnly: true, limit: pageSize, offset: opts.offset });
-        total = await storage.getProductCount({ activeOnly: true });
-      }
-
-      const resolved = await resolveForList(req.user.priceListId, productList);
-      let items = productList.map((p) => {
-        const cp = toCustomerPrice(resolved.get(p.id)!);
-        return {
-          id: p.id,
-          productName: p.productName,
-          sku: p.sku,
-          ean: p.ean,
-          brandId: p.brandId,
-          categoryId: p.categoryId,
-          imageUrl: p.imageUrl,
-          packSize: p.packSize,
-          caseSize: p.caseSize,
-          uom: p.uom,
-          slug: p.slug,
-          rrp: p.rrp,
-          price: cp.price,
-          availability: cp.availability,
-          availableQty: cp.availableQty,
-        };
+      const all = await pricingV2.getCustomerCatalogue(req.user.id, {
+        search: (req.query.search as string) || "",
+        brandId: req.query.brand ? Number(req.query.brand) : undefined,
+        categoryId: req.query.category ? Number(req.query.category) : undefined,
+        availability: (req.query.availability as string) || "",
+        sort: (req.query.sort as string) || "name",
       });
-
-      // Availability filter + price sort applied within the page.
-      if (availability) items = items.filter((i) => i.availability === availability);
-      if (sort === "price-asc") items.sort((a, b) => (a.price ?? Infinity) - (b.price ?? Infinity));
-      else if (sort === "price-desc") items.sort((a, b) => (b.price ?? -Infinity) - (a.price ?? -Infinity));
-
-      res.json({ products: items, total, page: pageNum, pageSize, hasPriceList: !!req.user.priceListId });
+      const total = all.length;
+      const start = (pageNum - 1) * pageSize;
+      const products = all.slice(start, start + pageSize);
+      res.json({ products, total, page: pageNum, pageSize, hasPriceList: total > 0 || (await pricingV2.customerListIds(req.user.id)).length > 0 });
     } catch (error: any) {
       console.error("Portal products error:", error);
       res.status(500).json({ message: "Failed to load products" });
     }
   });
 
-  // Single product priced for the customer (for a detail view).
+  // Single prepared item priced for the customer (basket / detail view).
   app.get("/api/portal/products/:id", requireActiveCustomer, async (req: any, res) => {
-    const product = await storage.getProduct(Number(req.params.id));
-    if (!product || !product.isActive) return res.status(404).json({ message: "Product not found" });
-    const resolved = await resolveForList(req.user.priceListId, [product]);
-    const cp = toCustomerPrice(resolved.get(product.id)!);
-    const { activeCostPrice, activeCostUploadId, costEffectiveDate, costExpiryDate, costStatus, wholesalePrice, googleFeedPrice, notesInternal, ...safe } = product as any;
-    res.json({ ...safe, ...cp });
+    const it = await pricingV2.getCustomerItem(req.user.id, Number(req.params.id));
+    if (!it) return res.status(404).json({ message: "Product not found" });
+    res.json({
+      itemId: it.id,
+      ean: it.ean,
+      description: it.description,
+      caseSize: it.caseSize,
+      pricingCategoryId: it.pricingCategoryId,
+      price: it.preparedPrice != null ? Number(it.preparedPrice) : null,
+      availability: pricingV2.availabilityOf(it.supplierQty),
+      availableQty: it.supplierQty,
+    });
   });
 
-  // Snapshot priced lines for an order/quote at the customer's current prices.
+  // Snapshot priced lines for an order/quote at the customer's current prepared prices.
+  // Basket items reference prepared list items by `itemId` (falls back to productId).
   async function buildPricedLines(user: any, items: any[]) {
-    const ids = items.map((i) => Number(i.productId));
-    const prods = (await Promise.all(ids.map((id) => storage.getProduct(id)))).filter(Boolean) as any[];
-    const resolved = await resolveForList(user.priceListId, prods);
-    const byId = new Map(prods.map((p) => [p.id, p]));
     const lines: any[] = [];
     let total = 0;
     for (const it of items) {
-      const pid = Number(it.productId);
-      const product = byId.get(pid);
-      if (!product || !product.isActive) throw new Error(`Invalid product: ${pid}`);
-      const r = resolved.get(pid);
+      const itemId = Number(it.itemId ?? it.productId);
+      const li = await pricingV2.getCustomerItem(user.id, itemId);
+      if (!li) throw new Error(`Invalid item: ${itemId}`);
       const qty = Math.max(1, Number(it.quantity) || 1);
-      const unitPrice = r?.price ?? null;
+      const unitPrice = li.preparedPrice != null ? Number(li.preparedPrice) : null;
+      const unitCost = li.costPrice != null ? Number(li.costPrice) : null;
+      const marginApplied = li.method === "margin" && li.marginPercent != null ? Number(li.marginPercent) : null;
       const lineTotal = unitPrice != null ? unitPrice * qty : 0;
       total += lineTotal;
-      lines.push({ productId: pid, quantity: qty, unitCost: r?.cost ?? null, unitPrice, marginApplied: r?.marginPercent ?? null, lineTotal });
+      lines.push({
+        priceListItemId: li.id,
+        ean: li.ean,
+        description: li.description,
+        quantity: qty,
+        unitCost,
+        unitPrice,
+        marginApplied,
+        lineTotal,
+      });
     }
     return { lines, total };
   }
@@ -4046,7 +4177,7 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
       const { lines, total } = await buildPricedLines(req.user, items);
       const order = await pricingStore.createOrder({
         userId: req.user.id,
-        priceListId: req.user.priceListId ?? null,
+        priceListId: null, // v2: pricing is per-brand across multiple lists
         totalAmount: total,
         customerNotes: customerNotes || null,
         lines,
@@ -4083,7 +4214,10 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
       for (const l of lines) {
         await storage.createQuoteItem({
           quoteId: quote.id,
-          productId: l.productId,
+          productId: l.productId ?? null,
+          priceListItemId: l.priceListItemId ?? null,
+          ean: l.ean ?? null,
+          description: l.description ?? null,
           quantity: l.quantity,
           unitPrice: l.unitPrice != null ? String(l.unitPrice) : null,
           unitCost: l.unitCost != null ? String(l.unitCost) : null,
@@ -4130,7 +4264,19 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
       const format = (req.query.format as string) === "pdf" ? "pdf" : "xlsx";
       const scope = { brandIds: parseIdList(req.query.brands), categoryIds: parseIdList(req.query.categories) };
       const title = `Price List — ${req.user.companyName || req.user.email}`;
-      await sendPriceListDownload(res, req.user.priceListId ?? null, scope, title, format);
+      const data = await buildCustomerPriceListData(req.user.id, scope, title);
+      const safeTitle = title.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+      if (format === "pdf") {
+        const buf = await buildPriceListPdf(data);
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", `attachment; filename="${safeTitle}.pdf"`);
+        res.send(buf);
+      } else {
+        const buf = buildPriceListXlsx(data);
+        res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        res.setHeader("Content-Disposition", `attachment; filename="${safeTitle}.xlsx"`);
+        res.send(buf);
+      }
     } catch (error: any) {
       console.error("Price list download error:", error);
       res.status(500).json({ message: "Failed to generate price list" });

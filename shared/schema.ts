@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, decimal, varchar } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, decimal, varchar, unique } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -163,7 +163,10 @@ export const quotes = pgTable("quotes", {
 export const quoteItems = pgTable("quote_items", {
   id: serial("id").primaryKey(),
   quoteId: integer("quote_id").notNull(),
-  productId: integer("product_id").notNull(),
+  productId: integer("product_id"), // legacy catalogue product (nullable in v2)
+  priceListItemId: integer("price_list_item_id"), // v2: the prepared list line quoted
+  ean: varchar("ean", { length: 50 }),
+  description: varchar("description", { length: 500 }),
   quantity: integer("quantity").notNull(),
   unitPrice: decimal("unit_price", { precision: 10, scale: 2 }),
   unitCost: decimal("unit_cost", { precision: 10, scale: 2 }), // snapshot of cost at submission
@@ -1264,6 +1267,7 @@ export const costUploadRows = pgTable("cost_upload_rows", {
   ean: varchar("ean", { length: 50 }),
   description: varchar("description", { length: 500 }),
   categoryName: varchar("category_name", { length: 255 }), // from "Category:" section in file
+  pricingCategoryId: integer("pricing_category_id"), // FK -> pricing_categories (resolved from categoryName)
   caseSize: varchar("case_size", { length: 100 }),
   costPrice: decimal("cost_price", { precision: 10, scale: 2 }),
   supplierQty: integer("supplier_qty"), // QTY column; null = blank = "on request"
@@ -1286,14 +1290,21 @@ export type InsertCostUploadRow = z.infer<typeof insertCostUploadRowSchema>;
 export type CostUploadRow = typeof costUploadRows.$inferSelect;
 
 // ============================================
-// CUSTOMER PRICING — PRICE LISTS (reusable tiers OR per-customer)
+// CUSTOMER PRICING — PRICE LISTS (v2: brand-scoped, prepared & saved)
+// A price list belongs to ONE pricing brand and holds prepared line prices
+// (see priceListItems). Built from that brand's base cost upload.
 // ============================================
 export const priceLists = pgTable("price_lists", {
   id: serial("id").primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
+  brandId: integer("brand_id"), // FK -> pricing_brands (every v2 list is scoped to one brand)
+  baseCostUploadId: integer("base_cost_upload_id"), // which base cost this list was prepared from
+  defaultMarginPercent: decimal("default_margin_percent", { precision: 6, scale: 2 }), // list-wide default applied on build
+  status: varchar("status", { length: 20 }).notNull().default("draft"), // draft | published
+  // --- legacy v1 fields (kept for backward compatibility / migration) ---
   type: varchar("type", { length: 20 }).notNull().default("tier"), // tier | customer
   isActive: boolean("is_active").default(true),
-  isDefault: boolean("is_default").default(false), // baseline list for new customers
+  isDefault: boolean("is_default").default(false),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -1362,7 +1373,10 @@ export type Order = typeof orders.$inferSelect;
 export const orderItems = pgTable("order_items", {
   id: serial("id").primaryKey(),
   orderId: integer("order_id").notNull(),
-  productId: integer("product_id").notNull(),
+  productId: integer("product_id"), // legacy catalogue product (nullable in v2)
+  priceListItemId: integer("price_list_item_id"), // v2: the prepared list line ordered
+  ean: varchar("ean", { length: 50 }), // snapshot for standalone display
+  description: varchar("description", { length: 500 }), // snapshot product name
   quantity: integer("quantity").notNull(),
   unitCost: decimal("unit_cost", { precision: 10, scale: 2 }), // snapshot
   unitPrice: decimal("unit_price", { precision: 10, scale: 2 }), // snapshot (customer price)
@@ -1377,3 +1391,111 @@ export const insertOrderItemSchema = createInsertSchema(orderItems).omit({
 });
 export type InsertOrderItem = z.infer<typeof insertOrderItemSchema>;
 export type OrderItem = typeof orderItems.$inferSelect;
+
+// ============================================
+// CUSTOMER PRICING v2 — STANDALONE PRICING BRANDS
+// Separate from the public-catalogue `brands` table. The pricing/portal side
+// owns its own brand list, managed independently.
+// ============================================
+export const pricingBrands = pgTable("pricing_brands", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull().unique(),
+  slug: varchar("slug", { length: 255 }),
+  logoUrl: text("logo_url"),
+  isActive: boolean("is_active").default(true),
+  sortOrder: integer("sort_order").default(0),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertPricingBrandSchema = createInsertSchema(pricingBrands).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertPricingBrand = z.infer<typeof insertPricingBrandSchema>;
+export type PricingBrand = typeof pricingBrands.$inferSelect;
+
+// ============================================
+// CUSTOMER PRICING v2 — STANDALONE PRICING CATEGORIES
+// ============================================
+export const pricingCategories = pgTable("pricing_categories", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull().unique(),
+  slug: varchar("slug", { length: 255 }),
+  isActive: boolean("is_active").default(true),
+  sortOrder: integer("sort_order").default(0),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertPricingCategorySchema = createInsertSchema(pricingCategories).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertPricingCategory = z.infer<typeof insertPricingCategorySchema>;
+export type PricingCategory = typeof pricingCategories.$inferSelect;
+
+// ============================================
+// CUSTOMER PRICING v2 — PRICE LIST ITEMS (the prepared, saved prices)
+// One row per product (sourced from a base-cost row). The customer price is
+// computed at save time (preparedPrice) from the chosen method, so a list is a
+// real stored artifact, not recomputed on every view.
+// ============================================
+export const priceListItems = pgTable("price_list_items", {
+  id: serial("id").primaryKey(),
+  priceListId: integer("price_list_id").notNull(),
+  costRowId: integer("cost_row_id"), // FK -> cost_upload_rows (source product/cost line)
+  ean: varchar("ean", { length: 50 }), // denormalised for stability + display
+  description: varchar("description", { length: 500 }),
+  pricingCategoryId: integer("pricing_category_id"),
+  caseSize: varchar("case_size", { length: 100 }),
+  costPrice: decimal("cost_price", { precision: 10, scale: 2 }), // snapshot of base cost at prepare time (ADMIN-ONLY)
+  method: varchar("method", { length: 20 }).notNull().default("margin"), // margin | fixed | cost_plus
+  marginPercent: decimal("margin_percent", { precision: 6, scale: 2 }), // when method = margin
+  fixedPrice: decimal("fixed_price", { precision: 10, scale: 2 }), // when method = fixed
+  plusAmount: decimal("plus_amount", { precision: 10, scale: 2 }), // when method = cost_plus
+  preparedPrice: decimal("prepared_price", { precision: 10, scale: 2 }), // the stored customer price
+  supplierQty: integer("supplier_qty"), // availability snapshot (null = on request)
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertPriceListItemSchema = createInsertSchema(priceListItems).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertPriceListItem = z.infer<typeof insertPriceListItemSchema>;
+export type PriceListItem = typeof priceListItems.$inferSelect;
+
+// ============================================
+// CUSTOMER PRICING v2 — CUSTOMER ⇄ PRICE LIST ASSIGNMENTS
+// A customer may hold several lists (one per brand). The composite unique
+// constraint on (customerId, brandId) enforces "one list per customer PER BRAND".
+// ============================================
+export const customerPriceLists = pgTable(
+  "customer_price_lists",
+  {
+    id: serial("id").primaryKey(),
+    customerId: integer("customer_id").notNull(),
+    priceListId: integer("price_list_id").notNull(),
+    brandId: integer("brand_id").notNull(), // denormalised from the list for the uniqueness guard
+    assignedBy: integer("assigned_by"),
+    assignedAt: timestamp("assigned_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    uniqCustomerBrand: unique("uniq_customer_brand").on(t.customerId, t.brandId),
+  }),
+);
+
+export const insertCustomerPriceListSchema = createInsertSchema(customerPriceLists).omit({
+  id: true,
+  assignedAt: true,
+});
+export type InsertCustomerPriceList = z.infer<typeof insertCustomerPriceListSchema>;
+export type CustomerPriceList = typeof customerPriceLists.$inferSelect;

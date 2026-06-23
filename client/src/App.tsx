@@ -64,6 +64,9 @@ import AdminProductRotationPage from "@/pages/admin/product-rotation";
 import AdminOffersPage from "@/pages/admin/offers";
 import AdminCostUploadsPage from "@/pages/admin/cost-uploads";
 import AdminPriceListsPage from "@/pages/admin/price-lists";
+import AdminPricingBrandsPage from "@/pages/admin/pricing-brands";
+import AdminPricingCategoriesPage from "@/pages/admin/pricing-categories";
+import AdminPriceBuilderPage from "@/pages/admin/price-builder";
 import AdminOrdersPage from "@/pages/admin/orders";
 
 import PortalCataloguePage from "@/pages/portal/catalogue";
@@ -183,6 +186,9 @@ function Router() {
       <Route path="/admin/orders">{() => <AdminRoute component={AdminOrdersPage} />}</Route>
       <Route path="/admin/cost-uploads">{() => <AdminRoute component={AdminCostUploadsPage} />}</Route>
       <Route path="/admin/price-lists">{() => <AdminRoute component={AdminPriceListsPage} />}</Route>
+      <Route path="/admin/pricing-brands">{() => <AdminRoute component={AdminPricingBrandsPage} />}</Route>
+      <Route path="/admin/pricing-categories">{() => <AdminRoute component={AdminPricingCategoriesPage} />}</Route>
+      <Route path="/admin/price-builder">{() => <AdminRoute component={AdminPriceBuilderPage} />}</Route>
 
       <Route path="/portal">{() => <PortalRoute component={PortalCataloguePage} />}</Route>
       <Route path="/portal/basket">{() => <PortalRoute component={PortalBasketPage} />}</Route>

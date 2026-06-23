@@ -49,7 +49,7 @@ export default function AdminCostUploadsPage() {
   const [preview, setPreview] = useState<{ uploadId: number; summary: PreviewSummary } | null>(null);
   const [uploading, setUploading] = useState(false);
 
-  const { data: brands = [] } = useQuery<Brand[]>({ queryKey: ["/api/brands"] });
+  const { data: brands = [] } = useQuery<Brand[]>({ queryKey: ["/api/admin/pricing-brands"] });
   const { data: uploads = [] } = useQuery<CostUpload[]>({ queryKey: ["/api/admin/cost-uploads"] });
   const { data: alerts = [] } = useQuery<{ brandId: number; brandName: string | null; count: number }[]>({
     queryKey: ["/api/admin/cost-alerts"],

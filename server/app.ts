@@ -77,30 +77,39 @@ const allowedOrigins = [
   "https://pharma-oasis--jeevan.replit.app",
 ];
 
+// Replit preview/deploy domains provided by the platform (comma-separated)
+const replitHosts = (process.env.REPLIT_DOMAINS || process.env.REPLIT_DEV_DOMAIN || "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+// Single source of truth for whether an Origin may access the app.
+function isOriginAllowed(origin?: string): boolean {
+  if (!origin) return true; // same-origin, health probes, server-to-server
+  if (allowedOrigins.includes(origin)) return true;
+  try {
+    const host = new URL(origin).hostname;
+    // Localhost in development
+    if (!IS_PRODUCTION && (host === "localhost" || host === "127.0.0.1")) return true;
+    // Replit preview & deployment domains
+    if (/\.replit\.dev$/.test(host) || /\.replit\.app$/.test(host) || /\.repl\.co$/.test(host)) return true;
+    if (replitHosts.includes(host)) return true;
+  } catch {
+    // malformed Origin — fall through to reject
+  }
+  return false;
+}
+
 app.use(cors({
-  origin: (origin, callback) => {
-    // Allow requests with no origin (same-origin, health probes, server-to-server)
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) return callback(null, true);
-    // In development also allow localhost on any port
-    if (!IS_PRODUCTION && /^https?:\/\/localhost(:\d+)?$/.test(origin)) return callback(null, true);
-    // Reject all other origins with a clear 403
-    return callback(null, false);
-  },
+  origin: (origin, callback) => callback(null, isOriginAllowed(origin)),
   credentials: true,
 }));
 
 // Explicitly return 403 for requests whose origin was rejected by CORS
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  if (!origin) return next();
-  const isAllowed =
-    allowedOrigins.includes(origin) ||
-    (!IS_PRODUCTION && /^https?:\/\/localhost(:\d+)?$/.test(origin));
-  if (!isAllowed) {
-    return res.status(403).json({ message: "Origin not allowed" });
-  }
-  next();
+  if (!origin || isOriginAllowed(origin)) return next();
+  return res.status(403).json({ message: "Origin not allowed" });
 });
 
 // Global API rate limiter — 100 requests per minute per IP across all /api/ routes

@@ -10,6 +10,7 @@ import {
   priceListRules,
   products,
   brands,
+  pricingBrands,
   users,
   orders,
   orderItems,
@@ -25,6 +26,7 @@ import type {
   OrderItem,
 } from "@shared/schema";
 import type { PreviewRow } from "./cost-importer";
+import { ensurePricingCategory } from "./pricing-v2";
 
 const toStr = (n: number | null | undefined): string | null =>
   n === null || n === undefined ? null : String(n);
@@ -62,6 +64,11 @@ export async function createDraftUpload(input: CreateUploadInput): Promise<CostU
     .returning();
 
   if (input.rows.length) {
+    // Resolve (creating as needed) a standalone pricing-category id per row.
+    const uniqueCats = Array.from(new Set(input.rows.map((r) => (r.categoryName || "").trim()).filter(Boolean)));
+    const catIdByName = new Map<string, number | null>();
+    for (const name of uniqueCats) catIdByName.set(name, await ensurePricingCategory(name));
+
     await db.insert(costUploadRows).values(
       input.rows.map((r) => ({
         uploadId: upload.id,
@@ -69,6 +76,7 @@ export async function createDraftUpload(input: CreateUploadInput): Promise<CostU
         ean: r.ean || null,
         description: r.description || null,
         categoryName: r.categoryName || null,
+        pricingCategoryId: catIdByName.get((r.categoryName || "").trim()) ?? null,
         caseSize: r.caseSize || null,
         costPrice: toStr(r.costPrice),
         supplierQty: r.supplierQty,
@@ -88,9 +96,9 @@ export async function createDraftUpload(input: CreateUploadInput): Promise<CostU
 
 export async function listUploads(brandId?: number): Promise<(CostUpload & { brandName: string | null })[]> {
   const rows = await db
-    .select({ upload: costUploads, brandName: brands.name })
+    .select({ upload: costUploads, brandName: pricingBrands.name })
     .from(costUploads)
-    .leftJoin(brands, eq(costUploads.brandId, brands.id))
+    .leftJoin(pricingBrands, eq(costUploads.brandId, pricingBrands.id))
     .where(brandId ? eq(costUploads.brandId, brandId) : sql`true`)
     .orderBy(desc(costUploads.createdAt));
   return rows.map((r) => ({ ...r.upload, brandName: r.brandName }));
@@ -243,7 +251,10 @@ export async function assignCustomerPriceList(userId: number, priceListId: numbe
 // ---------- ORDERS ----------
 
 export interface OrderLineInput {
-  productId: number;
+  productId?: number | null;
+  priceListItemId?: number | null;
+  ean?: string | null;
+  description?: string | null;
   quantity: number;
   unitCost: number | null;
   unitPrice: number | null;
@@ -273,7 +284,10 @@ export async function createOrder(input: {
     await db.insert(orderItems).values(
       input.lines.map((l) => ({
         orderId: order.id,
-        productId: l.productId,
+        productId: l.productId ?? null,
+        priceListItemId: l.priceListItemId ?? null,
+        ean: l.ean ?? null,
+        description: l.description ?? null,
         quantity: l.quantity,
         unitCost: toStr(l.unitCost),
         unitPrice: toStr(l.unitPrice),
@@ -299,7 +313,7 @@ export async function getOrderWithItems(
     .from(orderItems)
     .leftJoin(products, eq(orderItems.productId, products.id))
     .where(eq(orderItems.orderId, id));
-  return { order, items: items.map((r) => ({ ...r.item, productName: r.productName })) };
+  return { order, items: items.map((r) => ({ ...r.item, productName: r.productName ?? r.item.description })) };
 }
 
 export async function listAllOrders(): Promise<(Order & { companyName: string | null; email: string | null })[]> {

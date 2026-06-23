@@ -66,8 +66,11 @@ const mainMenuItems = [
 ];
 
 const pricingMenuItems = [
+  { title: "Pricing Brands", href: "/admin/pricing-brands", icon: Building2, staffAccess: false },
+  { title: "Pricing Categories", href: "/admin/pricing-categories", icon: Tag, staffAccess: false },
   { title: "Cost Uploads", href: "/admin/cost-uploads", icon: FileUp, staffAccess: false },
-  { title: "Price Lists", href: "/admin/price-lists", icon: Coins, staffAccess: false },
+  { title: "Price List Builder", href: "/admin/price-builder", icon: Coins, staffAccess: false },
+  { title: "Price Lists (legacy)", href: "/admin/price-lists", icon: Coins, staffAccess: false },
 ];
 
 const homepageMenuItems = [

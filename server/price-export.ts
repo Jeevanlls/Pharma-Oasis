@@ -6,6 +6,7 @@ import * as XLSX from "xlsx";
 import PDFDocument from "pdfkit";
 import { storage } from "./storage";
 import { resolveForList, toCustomerPrice } from "./pricing";
+import { getCustomerCatalogue, listPricingCategories } from "./pricing-v2";
 
 export interface ExportScope {
   brandIds?: number[];
@@ -73,6 +74,38 @@ export async function buildPriceListData(
   // Sort by brand then product for a tidy sheet.
   rows.sort((a, b) => a.brand.localeCompare(b.brand) || a.productName.localeCompare(b.productName));
 
+  return { title, generatedAt: new Date(), rows };
+}
+
+/** v2: build a customer's downloadable list from their PREPARED prices
+ *  (across the lists nominated to them), scoped to chosen brands/categories. */
+export async function buildCustomerPriceListData(
+  customerId: number,
+  scope: ExportScope,
+  title: string,
+): Promise<PriceListExport> {
+  const [items, categories] = await Promise.all([
+    getCustomerCatalogue(customerId, {}),
+    listPricingCategories(),
+  ]);
+  const catName = new Map(categories.map((c) => [c.id, c.name]));
+  const brandSet = scope.brandIds && scope.brandIds.length ? new Set(scope.brandIds) : null;
+  const catSet = scope.categoryIds && scope.categoryIds.length ? new Set(scope.categoryIds) : null;
+
+  let filtered = items;
+  if (brandSet) filtered = filtered.filter((i) => i.brandId != null && brandSet.has(i.brandId));
+  if (catSet) filtered = filtered.filter((i) => i.pricingCategoryId != null && catSet.has(i.pricingCategoryId));
+
+  const rows: PriceRow[] = filtered.map((i) => ({
+    brand: i.brandName || "",
+    category: (i.pricingCategoryId != null && catName.get(i.pricingCategoryId)) || "",
+    productName: i.description || "",
+    ean: i.ean || "",
+    packSize: i.caseSize || "",
+    price: i.price,
+    availability: availabilityLabel[i.availability] || i.availability,
+  }));
+  rows.sort((a, b) => a.brand.localeCompare(b.brand) || a.productName.localeCompare(b.productName));
   return { title, generatedAt: new Date(), rows };
 }
 
