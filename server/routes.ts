@@ -30,12 +30,16 @@ import {
   sendRegistrationConfirmationToUser,
   sendContactFormConfirmation,
   sendSupplierConfirmation,
+  sendOrderSubmissionNotification,
+  sendOrderConfirmationToCustomer,
+  sendCustomerResponseEmail,
 } from "./email";
 import { sessionMiddleware } from "./session-store";
 import feedsRouter from "./feeds";
 import { parseCostFile, buildPreview, buildTemplateWorkbook } from "./cost-importer";
 import * as pricingStore from "./pricing-store";
 import { resolveForList, toCustomerPrice } from "./pricing";
+import { buildPriceListData, buildPriceListXlsx, buildPriceListPdf } from "./price-export";
 import {
   createImportJob, 
   getImportJob, 
@@ -4010,6 +4014,185 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
     const cp = toCustomerPrice(resolved.get(product.id)!);
     const { activeCostPrice, activeCostUploadId, costEffectiveDate, costExpiryDate, costStatus, wholesalePrice, googleFeedPrice, notesInternal, ...safe } = product as any;
     res.json({ ...safe, ...cp });
+  });
+
+  // Snapshot priced lines for an order/quote at the customer's current prices.
+  async function buildPricedLines(user: any, items: any[]) {
+    const ids = items.map((i) => Number(i.productId));
+    const prods = (await Promise.all(ids.map((id) => storage.getProduct(id)))).filter(Boolean) as any[];
+    const resolved = await resolveForList(user.priceListId, prods);
+    const byId = new Map(prods.map((p) => [p.id, p]));
+    const lines: any[] = [];
+    let total = 0;
+    for (const it of items) {
+      const pid = Number(it.productId);
+      const product = byId.get(pid);
+      if (!product || !product.isActive) throw new Error(`Invalid product: ${pid}`);
+      const r = resolved.get(pid);
+      const qty = Math.max(1, Number(it.quantity) || 1);
+      const unitPrice = r?.price ?? null;
+      const lineTotal = unitPrice != null ? unitPrice * qty : 0;
+      total += lineTotal;
+      lines.push({ productId: pid, quantity: qty, unitCost: r?.cost ?? null, unitPrice, marginApplied: r?.marginPercent ?? null, lineTotal });
+    }
+    return { lines, total };
+  }
+
+  // Place an order from the basket (snapshots prices)
+  app.post("/api/portal/orders", requireActiveCustomer, async (req: any, res) => {
+    try {
+      const { items, customerNotes } = req.body;
+      if (!Array.isArray(items) || items.length === 0) return res.status(400).json({ message: "Order must have at least one item" });
+      const { lines, total } = await buildPricedLines(req.user, items);
+      const order = await pricingStore.createOrder({
+        userId: req.user.id,
+        priceListId: req.user.priceListId ?? null,
+        totalAmount: total,
+        customerNotes: customerNotes || null,
+        lines,
+      });
+      const totalFmt = `£${total.toFixed(2)}`;
+      const name = req.user.primaryContactName || req.user.companyName || req.user.email;
+      await sendOrderSubmissionNotification({ orderId: order.id, customerEmail: req.user.email, customerName: name, companyName: req.user.companyName || name, itemCount: lines.length, totalValue: totalFmt });
+      await sendOrderConfirmationToCustomer({ email: req.user.email, contactName: name, orderId: order.id, itemCount: lines.length, totalValue: totalFmt });
+      res.status(201).json({ order, message: "Order placed successfully" });
+    } catch (error: any) {
+      console.error("Order creation error:", error);
+      res.status(500).json({ message: error.message || "Failed to place order" });
+    }
+  });
+
+  app.get("/api/portal/orders", requireActiveCustomer, async (req: any, res) => {
+    res.json(await pricingStore.getOrdersByUser(req.user.id));
+  });
+
+  app.get("/api/portal/orders/:id", requireActiveCustomer, async (req: any, res) => {
+    const found = await pricingStore.getOrderWithItems(Number(req.params.id));
+    if (!found) return res.status(404).json({ message: "Order not found" });
+    if (found.order.userId !== req.user.id && req.user.role !== "admin") return res.status(403).json({ message: "Access denied" });
+    res.json(found);
+  });
+
+  // Request a quote / availability from the basket (snapshots prices)
+  app.post("/api/portal/quotes", requireActiveCustomer, async (req: any, res) => {
+    try {
+      const { items, customerNotes } = req.body;
+      if (!Array.isArray(items) || items.length === 0) return res.status(400).json({ message: "Quote must have at least one item" });
+      const { lines, total } = await buildPricedLines(req.user, items);
+      const quote = await storage.createQuote({ userId: req.user.id, status: "pending", customerNotes: customerNotes || null, totalEstimate: total.toFixed(2) });
+      for (const l of lines) {
+        await storage.createQuoteItem({
+          quoteId: quote.id,
+          productId: l.productId,
+          quantity: l.quantity,
+          unitPrice: l.unitPrice != null ? String(l.unitPrice) : null,
+          unitCost: l.unitCost != null ? String(l.unitCost) : null,
+          marginApplied: l.marginApplied != null ? String(l.marginApplied) : null,
+          lineTotal: l.lineTotal.toFixed(2),
+        });
+      }
+      const totalFmt = `£${total.toFixed(2)}`;
+      const name = req.user.primaryContactName || req.user.companyName || req.user.email;
+      await sendQuoteSubmissionNotification({ quoteId: quote.id, customerEmail: req.user.email, customerName: name, companyName: req.user.companyName || name, itemCount: lines.length, totalValue: totalFmt });
+      await sendQuoteConfirmationToCustomer({ email: req.user.email, contactName: name, quoteId: quote.id, itemCount: lines.length, totalValue: totalFmt });
+      res.status(201).json({ quote, message: "Quote request submitted successfully" });
+    } catch (error: any) {
+      console.error("Portal quote creation error:", error);
+      res.status(500).json({ message: error.message || "Failed to create quote" });
+    }
+  });
+
+  // ===== Price-list downloads (Excel / PDF) =====
+  const parseIdList = (v: any): number[] =>
+    (typeof v === "string" ? v.split(",") : [])
+      .map((s) => parseInt(s.trim(), 10))
+      .filter((n) => Number.isFinite(n));
+
+  async function sendPriceListDownload(res: any, priceListId: number | null, scope: any, title: string, format: string) {
+    const data = await buildPriceListData(priceListId, scope, title);
+    const safeTitle = title.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+    if (format === "pdf") {
+      const buf = await buildPriceListPdf(data);
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${safeTitle}.pdf"`);
+      res.send(buf);
+    } else {
+      const buf = buildPriceListXlsx(data);
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", `attachment; filename="${safeTitle}.xlsx"`);
+      res.send(buf);
+    }
+  }
+
+  // Customer downloads their own price list, scoped to chosen brands/categories.
+  app.get("/api/portal/price-list/download", requireActiveCustomer, async (req: any, res) => {
+    try {
+      const format = (req.query.format as string) === "pdf" ? "pdf" : "xlsx";
+      const scope = { brandIds: parseIdList(req.query.brands), categoryIds: parseIdList(req.query.categories) };
+      const title = `Price List — ${req.user.companyName || req.user.email}`;
+      await sendPriceListDownload(res, req.user.priceListId ?? null, scope, title, format);
+    } catch (error: any) {
+      console.error("Price list download error:", error);
+      res.status(500).json({ message: "Failed to generate price list" });
+    }
+  });
+
+  // Admin generates a list's prices to send manually.
+  app.get("/api/admin/price-lists/:id/download", requireAdmin, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const format = (req.query.format as string) === "pdf" ? "pdf" : "xlsx";
+      const scope = { brandIds: parseIdList(req.query.brands), categoryIds: parseIdList(req.query.categories) };
+      const found = await pricingStore.getPriceListWithRules(id);
+      const title = `Price List — ${found?.list.name ?? "List " + id}`;
+      await sendPriceListDownload(res, id, scope, title, format);
+    } catch (error: any) {
+      console.error("Admin price list download error:", error);
+      res.status(500).json({ message: "Failed to generate price list" });
+    }
+  });
+
+  // ===== Admin: orders =====
+  app.get("/api/admin/orders", requireAdmin, async (req, res) => {
+    res.json(await pricingStore.listAllOrders());
+  });
+
+  app.get("/api/admin/orders/:id", requireAdmin, async (req, res) => {
+    const found = await pricingStore.getOrderWithItems(Number(req.params.id));
+    if (!found) return res.status(404).json({ message: "Order not found" });
+    res.json(found);
+  });
+
+  app.post("/api/admin/orders/:id/respond", requireAdmin, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const { status, adminResponse, adminNotes, sendEmail } = req.body;
+      const order = await pricingStore.respondToOrder(id, { status, adminResponse, adminNotes });
+      if (sendEmail && adminResponse) {
+        const customer = await storage.getUser(order.userId);
+        if (customer) await sendCustomerResponseEmail({ email: customer.email, contactName: customer.primaryContactName || customer.companyName || customer.email, kind: "order", refId: id, status: order.status, message: adminResponse });
+      }
+      res.json(order);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to respond" });
+    }
+  });
+
+  // ===== Admin: quote response email (status update reuses existing PATCH) =====
+  app.post("/api/admin/quotes/:id/respond", requireAdmin, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const { adminNotes, sendEmail } = req.body;
+      const updated = await storage.updateQuote(id, adminNotes !== undefined ? { adminNotes } : {});
+      if (sendEmail) {
+        const quote = await storage.getQuote(id);
+        const customer = quote ? await storage.getUser(quote.userId) : null;
+        if (customer) await sendCustomerResponseEmail({ email: customer.email, contactName: customer.primaryContactName || customer.companyName || customer.email, kind: "quote", refId: id, status: quote?.status || "updated", message: adminNotes || "" });
+      }
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to respond" });
+    }
   });
 
   app.get("/api/admin/uploads/categories", requireAdmin, (req, res) => {

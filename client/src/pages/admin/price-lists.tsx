@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Trash2, Save, Coins, Eye, Loader2, Star } from "lucide-react";
+import { Plus, Trash2, Save, Coins, Eye, Loader2, Star, FileSpreadsheet, FileText } from "lucide-react";
 
 interface Brand { id: number; name: string; }
 interface Category { id: number; name: string; }
@@ -177,11 +177,19 @@ export default function AdminPriceListsPage() {
                     <CardTitle>{detail?.list.name}</CardTitle>
                     <CardDescription>Margin on cost. A fixed price overrides the margin.</CardDescription>
                   </div>
-                  {!detail?.list.isDefault && (
-                    <Button variant="ghost" size="sm" onClick={() => deleteMut.mutate(selectedId)}>
-                      <Trash2 className="h-4 w-4 text-destructive" />
+                  <div className="flex items-center gap-1">
+                    <Button variant="outline" size="sm" asChild>
+                      <a href={`/api/admin/price-lists/${selectedId}/download?format=xlsx`}><FileSpreadsheet className="h-4 w-4 mr-1" /> Excel</a>
                     </Button>
-                  )}
+                    <Button variant="outline" size="sm" asChild>
+                      <a href={`/api/admin/price-lists/${selectedId}/download?format=pdf`}><FileText className="h-4 w-4 mr-1" /> PDF</a>
+                    </Button>
+                    {!detail?.list.isDefault && (
+                      <Button variant="ghost" size="sm" onClick={() => deleteMut.mutate(selectedId)}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    )}
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <Table>

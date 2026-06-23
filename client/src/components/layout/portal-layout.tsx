@@ -5,12 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/theme-toggle";
 import logoImage from "@assets/01_1772051902531.png";
-import { ShoppingCart, LogOut, LayoutGrid, FileText, Package, ClipboardList } from "lucide-react";
+import { ShoppingCart, LogOut, LayoutGrid, FileText, Package, ClipboardList, Download } from "lucide-react";
 
 const navItems = [
   { href: "/portal", label: "Catalogue", icon: LayoutGrid },
   { href: "/portal/orders", label: "My Orders", icon: ClipboardList },
   { href: "/portal/quotes", label: "My Quotes", icon: FileText },
+  { href: "/portal/downloads", label: "Price List", icon: Download },
 ];
 
 export function PortalLayout({ children }: { children: React.ReactNode }) {

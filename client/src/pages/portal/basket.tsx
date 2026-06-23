@@ -1,15 +1,42 @@
-import { Link } from "wouter";
+import { useState } from "react";
+import { Link, useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { usePortalBasket } from "@/lib/portal-basket";
-import { Trash2, ShoppingCart, ArrowLeft } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Trash2, ShoppingCart, ArrowLeft, Loader2, ClipboardCheck, FileText } from "lucide-react";
 
 export default function PortalBasketPage() {
   const { items, updateQuantity, removeItem, clearBasket, total } = usePortalBasket();
+  const { toast } = useToast();
+  const [, setLocation] = useLocation();
+  const [notes, setNotes] = useState("");
+  const [submitting, setSubmitting] = useState<"order" | "quote" | null>(null);
   const money = (n: number) => `£${n.toFixed(2)}`;
   const hasPOA = items.some((i) => i.product.price === null);
+
+  async function submit(kind: "order" | "quote") {
+    setSubmitting(kind);
+    try {
+      const payload = { items: items.map((i) => ({ productId: i.product.id, quantity: i.quantity })), customerNotes: notes || null };
+      await apiRequest("POST", kind === "order" ? "/api/portal/orders" : "/api/portal/quotes", payload);
+      clearBasket();
+      queryClient.invalidateQueries({ queryKey: [kind === "order" ? "/api/portal/orders" : "/api/quotes"] });
+      toast({
+        title: kind === "order" ? "Order placed" : "Quote requested",
+        description: kind === "order" ? "We've emailed you a confirmation and our team will be in touch." : "We'll confirm pricing & availability shortly.",
+      });
+      setLocation(kind === "order" ? "/portal/orders" : "/portal/quotes");
+    } catch (e: any) {
+      toast({ title: "Submission failed", description: e.message, variant: "destructive" });
+    } finally {
+      setSubmitting(null);
+    }
+  }
 
   if (items.length === 0) {
     return (
@@ -58,16 +85,21 @@ export default function PortalBasketPage() {
           <span>Estimated total</span>
           <span>{money(total)}{hasPOA && <span className="text-sm font-normal text-muted-foreground"> + items on request</span>}</span>
         </CardTitle></CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground mb-4">
-            Submit your basket as an order or a quote/availability request. Our team confirms pricing and stock before anything is finalised.
+        <CardContent className="space-y-4">
+          <Textarea placeholder="Notes for our team (optional) — e.g. delivery date, PO number, special requests" value={notes} onChange={(e) => setNotes(e.target.value)} />
+          <p className="text-sm text-muted-foreground">
+            Submit as an order, or as a quote/availability request. Our team confirms pricing and stock before anything is finalised.
           </p>
-          {/* Checkout actions are added in the next step (Phase 5). */}
           <div className="flex flex-wrap gap-3">
-            <Button size="lg" disabled>Place Order</Button>
-            <Button size="lg" variant="outline" disabled>Request Quote / Availability</Button>
+            <Button size="lg" onClick={() => submit("order")} disabled={submitting !== null}>
+              {submitting === "order" ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ClipboardCheck className="h-4 w-4 mr-2" />}
+              Place Order
+            </Button>
+            <Button size="lg" variant="outline" onClick={() => submit("quote")} disabled={submitting !== null}>
+              {submitting === "quote" ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
+              Request Quote / Availability
+            </Button>
           </div>
-          <p className="text-xs text-muted-foreground mt-2">Checkout submission is being finalised.</p>
         </CardContent>
       </Card>
     </div>

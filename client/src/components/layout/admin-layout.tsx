@@ -40,6 +40,7 @@ import {
   Percent,
   FileUp,
   Coins,
+  ClipboardList,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 
@@ -56,6 +57,7 @@ const mainMenuItems = [
   { title: "Brands", href: "/admin/brands", icon: Building2, staffAccess: true },
   { title: "Categories", href: "/admin/categories", icon: Tag, staffAccess: true },
   { title: "Quotes", href: "/admin/quotes", icon: FileText, staffAccess: false },
+  { title: "Orders", href: "/admin/orders", icon: ClipboardList, staffAccess: false },
   { title: "CSV Import", href: "/admin/import", icon: Upload, staffAccess: true },
   { title: "Suppliers", href: "/admin/suppliers", icon: Globe, staffAccess: false },
   { title: "Messages", href: "/admin/messages", icon: MessageSquare, staffAccess: false },

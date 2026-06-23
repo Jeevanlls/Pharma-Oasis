@@ -14,7 +14,16 @@
       "Bash(curl -s -o /dev/null -w \"home:%{http_code} \" http://localhost:5000/)",
       "Bash(curl -s -o /dev/null -w \"portal-api\\(no auth\\):%{http_code}\" http://localhost:5000/api/portal/products)",
       "Bash(curl -s -c jar.txt -X POST http://localhost:5000/api/auth/login -H \"Content-Type: application/json\" -d '{\"email\":\"admin@pharmaoasis.com\",\"password\":\"Admin!234\"}' -o /dev/null -w \"login:%{http_code}\\\\n\")",
-      "Bash(curl -s -b jar.txt \"http://localhost:5000/api/portal/products?limit=3\")"
+      "Bash(curl -s -b jar.txt \"http://localhost:5000/api/portal/products?limit=3\")",
+      "Bash(curl -s -b jar.txt -X POST http://localhost:5000/api/portal/orders -H \"Content-Type: application/json\" -d '{\"items\":[{\"productId\":587,\"quantity\":3},{\"productId\":589,\"quantity\":2}],\"customerNotes\":\"test order\"}')",
+      "Bash(curl -s -b jar.txt http://localhost:5000/api/portal/orders)",
+      "Bash(curl -s -b jar.txt http://localhost:5000/api/admin/orders)",
+      "Bash(curl -s -b jar.txt http://localhost:5000/api/admin/orders/1)",
+      "Bash(curl -s -b jar.txt -X POST http://localhost:5000/api/admin/orders/1/respond -H \"Content-Type: application/json\" -d '{\"status\":\"confirmed\",\"adminResponse\":\"Confirmed, dispatching tomorrow\",\"sendEmail\":true}')",
+      "Bash(curl -s -b jar.txt \"http://localhost:5000/api/portal/price-list/download?format=xlsx&brands=7\" -o pl.xlsx -w \"http:%{http_code} type:%{content_type} size:%{size_download}\\\\n\")",
+      "Bash(xxd)",
+      "Bash(curl -s -b jar.txt \"http://localhost:5000/api/portal/price-list/download?format=pdf&brands=7\" -o pl.pdf -w \"http:%{http_code} type:%{content_type} size:%{size_download}\\\\n\")",
+      "Bash(curl -s -b jar.txt \"http://localhost:5000/api/admin/price-lists\")"
     ]
   }
 }

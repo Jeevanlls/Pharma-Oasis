@@ -11,6 +11,8 @@ import {
   products,
   brands,
   users,
+  orders,
+  orderItems,
 } from "@shared/schema";
 import { eq, and, desc, ne, lt, sql } from "drizzle-orm";
 import type {
@@ -19,6 +21,8 @@ import type {
   InsertPriceList,
   PriceList,
   PriceListRule,
+  Order,
+  OrderItem,
 } from "@shared/schema";
 import type { PreviewRow } from "./cost-importer";
 
@@ -234,6 +238,94 @@ export async function setRules(priceListId: number, rules: RuleInput[]): Promise
 /** Assign (or clear) a customer's price list. */
 export async function assignCustomerPriceList(userId: number, priceListId: number | null): Promise<void> {
   await db.update(users).set({ priceListId, updatedAt: new Date() }).where(eq(users.id, userId));
+}
+
+// ---------- ORDERS ----------
+
+export interface OrderLineInput {
+  productId: number;
+  quantity: number;
+  unitCost: number | null;
+  unitPrice: number | null;
+  marginApplied: number | null;
+  lineTotal: number;
+}
+
+export async function createOrder(input: {
+  userId: number;
+  priceListId: number | null;
+  totalAmount: number;
+  customerNotes: string | null;
+  lines: OrderLineInput[];
+}): Promise<Order> {
+  const [order] = await db
+    .insert(orders)
+    .values({
+      userId: input.userId,
+      status: "submitted",
+      priceListId: input.priceListId,
+      totalAmount: toStr(input.totalAmount),
+      customerNotes: input.customerNotes,
+    })
+    .returning();
+
+  if (input.lines.length) {
+    await db.insert(orderItems).values(
+      input.lines.map((l) => ({
+        orderId: order.id,
+        productId: l.productId,
+        quantity: l.quantity,
+        unitCost: toStr(l.unitCost),
+        unitPrice: toStr(l.unitPrice),
+        marginApplied: toStr(l.marginApplied),
+        lineTotal: toStr(l.lineTotal),
+      })),
+    );
+  }
+  return order;
+}
+
+export async function getOrdersByUser(userId: number): Promise<Order[]> {
+  return db.select().from(orders).where(eq(orders.userId, userId)).orderBy(desc(orders.createdAt));
+}
+
+export async function getOrderWithItems(
+  id: number,
+): Promise<{ order: Order; items: (OrderItem & { productName: string | null })[] } | null> {
+  const [order] = await db.select().from(orders).where(eq(orders.id, id));
+  if (!order) return null;
+  const items = await db
+    .select({ item: orderItems, productName: products.productName })
+    .from(orderItems)
+    .leftJoin(products, eq(orderItems.productId, products.id))
+    .where(eq(orderItems.orderId, id));
+  return { order, items: items.map((r) => ({ ...r.item, productName: r.productName })) };
+}
+
+export async function listAllOrders(): Promise<(Order & { companyName: string | null; email: string | null })[]> {
+  const rows = await db
+    .select({ order: orders, companyName: users.companyName, email: users.email })
+    .from(orders)
+    .leftJoin(users, eq(orders.userId, users.id))
+    .orderBy(desc(orders.createdAt));
+  return rows.map((r) => ({ ...r.order, companyName: r.companyName, email: r.email }));
+}
+
+export async function respondToOrder(
+  id: number,
+  data: { status?: string; adminResponse?: string; adminNotes?: string },
+): Promise<Order> {
+  const [order] = await db
+    .update(orders)
+    .set({
+      ...(data.status ? { status: data.status } : {}),
+      ...(data.adminResponse !== undefined ? { adminResponse: data.adminResponse, respondedAt: new Date() } : {}),
+      ...(data.adminNotes !== undefined ? { adminNotes: data.adminNotes } : {}),
+      updatedAt: new Date(),
+    })
+    .where(eq(orders.id, id))
+    .returning();
+  return order;
 }
 
 /** Ensure a baseline default list exists; returns its id. */

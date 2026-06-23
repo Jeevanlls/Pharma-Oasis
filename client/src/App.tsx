@@ -64,11 +64,13 @@ import AdminProductRotationPage from "@/pages/admin/product-rotation";
 import AdminOffersPage from "@/pages/admin/offers";
 import AdminCostUploadsPage from "@/pages/admin/cost-uploads";
 import AdminPriceListsPage from "@/pages/admin/price-lists";
+import AdminOrdersPage from "@/pages/admin/orders";
 
 import PortalCataloguePage from "@/pages/portal/catalogue";
 import PortalBasketPage from "@/pages/portal/basket";
 import PortalOrdersPage from "@/pages/portal/orders";
 import PortalQuotesPage from "@/pages/portal/quotes";
+import PortalDownloadsPage from "@/pages/portal/downloads";
 
 function AdminRoute({ component: Component }: { component: React.ComponentType }) {
   const { isAdmin, isLoading } = useAuth();
@@ -178,6 +180,7 @@ function Router() {
       <Route path="/admin/blog">{() => <AdminRoute component={AdminBlogPage} />}</Route>
       <Route path="/admin/product-rotation">{() => <AdminRoute component={AdminProductRotationPage} />}</Route>
       <Route path="/admin/offers">{() => <AdminRoute component={AdminOffersPage} />}</Route>
+      <Route path="/admin/orders">{() => <AdminRoute component={AdminOrdersPage} />}</Route>
       <Route path="/admin/cost-uploads">{() => <AdminRoute component={AdminCostUploadsPage} />}</Route>
       <Route path="/admin/price-lists">{() => <AdminRoute component={AdminPriceListsPage} />}</Route>
 
@@ -185,6 +188,7 @@ function Router() {
       <Route path="/portal/basket">{() => <PortalRoute component={PortalBasketPage} />}</Route>
       <Route path="/portal/orders">{() => <PortalRoute component={PortalOrdersPage} />}</Route>
       <Route path="/portal/quotes">{() => <PortalRoute component={PortalQuotesPage} />}</Route>
+      <Route path="/portal/downloads">{() => <PortalRoute component={PortalDownloadsPage} />}</Route>
 
       <Route component={NotFound} />
     </Switch>

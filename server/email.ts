@@ -554,3 +554,87 @@ export async function sendChatLeadNotification(data: {
 
   return sendEmail(notificationEmail, subject, html);
 }
+
+// ============================================================
+// Customer Portal — order & response emails
+// ============================================================
+export async function sendOrderSubmissionNotification(data: {
+  orderId: number;
+  customerEmail: string;
+  customerName: string;
+  companyName: string;
+  itemCount: number;
+  totalValue: string;
+}): Promise<EmailResult> {
+  const subject = `New Order #${data.orderId} from ${data.companyName}`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background: #0f766e; color: white; padding: 20px; text-align: center;">
+        <h1 style="margin: 0;">New Order Placed</h1>
+        <p style="margin: 5px 0 0 0; opacity: 0.9;">Order #${data.orderId}</p>
+      </div>
+      <div style="padding: 20px; background: #f8fafc;">
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr><td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; font-weight: bold; width: 140px;">Order ID:</td><td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;">#${data.orderId}</td></tr>
+          <tr><td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; font-weight: bold;">Company:</td><td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;">${data.companyName}</td></tr>
+          <tr><td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; font-weight: bold;">Contact:</td><td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;">${data.customerName}</td></tr>
+          <tr><td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; font-weight: bold;">Email:</td><td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;">${data.customerEmail}</td></tr>
+          <tr><td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; font-weight: bold;">Items:</td><td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;">${data.itemCount} product(s)</td></tr>
+          <tr><td style="padding: 8px 0; font-weight: bold;">Order Total:</td><td style="padding: 8px 0; font-size: 18px; color: #0f766e;">${data.totalValue}</td></tr>
+        </table>
+        <div style="margin-top: 20px; padding: 15px; background: #ccfbf1; border-radius: 8px;">
+          <p style="margin: 0; color: #115e59;"><strong>Action Required:</strong> Review and confirm this order in the admin panel.</p>
+        </div>
+      </div>
+      <div style="padding: 15px; background: #e2e8f0; text-align: center; font-size: 12px; color: #64748b;">Automated notification from Pharma Oasis B2B Platform</div>
+    </div>
+  `;
+  return sendEmail(NOTIFICATION_EMAIL, subject, html);
+}
+
+export async function sendOrderConfirmationToCustomer(data: {
+  email: string;
+  contactName: string;
+  orderId: number;
+  itemCount: number;
+  totalValue: string;
+}): Promise<EmailResult> {
+  const subject = `We've received your order #${data.orderId} - Pharma Oasis`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background: #0f766e; color: white; padding: 20px; text-align: center;"><h1 style="margin: 0;">Order Received</h1></div>
+      <div style="padding: 20px; background: #f8fafc;">
+        <p style="font-size: 16px;">Dear ${data.contactName},</p>
+        <p>Thank you — we've received your order <strong>#${data.orderId}</strong> (${data.itemCount} product(s), total ${data.totalValue}).</p>
+        <p>Our team will confirm pricing, stock and delivery shortly. You can track it in your portal.</p>
+      </div>
+      <div style="padding: 15px; background: #e2e8f0; text-align: center; font-size: 12px; color: #64748b;">Pharma Oasis - Your Trusted Wholesale Partner</div>
+    </div>
+  `;
+  return sendEmail(data.email, subject, html);
+}
+
+export async function sendCustomerResponseEmail(data: {
+  email: string;
+  contactName: string;
+  kind: "order" | "quote";
+  refId: number;
+  status: string;
+  message: string;
+}): Promise<EmailResult> {
+  const label = data.kind === "order" ? "Order" : "Quote";
+  const subject = `Update on your ${label.toLowerCase()} #${data.refId} - Pharma Oasis`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background: #7c3aed; color: white; padding: 20px; text-align: center;"><h1 style="margin: 0;">${label} Update</h1><p style="margin: 5px 0 0 0; opacity: 0.9;">${label} #${data.refId}</p></div>
+      <div style="padding: 20px; background: #f8fafc;">
+        <p style="font-size: 16px;">Dear ${data.contactName},</p>
+        <p>There's an update on your ${label.toLowerCase()} <strong>#${data.refId}</strong> — status: <strong>${data.status}</strong>.</p>
+        ${data.message ? `<div style="padding: 15px; background: white; border: 1px solid #e2e8f0; border-radius: 8px; margin: 16px 0;"><p style="margin: 0; white-space: pre-wrap;">${data.message}</p></div>` : ""}
+        <p style="color: #6b7280;">You can view full details in your customer portal.</p>
+      </div>
+      <div style="padding: 15px; background: #e2e8f0; text-align: center; font-size: 12px; color: #64748b;">Pharma Oasis - Your Trusted Wholesale Partner</div>
+    </div>
+  `;
+  return sendEmail(data.email, subject, html);
+}
