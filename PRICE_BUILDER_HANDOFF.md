@@ -16,7 +16,9 @@ Working on branch **`feature/price-list-builder`** (off `main`, NOT yet merged).
 
 > Context: a previous session built the Price List Builder but the workspace reset before committing, so it looked like "nothing happened." It was all recovered and is now safely committed. **Commit work promptly.**
 
-## 👉 RESUME HERE (last worked 2026-06-24)
+## 👉 RESUME HERE (last worked 2026-06-24 evening — user left to test in a later session)
+
+> **For the next-session agent:** everything below was BUILT + type-checked + built clean + (for the backend) synthetic-tested, and the dev server was restarted so it's all live. The user has NOT yet click-tested it. When the user returns they will report what they found. **Do not re-build or assume anything is broken** — wait for their testing feedback, then fix only what they flag, or proceed to merge if they're happy. The exact things awaiting their hands-on test are in the "⚠️ PENDING YOUR TEST" list just below.
 
 **State:** commits up to `e09ca03` are on the local branch. **Nothing is pushed.** The dev server (`npm run dev`, plain `tsx` — NO watch) was **restarted** (now running in the background, port 5000) so the new server code + routes are live; if you change server files again you MUST restart it (front-end Vite hot-reloads, server does not).
 
@@ -35,10 +37,18 @@ Working on branch **`feature/price-list-builder`** (off `main`, NOT yet merged).
 - **Missing products** (in last published costs, absent from new file): per-line **Keep at old price** (decision: **carried forward into this upload** at old cost) or **Remove**; Keep-all / Remove-all buttons.
 - New endpoint `PATCH /api/admin/cost-uploads/:id/draft` re-validates via shared `analyzeRows()` + persists draft (`replaceDraftRows`). Save-before-publish wired in the UI.
 
-**⚠️ NOT yet done / next steps (pending user):**
-1. **Click-test in the UI** the brand the user uploaded 3× (436/413/309 rows): confirm duplicates block + highlight, missing-info skips, keep/remove carry-forward, notes save, filter works, and NO more "EAN not found".
-2. **Then decide push/merge** — merge `feature/price-list-builder` → `main` and push `main` (only once user is happy). Pending the user's word.
-3. Possible follow-ups the user hinted at: dedupe **across the whole brand/system** (currently within-file only); validate that carried-forward kept rows behave correctly through publish → reconcile.
+**⚠️ PENDING YOUR TEST (what to click through next session) — nothing here is known-broken; these just haven't been hands-on tested by the user yet:**
+
+A. **Cost Uploads review screen** (`/admin/cost-uploads`) — upload a brand file (e.g. the 436/413/309-row brand) and confirm:
+   - Duplicate EANs flag + block Publish; **editing the EAN OR clicking the new red trash-icon** clears it **live as you type** (no Save needed); Publish re-enables.
+   - A big cost change (beyond the ±% threshold box) shows a red **"confirm +X%"** tick that **must be ticked** before Publish enables.
+   - Missing-info lines skip on publish (count reported); keep/remove carry-forward works; status filter works; NO "EAN not found".
+   - Download the template → it now has a **Notes** column; fill it → those notes show after upload.
+B. **Current Costs editor** (`/admin/current-costs`, NEW) — pick a brand → live costs + "published N days ago" badge → search → edit a few costs/notes → **Review & apply** → the confirm dialog lists every affected customer price (old→new cost, old→new price, per list + customers) → **Confirm & apply** republishes costs + reprices. Verify the toast counts and that customer prices actually moved.
+
+**Then (only once the user is happy):**
+1. **Merge + push** — merge `feature/price-list-builder` → `main`, then `git push gitsafe-backup main` (the feature branch itself can't be pushed — see "Why not pushed" above).
+2. Possible follow-ups the user hinted at: dedupe **across the whole brand/system** (cost-upload dedupe is within-file only); persist bands so reconcile can re-apply them across band boundaries.
 
 ## ✅ FIXED 2026-06-24 — cost-upload EAN matching (was: KNOWN BUG below)
 
