@@ -3823,7 +3823,10 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
         return res.status(400).json({ message: "No data rows found. Check the file matches the template format." });
       }
       const threshold = await getCostThreshold();
-      const summary = await buildPreview(parsed, brandId, threshold);
+      // Compare against the brand's prior PUBLISHED cost upload (same pricing_brands
+      // id namespace) — NOT the catalogue products table.
+      const base = await pricingV2.getBaseCostForBrand(brandId);
+      const summary = buildPreview(parsed, base?.rows ?? [], threshold);
 
       const upload = await pricingStore.createDraftUpload({
         brandId,

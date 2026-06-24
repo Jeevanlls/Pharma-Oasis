@@ -5,9 +5,6 @@
 // guardrail flags. Pure parsing + preview; persistence lives in storage.ts.
 // ============================================================
 import * as XLSX from "xlsx";
-import { db } from "./db";
-import { products } from "@shared/schema";
-import { eq } from "drizzle-orm";
 
 export interface ParsedCostRow {
   ean: string;
@@ -25,19 +22,41 @@ export interface ParsedFile {
 
 export interface PreviewRow extends ParsedCostRow {
   productId: number | null;
-  matchStatus: "matched" | "unmatched";
+  // "matched" = EAN existed in the brand's prior published cost upload;
+  // "new" = first time we've seen this EAN for the brand.
+  matchStatus: "matched" | "new";
   previousCost: number | null;
   changePercent: number | null;
   flagged: boolean;
   flagReason: string;
 }
 
+/** A product that was in the brand's prior published cost upload but is absent
+ *  from the file just uploaded (i.e. the supplier dropped it). */
+export interface RemovedRow {
+  ean: string;
+  description: string;
+  previousCost: number | null;
+}
+
+/** A row from the brand's prior published cost upload, used as the "previous cost"
+ *  baseline. Kept deliberately loose so the route can pass cost_upload_rows directly. */
+export interface PriorCostRow {
+  ean: string | null;
+  description?: string | null;
+  costPrice: number | string | null;
+  productId?: number | null;
+}
+
 export interface PreviewSummary {
   brandNameInFile: string | null;
   rows: PreviewRow[];
+  removed: RemovedRow[];
   total: number;
   matched: number;
-  unmatched: number;
+  /** brand-new EANs not seen in the prior published upload */
+  newCount: number;
+  removedCount: number;
   flagged: number;
 }
 
@@ -140,26 +159,37 @@ export function parseCostFile(buffer: Buffer): ParsedFile {
   return { brandName, rows };
 }
 
-/** Match parsed rows to products (by EAN within the brand) and flag problems. */
-export async function buildPreview(
+/**
+ * Match parsed rows against the brand's PRIOR PUBLISHED cost upload (by EAN) and
+ * flag problems. `priorRows` are the rows of the brand's latest published upload
+ * (empty for the brand's first-ever upload).
+ *
+ * Note: this matches on the pricing-brand's own cost history — NOT the catalogue
+ * `products` table. The catalogue `brands` and `pricing_brands` tables use
+ * different id namespaces, so matching uploaded EANs against catalogue products
+ * by brand id returned nothing and flagged every row "EAN not found".
+ */
+export function buildPreview(
   parsed: ParsedFile,
-  brandId: number,
+  priorRows: PriorCostRow[],
   thresholdPct: number,
-): Promise<PreviewSummary> {
-  const brandProducts = await db.select().from(products).where(eq(products.brandId, brandId));
-  const byEan = new Map<string, (typeof brandProducts)[number]>();
-  for (const p of brandProducts) {
+): PreviewSummary {
+  const priorByEan = new Map<string, PriorCostRow>();
+  for (const p of priorRows) {
     const k = normEan(p.ean);
-    if (k) byEan.set(k, p);
+    if (k) priorByEan.set(k, p);
   }
 
   const seen = new Set<string>();
+  const seenPriorEans = new Set<string>();
   const out: PreviewRow[] = [];
 
   for (const r of parsed.rows) {
     const key = normEan(r.ean);
-    const product = key ? byEan.get(key) : undefined;
-    const prevCost = product?.activeCostPrice != null ? Number(product.activeCostPrice) : null;
+    const prior = key ? priorByEan.get(key) : undefined;
+    if (prior && key) seenPriorEans.add(key);
+    const prevCost =
+      prior?.costPrice != null && prior.costPrice !== "" ? Number(prior.costPrice) : null;
 
     let changePercent: number | null = null;
     if (prevCost !== null && prevCost > 0 && r.costPrice !== null) {
@@ -168,19 +198,16 @@ export async function buildPreview(
 
     const flags: string[] = [];
     if (r.costPrice === null || r.costPrice <= 0) flags.push("Cost is zero or blank");
-    if (product?.rrp != null && r.costPrice !== null && r.costPrice > Number(product.rrp))
-      flags.push("Cost exceeds RRP");
     if (changePercent !== null && Math.abs(changePercent) > thresholdPct)
       flags.push(`Cost change ${changePercent > 0 ? "+" : ""}${changePercent}% exceeds ±${thresholdPct}%`);
     if (key && seen.has(key)) flags.push("Duplicate EAN in file");
-    if (!product) flags.push("No matching product (EAN not found)");
     if (key) seen.add(key);
 
     out.push({
       ...r,
-      description: r.description || product?.productName || "",
-      productId: product?.id ?? null,
-      matchStatus: product ? "matched" : "unmatched",
+      description: r.description || prior?.description || "",
+      productId: prior?.productId ?? null,
+      matchStatus: prior ? "matched" : "new",
       previousCost: prevCost,
       changePercent,
       flagged: flags.length > 0,
@@ -188,12 +215,25 @@ export async function buildPreview(
     });
   }
 
+  // Products that were in the prior published upload but are absent from this file.
+  const removed: RemovedRow[] = [];
+  for (const [key, p] of Array.from(priorByEan.entries())) {
+    if (seenPriorEans.has(key)) continue;
+    removed.push({
+      ean: p.ean ?? key,
+      description: p.description ?? "",
+      previousCost: p.costPrice != null && p.costPrice !== "" ? Number(p.costPrice) : null,
+    });
+  }
+
   return {
     brandNameInFile: parsed.brandName,
     rows: out,
+    removed,
     total: out.length,
     matched: out.filter((r) => r.matchStatus === "matched").length,
-    unmatched: out.filter((r) => r.matchStatus === "unmatched").length,
+    newCount: out.filter((r) => r.matchStatus === "new").length,
+    removedCount: removed.length,
     flagged: out.filter((r) => r.flagged).length,
   };
 }

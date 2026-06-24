@@ -12,7 +12,20 @@ Working on branch **`feature/price-list-builder`** (off `main`, NOT yet merged).
 
 > Context: a previous session built the Price List Builder but the workspace reset before committing, so it looked like "nothing happened." It was all recovered and is now safely committed. **Commit work promptly.**
 
-## 🐞 KNOWN BUG — investigate FIRST (reported by user 2026-06-23)
+## ✅ FIXED 2026-06-24 — cost-upload EAN matching (was: KNOWN BUG below)
+
+The bug below is now fixed in `server/cost-importer.ts` + `server/routes.ts` + `client/src/pages/admin/cost-uploads.tsx` (not yet committed).
+
+**What changed:**
+- `buildPreview` no longer queries the catalogue `products` table at all. It is now a **pure function** that takes the brand's **prior published cost upload rows** (fetched in the route via `pricingV2.getBaseCostForBrand(brandId)`) and matches uploaded EANs against those. Correct id namespace → "previous cost" and "change %" now populate.
+- A brand-new EAN is now status **"new"** (blue), not an error. The bogus "No matching product (EAN not found)" flag and the `products.rrp`-based "Cost exceeds RRP" flag are gone (no rrp in the pricing-brand world).
+- The preview now also returns a **`removed[]`** list — EANs that were in the prior published upload but are absent from the new file. The Cost Uploads page shows these in an amber "X product(s) … NOT in this upload" panel (**this addresses symptom (a)** — the ~20 dropped lines are now visible at upload time). Note: removal from existing price lists still happens via the Price List Builder's "Review new cost" (reconcile), as before.
+- Summary fields renamed: `matched`→still matched (count of EANs seen before), added `newCount`, `removedCount` (was `unmatched`).
+- Verified with a synthetic pure-function test: matched/new/removed counts, change %, big-change flag, and first-ever-upload (0 flagged) all correct.
+
+**Symptom (a) caveat still true:** the Price List Builder reconcile only detects changes against the brand's *latest **published*** upload — a draft upload won't reconcile. That's by design.
+
+<details><summary>Original bug report (for history)</summary>
 
 User re-uploaded the same cost file with ~20 lines removed and saw: (a) the **missing 20 lines were not identified** by reconciliation, and (b) **every row flagged "No matching product (EAN not found)"**.
 
@@ -32,6 +45,8 @@ User re-uploaded the same cost file with ~20 lines removed and saw: (a) the **mi
 - Query the DB: compare `cost_upload_rows.ean` for the brand's latest published upload vs `price_list_items.ean` for the list — are they present and same format?
 - Confirm `reconcilePreview` is reading the new upload (check `getBaseCostForBrand` returns the new uploadId).
 - Backend reconcile logic itself is unit-tested and works on matching EANs (see test history) — so the bug is almost certainly in EAN storage/format or the publish step, not the reconcile maths.
+
+</details>
 
 ## What's built (all working)
 

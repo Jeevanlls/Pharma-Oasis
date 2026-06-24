@@ -21,13 +21,14 @@ interface Brand { id: number; name: string; }
 interface PreviewRow {
   ean: string; description: string; caseSize: string;
   costPrice: number | null; supplierQty: number | null; categoryName: string;
-  productId: number | null; matchStatus: "matched" | "unmatched";
+  productId: number | null; matchStatus: "matched" | "new";
   previousCost: number | null; changePercent: number | null;
   flagged: boolean; flagReason: string;
 }
+interface RemovedRow { ean: string; description: string; previousCost: number | null; }
 interface PreviewSummary {
-  brandNameInFile: string | null; rows: PreviewRow[];
-  total: number; matched: number; unmatched: number; flagged: number; threshold: number;
+  brandNameInFile: string | null; rows: PreviewRow[]; removed: RemovedRow[];
+  total: number; matched: number; newCount: number; removedCount: number; flagged: number; threshold: number;
 }
 interface CostUpload {
   id: number; brandId: number; brandName: string | null; supplierName: string | null;
@@ -85,7 +86,7 @@ export default function AdminCostUploadsPage() {
       const data = await res.json();
       setPreview({ uploadId: data.upload.id, summary: data.summary });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/cost-uploads"] });
-      toast({ title: "File parsed", description: `${data.summary.matched} matched, ${data.summary.flagged} flagged. Review then publish.` });
+      toast({ title: "File parsed", description: `${data.summary.matched} updated, ${data.summary.newCount} new, ${data.summary.removedCount} removed, ${data.summary.flagged} flagged. Review then publish.` });
     } catch (e: any) {
       toast({ title: "Upload failed", description: e.message, variant: "destructive" });
     } finally {
@@ -201,8 +202,9 @@ export default function AdminCostUploadsPage() {
             <CardTitle>Preview — review before publishing</CardTitle>
             <CardDescription className="flex flex-wrap gap-2 pt-1">
               <Badge variant="outline">{preview.summary.total} rows</Badge>
-              <Badge className="bg-green-100 text-green-800">{preview.summary.matched} matched</Badge>
-              {preview.summary.unmatched > 0 && <Badge className="bg-gray-100 text-gray-600">{preview.summary.unmatched} unmatched</Badge>}
+              <Badge className="bg-green-100 text-green-800">{preview.summary.matched} updated</Badge>
+              {preview.summary.newCount > 0 && <Badge className="bg-blue-100 text-blue-800">{preview.summary.newCount} new</Badge>}
+              {preview.summary.removedCount > 0 && <Badge className="bg-amber-100 text-amber-800">{preview.summary.removedCount} removed</Badge>}
               {preview.summary.flagged > 0 && <Badge className="bg-red-100 text-red-800">{preview.summary.flagged} flagged</Badge>}
               {preview.summary.brandNameInFile && <Badge variant="outline">File brand: {preview.summary.brandNameInFile}</Badge>}
             </CardDescription>
@@ -239,13 +241,43 @@ export default function AdminCostUploadsPage() {
                           ? <span className="flex items-center gap-1 text-red-600 text-xs" title={r.flagReason}><AlertTriangle className="h-3 w-3" /> {r.flagReason}</span>
                           : r.matchStatus === "matched"
                             ? <span className="flex items-center gap-1 text-green-700 text-xs"><CheckCircle2 className="h-3 w-3" /> ok</span>
-                            : <span className="text-gray-500 text-xs">unmatched</span>}
+                            : <span className="text-blue-600 text-xs">new</span>}
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
             </div>
+            {preview.summary.removed.length > 0 && (
+              <div className="mt-4 border border-amber-200 rounded bg-amber-50 p-3">
+                <div className="flex items-center gap-1 text-amber-800 text-sm font-medium mb-2">
+                  <AlertTriangle className="h-4 w-4" /> {preview.summary.removed.length} product(s) in the previous cost file are NOT in this upload
+                </div>
+                <p className="text-xs text-amber-700 mb-2">
+                  These EANs were in the brand's last published costs but are missing here. Publishing won't remove them from existing price lists — use "Review new cost" in the Price List Builder to drop them.
+                </p>
+                <div className="max-h-[160px] overflow-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>EAN</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead className="text-right">Prev cost</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {preview.summary.removed.map((r, i) => (
+                        <TableRow key={i}>
+                          <TableCell className="font-mono text-xs">{r.ean || "—"}</TableCell>
+                          <TableCell className="max-w-[220px] truncate text-xs">{r.description || "—"}</TableCell>
+                          <TableCell className="text-right text-xs">{money(r.previousCost)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            )}
             <div className="flex gap-2 mt-4">
               <Button onClick={() => publishMut.mutate(preview.uploadId)} disabled={publishMut.isPending}>
                 {publishMut.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
