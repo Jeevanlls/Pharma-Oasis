@@ -15,7 +15,7 @@ import {
   orders,
   orderItems,
 } from "@shared/schema";
-import { eq, and, desc, ne, lt, sql } from "drizzle-orm";
+import { eq, and, desc, ne, lt, sql, inArray } from "drizzle-orm";
 import type {
   CostUpload,
   CostUploadRow,
@@ -82,7 +82,7 @@ export async function createDraftUpload(input: CreateUploadInput): Promise<CostU
         supplierQty: r.supplierQty,
         supplierName: null,
         validUntil: null,
-        comment: null,
+        comment: r.comment || null,
         matchStatus: r.matchStatus,
         previousCost: toStr(r.previousCost),
         changePercent: toStr(r.changePercent),
@@ -116,13 +116,96 @@ export async function deleteUpload(id: number): Promise<void> {
   await db.delete(costUploads).where(eq(costUploads.id, id));
 }
 
+const normEan = (v: string | null | undefined): string =>
+  (v ?? "").toString().replace(/\s+/g, "").replace(/\.0$/, "").trim();
+
+/** Replace a draft upload's rows with an edited set (from the review screen) and
+ *  refresh the cached counts. The caller (route) re-validates via analyzeRows so the
+ *  PreviewRows already carry final status/flags/comment. */
+export async function replaceDraftRows(id: number, rows: PreviewRow[]): Promise<void> {
+  const found = await getUpload(id);
+  if (!found) throw new Error("Upload not found");
+  if (found.upload.status === "published") throw new Error("Cannot edit a published upload");
+  const brandId = found.upload.brandId;
+
+  await db.delete(costUploadRows).where(eq(costUploadRows.uploadId, id));
+
+  if (rows.length) {
+    const uniqueCats = Array.from(new Set(rows.map((r) => (r.categoryName || "").trim()).filter(Boolean)));
+    const catIdByName = new Map<string, number | null>();
+    for (const name of uniqueCats) catIdByName.set(name, await ensurePricingCategory(name));
+
+    await db.insert(costUploadRows).values(
+      rows.map((r) => ({
+        uploadId: id,
+        productId: r.productId,
+        ean: r.ean || null,
+        description: r.description || null,
+        categoryName: r.categoryName || null,
+        pricingCategoryId: catIdByName.get((r.categoryName || "").trim()) ?? null,
+        caseSize: r.caseSize || null,
+        costPrice: toStr(r.costPrice),
+        supplierQty: r.supplierQty,
+        supplierName: null,
+        validUntil: null,
+        comment: r.comment || null,
+        matchStatus: r.matchStatus,
+        previousCost: toStr(r.previousCost),
+        changePercent: toStr(r.changePercent),
+        flagged: r.flagged,
+        flagReason: r.flagReason || null,
+      })),
+    );
+  }
+
+  const matched = rows.filter((r) => r.matchStatus === "matched").length;
+  await db
+    .update(costUploads)
+    .set({ rowCount: rows.length, matchedCount: matched, unmatchedCount: rows.length - matched, updatedAt: new Date() })
+    .where(eq(costUploads.id, id));
+  void brandId;
+}
+
+/** Update the upload-level internal comment (editable until published). */
+export async function updateUploadComment(id: number, comment: string | null): Promise<void> {
+  await db
+    .update(costUploads)
+    .set({ comment: comment || null, updatedAt: new Date() })
+    .where(eq(costUploads.id, id));
+}
+
 /** Publish a draft: supersede the brand's previous published batch, then push
- *  matched costs onto products (active cost cache). */
-export async function publishUpload(id: number): Promise<{ updated: number }> {
+ *  matched costs onto products (active cost cache).
+ *  Gating: refuses to publish while duplicate EANs remain; incomplete rows
+ *  (missing EAN or cost) are skipped (deleted) and reported, never published. */
+export async function publishUpload(id: number): Promise<{ updated: number; skipped: number }> {
   const found = await getUpload(id);
   if (!found) throw new Error("Upload not found");
   const { upload, rows } = found;
-  if (upload.status === "published") return { updated: 0 };
+  if (upload.status === "published") return { updated: 0, skipped: 0 };
+
+  // Hard block: duplicate EANs must be resolved before publishing.
+  const counts = new Map<string, number>();
+  for (const r of rows) {
+    const k = normEan(r.ean);
+    if (k) counts.set(k, (counts.get(k) ?? 0) + 1);
+  }
+  const dupes = Array.from(counts.entries()).filter(([, n]) => n > 1).map(([k]) => k);
+  if (dupes.length) {
+    throw new Error(
+      `Cannot publish: ${dupes.length} duplicate EAN(s) in the file. Remove the duplicates and re-upload before publishing.`,
+    );
+  }
+
+  // Drop incomplete rows (no EAN or no cost) — they can never be part of a price list.
+  const incomplete = rows.filter((r) => !normEan(r.ean) || r.costPrice === null || Number(r.costPrice) <= 0);
+  if (incomplete.length) {
+    await db.delete(costUploadRows).where(
+      and(eq(costUploadRows.uploadId, id), inArray(costUploadRows.id, incomplete.map((r) => r.id))),
+    );
+  }
+  const skipped = incomplete.length;
+  const liveRows = rows.filter((r) => !incomplete.includes(r));
 
   // Supersede prior published uploads for the same brand.
   await db
@@ -132,7 +215,7 @@ export async function publishUpload(id: number): Promise<{ updated: number }> {
 
   const now = new Date();
   let updated = 0;
-  for (const row of rows) {
+  for (const row of liveRows) {
     if (!row.productId || row.costPrice === null) continue;
     const expiry = row.validUntil ?? upload.validUntil ?? null;
     const status = expiry && expiry < now ? "expired" : "active";
@@ -153,10 +236,17 @@ export async function publishUpload(id: number): Promise<{ updated: number }> {
 
   await db
     .update(costUploads)
-    .set({ status: "published", publishedAt: now, updatedAt: now })
+    .set({
+      status: "published",
+      publishedAt: now,
+      updatedAt: now,
+      rowCount: liveRows.length,
+      matchedCount: liveRows.filter((r) => r.matchStatus === "matched").length,
+      unmatchedCount: liveRows.filter((r) => r.matchStatus !== "matched").length,
+    })
     .where(eq(costUploads.id, id));
 
-  return { updated };
+  return { updated, skipped };
 }
 
 /** Mark products whose cost validity has passed as expired (price still shown). */

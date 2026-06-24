@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,21 +14,25 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
-  Upload, Download, AlertTriangle, CheckCircle2, Trash2, Loader2, FileUp, Clock,
+  Upload, Download, AlertTriangle, CheckCircle2, Trash2, Loader2, FileUp, Clock, Save, Filter,
 } from "lucide-react";
 
 interface Brand { id: number; name: string; }
+type RowStatus = "duplicate" | "missing_info" | "changed" | "new" | "ok";
 interface PreviewRow {
   ean: string; description: string; caseSize: string;
   costPrice: number | null; supplierQty: number | null; categoryName: string;
-  productId: number | null; matchStatus: "matched" | "new";
+  comment: string | null;
+  productId: number | null; matchStatus: "matched" | "new"; rowStatus: RowStatus;
   previousCost: number | null; changePercent: number | null;
-  flagged: boolean; flagReason: string;
+  flagged: boolean; flagReason: string; publishable: boolean;
 }
 interface RemovedRow { ean: string; description: string; previousCost: number | null; }
 interface PreviewSummary {
   brandNameInFile: string | null; rows: PreviewRow[]; removed: RemovedRow[];
-  total: number; matched: number; newCount: number; removedCount: number; flagged: number; threshold: number;
+  total: number; matched: number; newCount: number; removedCount: number;
+  changedCount: number; okCount: number; duplicateCount: number; missingInfoCount: number;
+  publishableCount: number; flagged: number; hasDuplicates: boolean; threshold: number;
 }
 interface CostUpload {
   id: number; brandId: number; brandName: string | null; supplierName: string | null;
@@ -49,6 +53,31 @@ export default function AdminCostUploadsPage() {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<{ uploadId: number; summary: PreviewSummary } | null>(null);
   const [uploading, setUploading] = useState(false);
+
+  // Interactive review state (editable rows, keep/remove decisions, status filter).
+  const [editRows, setEditRows] = useState<PreviewRow[]>([]);
+  const [editComment, setEditComment] = useState("");
+  const [keepRemoved, setKeepRemoved] = useState<Record<string, boolean>>({});
+  const [statusFilter, setStatusFilter] = useState<RowStatus | "all">("all");
+  const [dirty, setDirty] = useState(false);
+
+  // Re-seed the editable copy whenever a fresh preview arrives (upload or save).
+  useEffect(() => {
+    if (!preview) { setEditRows([]); return; }
+    setEditRows(preview.summary.rows.map((r) => ({ ...r })));
+    setKeepRemoved((prev) => {
+      const next: Record<string, boolean> = {};
+      for (const r of preview.summary.removed) next[r.ean] = prev[r.ean] ?? true; // default: keep at old price
+      return next;
+    });
+    setStatusFilter("all");
+    setDirty(false);
+  }, [preview]);
+
+  function patchRow(i: number, patch: Partial<PreviewRow>) {
+    setEditRows((rows) => rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
+    setDirty(true);
+  }
 
   const { data: brands = [] } = useQuery<Brand[]>({ queryKey: ["/api/admin/pricing-brands"] });
   const { data: uploads = [] } = useQuery<CostUpload[]>({ queryKey: ["/api/admin/cost-uploads"] });
@@ -84,6 +113,7 @@ export default function AdminCostUploadsPage() {
       const res = await fetch("/api/admin/cost-uploads", { method: "POST", body: fd, credentials: "include" });
       if (!res.ok) throw new Error((await res.json()).message || "Upload failed");
       const data = await res.json();
+      setEditComment(comment);
       setPreview({ uploadId: data.upload.id, summary: data.summary });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/cost-uploads"] });
       toast({ title: "File parsed", description: `${data.summary.matched} updated, ${data.summary.newCount} new, ${data.summary.removedCount} removed, ${data.summary.flagged} flagged. Review then publish.` });
@@ -98,7 +128,7 @@ export default function AdminCostUploadsPage() {
     mutationFn: async (id: number) => apiRequest("POST", `/api/admin/cost-uploads/${id}/publish`),
     onSuccess: async (res) => {
       const data = await res.json();
-      toast({ title: "Published", description: `${data.updated} product costs updated and now live.` });
+      toast({ title: "Published", description: `${data.updated} cost(s) now live${data.skipped ? `, ${data.skipped} incomplete line(s) skipped` : ""}.` });
       setPreview(null);
       queryClient.invalidateQueries({ queryKey: ["/api/admin/cost-uploads"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/cost-alerts"] });
@@ -114,6 +144,41 @@ export default function AdminCostUploadsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/cost-uploads"] });
     },
   });
+
+  const saveDraftMut = useMutation({
+    mutationFn: async (uploadId: number) => {
+      const keepMissingEans = Object.entries(keepRemoved).filter(([, keep]) => keep).map(([ean]) => ean);
+      const res = await apiRequest("PATCH", `/api/admin/cost-uploads/${uploadId}/draft`, {
+        rows: editRows,
+        keepMissingEans,
+        comment: editComment,
+      });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setPreview((p) => (p ? { ...p, summary: data.summary } : p));
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/cost-uploads"] });
+    },
+    onError: (e: any) => toast({ title: "Save failed", description: e.message, variant: "destructive" }),
+  });
+
+  async function handlePublish(uploadId: number) {
+    try {
+      // Always persist the latest edits + keep/remove decisions before publishing.
+      await saveDraftMut.mutateAsync(uploadId);
+      const res = await apiRequest("POST", `/api/admin/cost-uploads/${uploadId}/publish`);
+      const data = await res.json();
+      toast({
+        title: "Published",
+        description: `${data.updated} cost(s) now live${data.skipped ? `, ${data.skipped} incomplete line(s) skipped` : ""}.`,
+      });
+      setPreview(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/cost-uploads"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/cost-alerts"] });
+    } catch (e: any) {
+      toast({ title: "Publish failed", description: e.message, variant: "destructive" });
+    }
+  }
 
   const statusColor: Record<string, string> = {
     draft: "bg-amber-100 text-amber-800",
@@ -196,81 +261,162 @@ export default function AdminCostUploadsPage() {
         </CardContent>
       </Card>
 
-      {preview && (
+      {preview && (() => {
+        const s = preview.summary;
+        const busy = saveDraftMut.isPending;
+        const visible = editRows
+          .map((r, i) => ({ r, i }))
+          .filter(({ r }) => statusFilter === "all" || r.rowStatus === statusFilter);
+        const statusMeta: Record<RowStatus, { label: string; cls: string }> = {
+          duplicate: { label: "duplicate", cls: "text-red-600" },
+          missing_info: { label: "missing info", cls: "text-red-600" },
+          changed: { label: "cost changed", cls: "text-amber-700" },
+          new: { label: "new", cls: "text-blue-600" },
+          ok: { label: "ok", cls: "text-green-700" },
+        };
+        return (
         <Card>
           <CardHeader>
-            <CardTitle>Preview — review before publishing</CardTitle>
+            <CardTitle>Review before publishing</CardTitle>
             <CardDescription className="flex flex-wrap gap-2 pt-1">
-              <Badge variant="outline">{preview.summary.total} rows</Badge>
-              <Badge className="bg-green-100 text-green-800">{preview.summary.matched} updated</Badge>
-              {preview.summary.newCount > 0 && <Badge className="bg-blue-100 text-blue-800">{preview.summary.newCount} new</Badge>}
-              {preview.summary.removedCount > 0 && <Badge className="bg-amber-100 text-amber-800">{preview.summary.removedCount} removed</Badge>}
-              {preview.summary.flagged > 0 && <Badge className="bg-red-100 text-red-800">{preview.summary.flagged} flagged</Badge>}
-              {preview.summary.brandNameInFile && <Badge variant="outline">File brand: {preview.summary.brandNameInFile}</Badge>}
+              <Badge variant="outline">{s.total} rows</Badge>
+              <Badge className="bg-green-100 text-green-800">{s.matched} updated</Badge>
+              {s.changedCount > 0 && <Badge className="bg-amber-100 text-amber-800">{s.changedCount} cost changed</Badge>}
+              {s.newCount > 0 && <Badge className="bg-blue-100 text-blue-800">{s.newCount} new</Badge>}
+              {s.removedCount > 0 && <Badge className="bg-amber-100 text-amber-800">{s.removedCount} missing</Badge>}
+              {s.duplicateCount > 0 && <Badge className="bg-red-100 text-red-800">{s.duplicateCount} duplicate</Badge>}
+              {s.missingInfoCount > 0 && <Badge className="bg-red-100 text-red-800">{s.missingInfoCount} missing info</Badge>}
+              {s.brandNameInFile && <Badge variant="outline">File brand: {s.brandNameInFile}</Badge>}
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="max-h-[420px] overflow-auto border rounded">
+          <CardContent className="space-y-4">
+            {s.hasDuplicates && (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Duplicate EANs must be fixed before publishing</AlertTitle>
+                <AlertDescription>
+                  {s.duplicateCount} line(s) share an EAN with another line. The same EAN can't carry two products or costs.
+                  Filter to “Duplicate” below, correct or clear the duplicate EAN, click <strong>Save changes</strong> to re-check — or fix the file and re-upload.
+                </AlertDescription>
+              </Alert>
+            )}
+            {dirty && (
+              <p className="text-xs text-amber-700">You have unsaved edits — click <strong>Save changes</strong> to re-check statuses.</p>
+            )}
+
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as RowStatus | "all")}>
+                <SelectTrigger className="w-56"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All rows ({s.total})</SelectItem>
+                  <SelectItem value="changed">Cost changed ({s.changedCount})</SelectItem>
+                  <SelectItem value="new">New ({s.newCount})</SelectItem>
+                  <SelectItem value="duplicate">Duplicate ({s.duplicateCount})</SelectItem>
+                  <SelectItem value="missing_info">Missing info ({s.missingInfoCount})</SelectItem>
+                  <SelectItem value="ok">Unchanged ({s.okCount})</SelectItem>
+                </SelectContent>
+              </Select>
+              <span className="text-xs text-muted-foreground">Showing {visible.length} of {s.total}. Cost, EAN, QTY &amp; Notes are editable.</span>
+            </div>
+
+            <div className="max-h-[460px] overflow-auto border rounded">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>EAN</TableHead>
+                    <TableHead className="w-[140px]">EAN</TableHead>
                     <TableHead>Description</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead className="text-right">Prev</TableHead>
-                    <TableHead className="text-right">New cost</TableHead>
-                    <TableHead className="text-right">Change</TableHead>
-                    <TableHead className="text-right">QTY</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right w-[80px]">Prev</TableHead>
+                    <TableHead className="text-right w-[110px]">New cost</TableHead>
+                    <TableHead className="text-right w-[80px]">Change</TableHead>
+                    <TableHead className="text-right w-[80px]">QTY</TableHead>
+                    <TableHead className="w-[180px]">Notes</TableHead>
+                    <TableHead className="w-[120px]">Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {preview.summary.rows.map((r, i) => (
-                    <TableRow key={i} className={r.flagged ? "bg-red-50" : ""}>
-                      <TableCell className="font-mono text-xs">{r.ean || "—"}</TableCell>
-                      <TableCell className="max-w-[220px] truncate">{r.description}</TableCell>
-                      <TableCell className="text-xs">{r.categoryName || "—"}</TableCell>
-                      <TableCell className="text-right">{money(r.previousCost)}</TableCell>
-                      <TableCell className="text-right font-medium">{money(r.costPrice)}</TableCell>
-                      <TableCell className={`text-right ${r.changePercent && Math.abs(r.changePercent) > preview.summary.threshold ? "text-red-600 font-semibold" : ""}`}>
+                  {visible.length === 0 && (
+                    <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground text-sm">No rows for this filter</TableCell></TableRow>
+                  )}
+                  {visible.map(({ r, i }) => (
+                    <TableRow key={i} className={r.rowStatus === "duplicate" || r.rowStatus === "missing_info" ? "bg-red-50" : ""}>
+                      <TableCell>
+                        <Input value={r.ean} onChange={(e) => patchRow(i, { ean: e.target.value })}
+                          className="h-8 font-mono text-xs" placeholder="EAN" />
+                      </TableCell>
+                      <TableCell>
+                        <Input value={r.description} onChange={(e) => patchRow(i, { description: e.target.value })}
+                          className="h-8 text-xs" placeholder="Description" />
+                      </TableCell>
+                      <TableCell className="text-right text-xs">{money(r.previousCost)}</TableCell>
+                      <TableCell>
+                        <Input type="number" step="0.01" value={r.costPrice ?? ""}
+                          onChange={(e) => patchRow(i, { costPrice: e.target.value === "" ? null : Number(e.target.value) })}
+                          className="h-8 text-xs text-right" placeholder="0.00" />
+                      </TableCell>
+                      <TableCell className={`text-right text-xs ${r.changePercent && Math.abs(r.changePercent) > s.threshold ? "text-red-600 font-semibold" : ""}`}>
                         {r.changePercent === null ? "—" : `${r.changePercent > 0 ? "+" : ""}${r.changePercent}%`}
                       </TableCell>
-                      <TableCell className="text-right">{r.supplierQty ?? "—"}</TableCell>
                       <TableCell>
-                        {r.flagged
-                          ? <span className="flex items-center gap-1 text-red-600 text-xs" title={r.flagReason}><AlertTriangle className="h-3 w-3" /> {r.flagReason}</span>
-                          : r.matchStatus === "matched"
-                            ? <span className="flex items-center gap-1 text-green-700 text-xs"><CheckCircle2 className="h-3 w-3" /> ok</span>
-                            : <span className="text-blue-600 text-xs">new</span>}
+                        <Input type="number" value={r.supplierQty ?? ""}
+                          onChange={(e) => patchRow(i, { supplierQty: e.target.value === "" ? null : Number(e.target.value) })}
+                          className="h-8 text-xs text-right" placeholder="—" />
+                      </TableCell>
+                      <TableCell>
+                        <Input value={r.comment ?? ""} onChange={(e) => patchRow(i, { comment: e.target.value })}
+                          className="h-8 text-xs" placeholder="Internal note" />
+                      </TableCell>
+                      <TableCell>
+                        <span className={`text-xs ${statusMeta[r.rowStatus].cls}`} title={r.flagReason}>
+                          {statusMeta[r.rowStatus].label}
+                        </span>
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
             </div>
-            {preview.summary.removed.length > 0 && (
-              <div className="mt-4 border border-amber-200 rounded bg-amber-50 p-3">
-                <div className="flex items-center gap-1 text-amber-800 text-sm font-medium mb-2">
-                  <AlertTriangle className="h-4 w-4" /> {preview.summary.removed.length} product(s) in the previous cost file are NOT in this upload
+
+            {s.removed.length > 0 && (
+              <div className="border border-amber-200 rounded bg-amber-50 p-3">
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <div className="flex items-center gap-1 text-amber-800 text-sm font-medium">
+                    <AlertTriangle className="h-4 w-4" /> {s.removed.length} product(s) in the brand's last costs are NOT in this file
+                  </div>
+                  <div className="flex gap-1">
+                    <Button size="sm" variant="outline" onClick={() => { setKeepRemoved(Object.fromEntries(s.removed.map((r) => [r.ean, true]))); setDirty(true); }}>Keep all</Button>
+                    <Button size="sm" variant="outline" onClick={() => { setKeepRemoved(Object.fromEntries(s.removed.map((r) => [r.ean, false]))); setDirty(true); }}>Remove all</Button>
+                  </div>
                 </div>
                 <p className="text-xs text-amber-700 mb-2">
-                  These EANs were in the brand's last published costs but are missing here. Publishing won't remove them from existing price lists — use "Review new cost" in the Price List Builder to drop them.
+                  For each, choose <strong>Keep</strong> (carried into this upload at its old cost) or <strong>Remove</strong> (dropped). Then <strong>Save changes</strong>.
                 </p>
-                <div className="max-h-[160px] overflow-auto">
+                <div className="max-h-[200px] overflow-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>EAN</TableHead>
                         <TableHead>Description</TableHead>
-                        <TableHead className="text-right">Prev cost</TableHead>
+                        <TableHead className="text-right">Old cost</TableHead>
+                        <TableHead className="w-[170px]">Decision</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {preview.summary.removed.map((r, i) => (
-                        <TableRow key={i}>
+                      {s.removed.map((r) => (
+                        <TableRow key={r.ean}>
                           <TableCell className="font-mono text-xs">{r.ean || "—"}</TableCell>
                           <TableCell className="max-w-[220px] truncate text-xs">{r.description || "—"}</TableCell>
                           <TableCell className="text-right text-xs">{money(r.previousCost)}</TableCell>
+                          <TableCell>
+                            <Select value={keepRemoved[r.ean] ? "keep" : "remove"}
+                              onValueChange={(v) => { setKeepRemoved((p) => ({ ...p, [r.ean]: v === "keep" })); setDirty(true); }}>
+                              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="keep">Keep at old price</SelectItem>
+                                <SelectItem value="remove">Remove</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -278,18 +424,35 @@ export default function AdminCostUploadsPage() {
                 </div>
               </div>
             )}
-            <div className="flex gap-2 mt-4">
-              <Button onClick={() => publishMut.mutate(preview.uploadId)} disabled={publishMut.isPending}>
-                {publishMut.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
+
+            <div>
+              <Label>Comment (internal — editable until published)</Label>
+              <Textarea value={editComment} onChange={(e) => { setEditComment(e.target.value); setDirty(true); }}
+                placeholder="e.g. Promo batch, min order 5 cases" />
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant="secondary" onClick={() => saveDraftMut.mutate(preview.uploadId)} disabled={busy}>
+                {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                Save changes
+              </Button>
+              <Button onClick={() => handlePublish(preview.uploadId)} disabled={busy || s.hasDuplicates}>
+                <CheckCircle2 className="h-4 w-4 mr-2" />
                 Publish — make these costs live
               </Button>
-              <Button variant="outline" onClick={() => deleteMut.mutate(preview.uploadId)}>
+              <Button variant="outline" onClick={() => deleteMut.mutate(preview.uploadId)} disabled={busy}>
                 <Trash2 className="h-4 w-4 mr-2" /> Discard draft
               </Button>
+              {s.hasDuplicates
+                ? <span className="text-xs text-red-600">Resolve duplicate EANs to enable publishing.</span>
+                : s.missingInfoCount > 0
+                  ? <span className="text-xs text-amber-700">{s.missingInfoCount} incomplete line(s) will be skipped on publish.</span>
+                  : null}
             </div>
           </CardContent>
         </Card>
-      )}
+        );
+      })()}
 
       <Card>
         <CardHeader><CardTitle className="flex items-center gap-2"><Clock className="h-5 w-5" /> Upload history</CardTitle></CardHeader>

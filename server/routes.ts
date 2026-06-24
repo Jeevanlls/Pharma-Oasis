@@ -36,7 +36,8 @@ import {
 } from "./email";
 import { sessionMiddleware } from "./session-store";
 import feedsRouter from "./feeds";
-import { parseCostFile, buildPreview, buildTemplateWorkbook } from "./cost-importer";
+import { parseCostFile, buildPreview, analyzeRows, buildTemplateWorkbook } from "./cost-importer";
+import type { ParsedCostRow } from "./cost-importer";
 import * as pricingStore from "./pricing-store";
 import * as pricingV2 from "./pricing-v2";
 import { resolveForList, toCustomerPrice } from "./pricing";
@@ -3843,6 +3844,68 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
     } catch (error: any) {
       console.error("Cost upload error:", error);
       res.status(500).json({ message: error.message || "Failed to process cost upload" });
+    }
+  });
+
+  // Save edits made in the review screen (inline cost/EAN/notes fixes, carried-forward
+  // "kept" missing products, and the upload-level comment), then re-validate + return
+  // a fresh preview. Draft only.
+  app.patch("/api/admin/cost-uploads/:id/draft", requireAdmin, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const found = await pricingStore.getUpload(id);
+      if (!found) return res.status(404).json({ message: "Upload not found" });
+      if (found.upload.status === "published")
+        return res.status(400).json({ message: "This upload is already published and cannot be edited." });
+
+      const threshold = await getCostThreshold();
+      const base = await pricingV2.getBaseCostForBrand(found.upload.brandId);
+      const priorRows = base?.rows ?? [];
+
+      const incoming: any[] = Array.isArray(req.body.rows) ? req.body.rows : [];
+      const finalRows: ParsedCostRow[] = incoming.map((r) => ({
+        ean: (r.ean ?? "").toString(),
+        description: (r.description ?? "").toString(),
+        caseSize: (r.caseSize ?? "").toString(),
+        costPrice: r.costPrice === null || r.costPrice === undefined || r.costPrice === "" ? null : Number(r.costPrice),
+        supplierQty: r.supplierQty === null || r.supplierQty === undefined || r.supplierQty === "" ? null : Number(r.supplierQty),
+        categoryName: (r.categoryName ?? "").toString(),
+        comment: r.comment ? r.comment.toString() : null,
+      }));
+
+      // Carry forward "kept" missing products at their previous cost.
+      const keepEans: string[] = Array.isArray(req.body.keepMissingEans) ? req.body.keepMissingEans : [];
+      if (keepEans.length) {
+        const normEan = (v: any) => (v ?? "").toString().replace(/\s+/g, "").replace(/\.0$/, "").trim();
+        const present = new Set(finalRows.map((r) => normEan(r.ean)));
+        const priorByEan = new Map<string, any>();
+        for (const p of priorRows) priorByEan.set(normEan(p.ean), p);
+        for (const e of keepEans) {
+          const k = normEan(e);
+          if (!k || present.has(k)) continue;
+          const p = priorByEan.get(k);
+          if (!p) continue;
+          finalRows.push({
+            ean: (p.ean ?? "").toString(),
+            description: (p.description ?? "").toString(),
+            caseSize: (p.caseSize ?? "").toString(),
+            costPrice: p.costPrice === null || p.costPrice === undefined ? null : Number(p.costPrice),
+            supplierQty: p.supplierQty ?? null,
+            categoryName: (p.categoryName ?? "").toString(),
+            comment: "Kept from previous cost (not in new file)",
+          });
+          present.add(k);
+        }
+      }
+
+      const summary = analyzeRows(finalRows, priorRows, threshold);
+      await pricingStore.replaceDraftRows(id, summary.rows);
+      if (req.body.comment !== undefined) await pricingStore.updateUploadComment(id, req.body.comment || null);
+
+      res.json({ summary: { ...summary, threshold } });
+    } catch (error: any) {
+      console.error("Cost draft save error:", error);
+      res.status(500).json({ message: error.message || "Failed to save changes" });
     }
   });
 

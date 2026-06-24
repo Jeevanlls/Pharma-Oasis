@@ -13,6 +13,7 @@ export interface ParsedCostRow {
   costPrice: number | null;
   supplierQty: number | null;
   categoryName: string;
+  comment?: string | null; // internal note (user-entered, not from the file)
 }
 
 export interface ParsedFile {
@@ -20,15 +21,23 @@ export interface ParsedFile {
   rows: ParsedCostRow[];
 }
 
+/** Canonical single status used for filtering/navigation in the review screen.
+ *  Precedence (worst first): duplicate > missing_info > changed > new > ok. */
+export type RowStatus = "duplicate" | "missing_info" | "changed" | "new" | "ok";
+
 export interface PreviewRow extends ParsedCostRow {
+  comment: string | null;
   productId: number | null;
   // "matched" = EAN existed in the brand's prior published cost upload;
   // "new" = first time we've seen this EAN for the brand.
   matchStatus: "matched" | "new";
+  rowStatus: RowStatus;
   previousCost: number | null;
   changePercent: number | null;
   flagged: boolean;
   flagReason: string;
+  // True only when the row can actually be published (has EAN + cost, not a duplicate).
+  publishable: boolean;
 }
 
 /** A product that was in the brand's prior published cost upload but is absent
@@ -57,7 +66,19 @@ export interface PreviewSummary {
   /** brand-new EANs not seen in the prior published upload */
   newCount: number;
   removedCount: number;
+  /** matched rows whose cost differs from the previous published cost */
+  changedCount: number;
+  /** matched rows whose cost is unchanged */
+  okCount: number;
+  /** rows sharing an EAN with another row in the same file */
+  duplicateCount: number;
+  /** rows missing an EAN and/or a cost price (cannot be published) */
+  missingInfoCount: number;
+  /** rows that can be published right now */
+  publishableCount: number;
   flagged: number;
+  /** hard block: true when there is at least one duplicate EAN to resolve */
+  hasDuplicates: boolean;
 }
 
 const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
@@ -174,44 +195,82 @@ export function buildPreview(
   priorRows: PriorCostRow[],
   thresholdPct: number,
 ): PreviewSummary {
+  return { ...analyzeRows(parsed.rows, priorRows, thresholdPct), brandNameInFile: parsed.brandName };
+}
+
+/**
+ * The validation engine, shared by the initial upload and by re-validation after
+ * the admin edits rows in the review screen. Computes per-row status, flags,
+ * change% vs the brand's prior published cost, duplicate detection, and the list
+ * of products that were dropped from the file.
+ */
+export function analyzeRows(
+  rows: ParsedCostRow[],
+  priorRows: PriorCostRow[],
+  thresholdPct: number,
+): PreviewSummary {
   const priorByEan = new Map<string, PriorCostRow>();
   for (const p of priorRows) {
     const k = normEan(p.ean);
     if (k) priorByEan.set(k, p);
   }
 
-  const seen = new Set<string>();
+  // Count EAN occurrences up front so EVERY duplicate occurrence is flagged
+  // (not just the 2nd+), making the conflict obvious wherever the admin looks.
+  const eanCounts = new Map<string, number>();
+  for (const r of rows) {
+    const k = normEan(r.ean);
+    if (k) eanCounts.set(k, (eanCounts.get(k) ?? 0) + 1);
+  }
+
   const seenPriorEans = new Set<string>();
   const out: PreviewRow[] = [];
 
-  for (const r of parsed.rows) {
+  for (const r of rows) {
     const key = normEan(r.ean);
     const prior = key ? priorByEan.get(key) : undefined;
     if (prior && key) seenPriorEans.add(key);
     const prevCost =
       prior?.costPrice != null && prior.costPrice !== "" ? Number(prior.costPrice) : null;
+    const hasCost = r.costPrice !== null && r.costPrice > 0;
 
     let changePercent: number | null = null;
     if (prevCost !== null && prevCost > 0 && r.costPrice !== null) {
       changePercent = round2(((r.costPrice - prevCost) / prevCost) * 100);
     }
 
+    const isDuplicate = !!key && (eanCounts.get(key) ?? 0) > 1;
+    const missingEan = !key;
+    const missingCost = !hasCost;
+    const costChanged = prevCost !== null && r.costPrice !== null && round2(r.costPrice) !== round2(prevCost);
+
     const flags: string[] = [];
-    if (r.costPrice === null || r.costPrice <= 0) flags.push("Cost is zero or blank");
+    if (isDuplicate) flags.push("Duplicate EAN — remove the duplicate and re-upload");
+    if (missingEan) flags.push("Missing EAN");
+    if (missingCost) flags.push("Cost is zero or blank");
     if (changePercent !== null && Math.abs(changePercent) > thresholdPct)
       flags.push(`Cost change ${changePercent > 0 ? "+" : ""}${changePercent}% exceeds ±${thresholdPct}%`);
-    if (key && seen.has(key)) flags.push("Duplicate EAN in file");
-    if (key) seen.add(key);
+
+    // Worst-first status for the filter.
+    let rowStatus: RowStatus;
+    if (isDuplicate) rowStatus = "duplicate";
+    else if (missingEan || missingCost) rowStatus = "missing_info";
+    else if (!prior) rowStatus = "new";
+    else if (costChanged) rowStatus = "changed";
+    else rowStatus = "ok";
 
     out.push({
       ...r,
+      comment: r.comment ?? null,
       description: r.description || prior?.description || "",
       productId: prior?.productId ?? null,
       matchStatus: prior ? "matched" : "new",
+      rowStatus,
       previousCost: prevCost,
       changePercent,
       flagged: flags.length > 0,
       flagReason: flags.join("; "),
+      publishable: !isDuplicate && !missingEan && !missingCost,
     });
   }
 
@@ -226,15 +285,24 @@ export function buildPreview(
     });
   }
 
+  const duplicateCount = out.filter((r) => r.rowStatus === "duplicate").length;
   return {
-    brandNameInFile: parsed.brandName,
+    brandNameInFile: null,
     rows: out,
     removed,
     total: out.length,
     matched: out.filter((r) => r.matchStatus === "matched").length,
-    newCount: out.filter((r) => r.matchStatus === "new").length,
+    // status-based so the badge agrees with the "New" filter (a brand-new row that's
+    // also a duplicate or missing info counts under that worse status, not here).
+    newCount: out.filter((r) => r.rowStatus === "new").length,
     removedCount: removed.length,
+    changedCount: out.filter((r) => r.rowStatus === "changed").length,
+    okCount: out.filter((r) => r.rowStatus === "ok").length,
+    duplicateCount,
+    missingInfoCount: out.filter((r) => r.rowStatus === "missing_info").length,
+    publishableCount: out.filter((r) => r.publishable).length,
     flagged: out.filter((r) => r.flagged).length,
+    hasDuplicates: duplicateCount > 0,
   };
 }
 
