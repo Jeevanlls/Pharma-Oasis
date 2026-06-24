@@ -10,13 +10,20 @@ Working on branch **`feature/price-list-builder`** (off `main`, NOT yet merged).
 2. `856f339` — **Bulk pricing**: tiered cost bands + cost+£.
 3. `e6e855d` — **Cost reconciliation**: review a new supplier cost before applying.
 4. `4bba613` — **Fix cost-upload EAN matching** (compare vs prior published upload, not catalogue products).
-5. `1d2b678` — **Interactive cost-upload review** (dedupe block, missing-info skip, keep/remove, notes, status filter). Built + type-checked + synthetic-tested. ⚠️ NOT yet click-tested in the UI.
+5. `1d2b678` — **Interactive cost-upload review** (dedupe block, missing-info skip, keep/remove, notes, status filter). Built + type-checked + synthetic-tested.
+6. `fa025c9` — **Cost-review refinements**: per-row **Delete** button; **big-change confirm tick** (gates Publish, keyed by EAN+cost); **real-time/live validation** (statuses + change% recompute as you type); **Notes column** in the download template + parser (Notes/Comment/Remark headers). Type-checked.
+7. `e09ca03` — **Current Costs editor** (`/admin/current-costs`): pick a brand → see live costs + "published N days ago" badge → search → edit a few costs/notes → **Review & apply** confirm dialog showing every affected customer price (old→new cost, old→new price, per list + customers) → confirm publishes a NEW cost version (supersedes old) + reprices affected lists. Backend `getCurrentCosts`/`previewCostEdits`/`applyCostEdits` in pricing-v2; verified with a 12-assertion synthetic seed test (passed, data cleaned up).
 
 > Context: a previous session built the Price List Builder but the workspace reset before committing, so it looked like "nothing happened." It was all recovered and is now safely committed. **Commit work promptly.**
 
 ## 👉 RESUME HERE (last worked 2026-06-24)
 
-**State:** commits `4bba613` + `1d2b678` are on the local branch. **Nothing is pushed.** The dev server (`npm run dev`, plain `tsx` — NO watch) was **restarted** so the new server code is live; if you change server files again you MUST restart it (front-end Vite hot-reloads, server does not).
+**State:** commits up to `e09ca03` are on the local branch. **Nothing is pushed.** The dev server (`npm run dev`, plain `tsx` — NO watch) was **restarted** (now running in the background, port 5000) so the new server code + routes are live; if you change server files again you MUST restart it (front-end Vite hot-reloads, server does not).
+
+**Latest session (2026-06-24, later) added — all built, type-checked, built clean, server restarted:**
+- Cost-upload review **delete-line + big-change confirm-tick + live validation + file Notes column** (`fa025c9`).
+- **Current Costs editor** `/admin/current-costs` — quick-edit live costs with a customer-price impact confirmation, auto-applies + republishes (`e09ca03`). Synthetic test passed.
+- ⚠️ Still NOT click-tested in the UI by the user; merge/push still pending user go-ahead.
 
 **Why not pushed:** the only git remote is `gitsafe-backup` (a local backup mirror); its pre-receive hook **rejects every branch except `main`**. There is **no GitHub `origin`**. So the feature branch can't be pushed; the only route to the remote is **merge → `main`, then `git push gitsafe-backup main`**.
 
