@@ -9,21 +9,29 @@ Working on branch **`feature/price-list-builder`** (off `main`, NOT yet merged).
 1. `fdf5340` — **Price List Builder** admin tool (recovered from a lost session that never committed it).
 2. `856f339` — **Bulk pricing**: tiered cost bands + cost+£.
 3. `e6e855d` — **Cost reconciliation**: review a new supplier cost before applying.
-4. `4bba613` — **Fix cost-upload EAN matching** (the bug below). Built + type-checked + synthetic-tested. ⚠️ NOT yet click-tested in the UI.
+4. `4bba613` — **Fix cost-upload EAN matching** (compare vs prior published upload, not catalogue products).
+5. `1d2b678` — **Interactive cost-upload review** (dedupe block, missing-info skip, keep/remove, notes, status filter). Built + type-checked + synthetic-tested. ⚠️ NOT yet click-tested in the UI.
 
 > Context: a previous session built the Price List Builder but the workspace reset before committing, so it looked like "nothing happened." It was all recovered and is now safely committed. **Commit work promptly.**
 
-## 👉 RESUME HERE (left off 2026-06-24, user stepped away)
+## 👉 RESUME HERE (last worked 2026-06-24)
 
-**State:** the EAN-matching fix is committed locally as `4bba613`. **It is NOT pushed anywhere.**
+**State:** commits `4bba613` + `1d2b678` are on the local branch. **Nothing is pushed.** The dev server (`npm run dev`, plain `tsx` — NO watch) was **restarted** so the new server code is live; if you change server files again you MUST restart it (front-end Vite hot-reloads, server does not).
 
-**Why not pushed:** the only git remote is `gitsafe-backup` (a local backup mirror) and its pre-receive hook **rejects every branch except `main`** ("Only pushes to main branch are allowed"). There is **no GitHub `origin`**. So the feature branch cannot be pushed as-is.
+**Why not pushed:** the only git remote is `gitsafe-backup` (a local backup mirror); its pre-receive hook **rejects every branch except `main`**. There is **no GitHub `origin`**. So the feature branch can't be pushed; the only route to the remote is **merge → `main`, then `git push gitsafe-backup main`**.
 
-**Two open decisions for the user (do NOT do either without explicit go-ahead):**
-1. **Push path** — to get the commit onto the remote, the only route is **merge `feature/price-list-builder` → `main`, then `git push gitsafe-backup main`**. (Alternative: add a real GitHub `origin` that accepts feature branches.) User had not chosen when they left.
-2. **Pre-merge test** — user still needs to **click through a REAL cost upload that has ~20 lines removed** in the UI and confirm: every row is no longer "EAN not found"; previous-cost/change% populate; new EANs show blue "new"; the amber "X product(s) … NOT in this upload" panel lists the removed lines. Only synthetic-data tested so far.
+**Latest feature — interactive cost-upload review (`1d2b678`), built per the user's 2026-06-24 spec. Behaviour:**
+- **Duplicate EANs**: every occurrence flagged; **publish hard-blocked** until fixed (server `publishUpload` throws; UI disables Publish). User can edit the EAN inline + Save to re-check, or fix the file & re-upload.
+- **Missing EAN / cost** → "missing info"; editable inline. Decision (user-chosen): **publish the good lines and skip incomplete ones** (deleted, count reported) — NOT a full block.
+- **Editable rows** (EAN, cost, qty, **Notes** column) + **editable upload comment** until published.
+- **Status filter** dropdown (cost changed / new / duplicate / missing info / unchanged).
+- **Missing products** (in last published costs, absent from new file): per-line **Keep at old price** (decision: **carried forward into this upload** at old cost) or **Remove**; Keep-all / Remove-all buttons.
+- New endpoint `PATCH /api/admin/cost-uploads/:id/draft` re-validates via shared `analyzeRows()` + persists draft (`replaceDraftRows`). Save-before-publish wired in the UI.
 
-**So next session, after the user confirms:** (a) help them run the UI test, then (b) if happy, merge to `main` and push `main`. Both are pending the user's word.
+**⚠️ NOT yet done / next steps (pending user):**
+1. **Click-test in the UI** the brand the user uploaded 3× (436/413/309 rows): confirm duplicates block + highlight, missing-info skips, keep/remove carry-forward, notes save, filter works, and NO more "EAN not found".
+2. **Then decide push/merge** — merge `feature/price-list-builder` → `main` and push `main` (only once user is happy). Pending the user's word.
+3. Possible follow-ups the user hinted at: dedupe **across the whole brand/system** (currently within-file only); validate that carried-forward kept rows behave correctly through publish → reconcile.
 
 ## ✅ FIXED 2026-06-24 — cost-upload EAN matching (was: KNOWN BUG below)
 
