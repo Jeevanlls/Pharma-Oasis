@@ -593,6 +593,280 @@ export async function reconcileApply(listId: number, d: ReconcileDecisions): Pro
 }
 
 // ---------------------------------------------------------------
+// CURRENT COSTS — view & quick-edit the brand's live published costs,
+// with a customer-price impact preview before applying. Lets the buyer
+// change a handful of costs without re-uploading a whole file.
+// ---------------------------------------------------------------
+const normEan = (v: string | null | undefined): string =>
+  (v ?? "").toString().replace(/\s+/g, "").replace(/\.0$/, "").trim();
+
+export interface CurrentCostRow {
+  ean: string | null;
+  description: string | null;
+  costPrice: number | null;
+  supplierQty: number | null;
+  caseSize: string | null;
+  comment: string | null;
+  categoryName: string | null;
+}
+export interface CurrentCosts {
+  brandId: number;
+  uploadId: number | null;
+  publishedAt: string | null;
+  validUntil: string | null;
+  supplierName: string | null;
+  rows: CurrentCostRow[];
+}
+
+/** The brand's live (latest published) costs, for the Current Costs editor. */
+export async function getCurrentCosts(brandId: number): Promise<CurrentCosts> {
+  const [upload] = await db
+    .select()
+    .from(costUploads)
+    .where(and(eq(costUploads.brandId, brandId), eq(costUploads.status, "published")))
+    .orderBy(desc(costUploads.publishedAt))
+    .limit(1);
+  if (!upload) {
+    return { brandId, uploadId: null, publishedAt: null, validUntil: null, supplierName: null, rows: [] };
+  }
+  const rows = await db
+    .select()
+    .from(costUploadRows)
+    .where(eq(costUploadRows.uploadId, upload.id))
+    .orderBy(asc(costUploadRows.description));
+  return {
+    brandId,
+    uploadId: upload.id,
+    publishedAt: upload.publishedAt ? upload.publishedAt.toISOString() : null,
+    validUntil: upload.validUntil ? upload.validUntil.toISOString() : null,
+    supplierName: upload.supplierName ?? null,
+    rows: rows.map((r) => ({
+      ean: r.ean,
+      description: r.description,
+      costPrice: num(r.costPrice),
+      supplierQty: r.supplierQty,
+      caseSize: r.caseSize,
+      comment: r.comment,
+      categoryName: r.categoryName,
+    })),
+  };
+}
+
+export interface CostEdit { ean: string; newCost: number; comment?: string | null }
+
+export interface CostEditImpactLine {
+  listId: number;
+  listName: string;
+  customers: string[];
+  ean: string | null;
+  description: string | null;
+  method: string;
+  oldCost: number | null;
+  newCost: number;
+  changePercent: number | null;
+  big: boolean;
+  oldPrice: number | null;
+  newPrice: number | null;
+}
+export interface CostEditPreview {
+  costsChanged: number; // edits that genuinely move a cost
+  itemsAffected: number; // customer price-list lines that will change
+  listsAffected: number;
+  lines: CostEditImpactLine[];
+}
+
+/** Names of customers holding a given price list (company name, else email). */
+async function customerNamesForList(listId: number): Promise<string[]> {
+  const rows = await db
+    .select({ companyName: users.companyName, email: users.email })
+    .from(customerPriceLists)
+    .leftJoin(users, eq(customerPriceLists.customerId, users.id))
+    .where(eq(customerPriceLists.priceListId, listId));
+  return rows.map((r) => r.companyName || r.email || "—");
+}
+
+/** Keep only edits that actually change a current cost (and are valid). */
+function effectiveEdits(edits: CostEdit[], curByEan: Map<string, CurrentCostRow>): Map<string, CostEdit> {
+  const out = new Map<string, CostEdit>();
+  for (const e of edits) {
+    const key = normEan(e.ean);
+    if (!key || !Number.isFinite(e.newCost) || e.newCost <= 0) continue;
+    const cur = curByEan.get(key);
+    const old = cur ? cur.costPrice : null;
+    if (old !== null && round2(old) === round2(e.newCost) && (e.comment === undefined)) continue;
+    out.set(key, e);
+  }
+  return out;
+}
+
+/** Preview the customer-price impact of a set of cost edits, before applying. */
+export async function previewCostEdits(brandId: number, edits: CostEdit[]): Promise<CostEditPreview> {
+  const current = await getCurrentCosts(brandId);
+  const curByEan = new Map<string, CurrentCostRow>();
+  for (const r of current.rows) if (r.ean) curByEan.set(normEan(r.ean), r);
+  const editByEan = effectiveEdits(edits, curByEan);
+
+  // Count edits that move a cost (a notes-only edit doesn't reprice anything).
+  let costsChanged = 0;
+  for (const [key, e] of Array.from(editByEan.entries())) {
+    const old = curByEan.get(key)?.costPrice ?? null;
+    if (old === null || round2(old) !== round2(e.newCost)) costsChanged++;
+  }
+
+  const lists = await db.select().from(priceLists).where(eq(priceLists.brandId, brandId));
+  const lines: CostEditImpactLine[] = [];
+  const listIds = new Set<number>();
+  for (const list of lists) {
+    const items = await db.select().from(priceListItems).where(eq(priceListItems.priceListId, list.id));
+    let custs: string[] | null = null;
+    for (const it of items) {
+      const key = it.ean ? normEan(it.ean) : "";
+      if (!key || !editByEan.has(key)) continue;
+      const newCost = editByEan.get(key)!.newCost;
+      const oldCost = num(it.costPrice);
+      if (oldCost !== null && round2(oldCost) === round2(newCost)) continue; // no price move
+      const oldPrice = num(it.preparedPrice);
+      const newPrice = computePrepared(
+        it.method as PriceMethod, newCost, num(it.marginPercent), num(it.fixedPrice), num(it.plusAmount),
+      );
+      const cp = pctChange(oldCost, newCost);
+      if (custs === null) custs = await customerNamesForList(list.id);
+      lines.push({
+        listId: list.id, listName: list.name, customers: custs,
+        ean: it.ean, description: it.description, method: it.method,
+        oldCost, newCost, changePercent: cp, big: cp !== null && Math.abs(cp) > BIG_CHANGE_PCT,
+        oldPrice, newPrice,
+      });
+      listIds.add(list.id);
+    }
+  }
+  return { costsChanged, itemsAffected: lines.length, listsAffected: listIds.size, lines };
+}
+
+export interface CostEditResult {
+  newUploadId: number;
+  costsChanged: number;
+  itemsRepriced: number;
+  listsAffected: number;
+}
+
+/** Apply cost edits: publish a NEW cost version for the brand (cloned from the
+ *  current published costs with the edits applied, superseding the old one so the
+ *  "published on" date is always truthful), then reprice every affected customer
+ *  price-list line. Auto-applies — the route calls previewCostEdits first so the
+ *  admin has already confirmed the customer-price impact. */
+export async function applyCostEdits(
+  brandId: number,
+  edits: CostEdit[],
+  meta: { uploadedBy?: number | null } = {},
+): Promise<CostEditResult> {
+  const [priorUpload] = await db
+    .select()
+    .from(costUploads)
+    .where(and(eq(costUploads.brandId, brandId), eq(costUploads.status, "published")))
+    .orderBy(desc(costUploads.publishedAt))
+    .limit(1);
+  if (!priorUpload) throw new Error("This brand has no published costs to edit. Upload a cost file first.");
+  const priorRows = await db.select().from(costUploadRows).where(eq(costUploadRows.uploadId, priorUpload.id));
+
+  const curByEan = new Map<string, CurrentCostRow>();
+  for (const r of priorRows) if (r.ean) curByEan.set(normEan(r.ean), { ean: r.ean, description: r.description, costPrice: num(r.costPrice), supplierQty: r.supplierQty, caseSize: r.caseSize, comment: r.comment, categoryName: r.categoryName });
+  const editByEan = effectiveEdits(edits, curByEan);
+  if (editByEan.size === 0) throw new Error("Nothing to apply — no cost changes were provided.");
+
+  const now = new Date();
+
+  // New published upload, cloned from the prior one with edits applied.
+  let costsChanged = 0;
+  const [newUpload] = await db
+    .insert(costUploads)
+    .values({
+      brandId,
+      supplierName: priorUpload.supplierName ?? null,
+      validFrom: priorUpload.validFrom ?? null,
+      validUntil: priorUpload.validUntil ?? null,
+      comment: `Quick cost edit (${editByEan.size} line(s))`,
+      fileName: null,
+      uploadedBy: meta.uploadedBy ?? null,
+      status: "published",
+      publishedAt: now,
+      rowCount: priorRows.length,
+      matchedCount: priorRows.length,
+      unmatchedCount: 0,
+    })
+    .returning();
+
+  await db.insert(costUploadRows).values(
+    priorRows.map((r) => {
+      const key = r.ean ? normEan(r.ean) : "";
+      const edit = key ? editByEan.get(key) : undefined;
+      const oldCost = num(r.costPrice);
+      const newCost = edit ? edit.newCost : oldCost;
+      const changed = !!edit && (oldCost === null || round2(oldCost) !== round2(newCost ?? 0));
+      if (changed) costsChanged++;
+      return {
+        uploadId: newUpload.id,
+        productId: r.productId,
+        ean: r.ean,
+        description: r.description,
+        categoryName: r.categoryName,
+        pricingCategoryId: r.pricingCategoryId,
+        caseSize: r.caseSize,
+        costPrice: toStr(newCost),
+        supplierQty: r.supplierQty,
+        supplierName: null,
+        validUntil: null,
+        comment: edit && edit.comment !== undefined ? edit.comment : r.comment,
+        matchStatus: "matched" as const,
+        previousCost: toStr(oldCost),
+        changePercent: toStr(changed ? pctChange(oldCost, newCost) : null),
+        flagged: false,
+        flagReason: null,
+      };
+    }),
+  );
+
+  // Supersede the brand's prior published uploads (all but the new one).
+  await db
+    .update(costUploads)
+    .set({ status: "superseded", updatedAt: now })
+    .where(and(eq(costUploads.brandId, brandId), eq(costUploads.status, "published"), ne(costUploads.id, newUpload.id)));
+
+  // Reprice affected customer price-list lines across the brand.
+  const lists = await db.select().from(priceLists).where(eq(priceLists.brandId, brandId));
+  let itemsRepriced = 0;
+  const affectedLists = new Set<number>();
+  for (const list of lists) {
+    const items = await db.select().from(priceListItems).where(eq(priceListItems.priceListId, list.id));
+    for (const it of items) {
+      const key = it.ean ? normEan(it.ean) : "";
+      const edit = key ? editByEan.get(key) : undefined;
+      if (!edit) continue;
+      const cost = edit.newCost;
+      const oldCost = num(it.costPrice);
+      if (oldCost !== null && round2(oldCost) === round2(cost)) continue;
+      await db
+        .update(priceListItems)
+        .set({
+          costPrice: toStr(cost),
+          preparedPrice: toStr(
+            computePrepared(it.method as PriceMethod, cost, num(it.marginPercent), num(it.fixedPrice), num(it.plusAmount)),
+          ),
+          updatedAt: now,
+        })
+        .where(eq(priceListItems.id, it.id));
+      itemsRepriced++;
+      affectedLists.add(list.id);
+    }
+  }
+  for (const lid of Array.from(affectedLists)) {
+    await db.update(priceLists).set({ baseCostUploadId: newUpload.id, updatedAt: now }).where(eq(priceLists.id, lid));
+  }
+
+  return { newUploadId: newUpload.id, costsChanged, itemsRepriced, listsAffected: affectedLists.size };
+}
+
+// ---------------------------------------------------------------
 // CUSTOMER ASSIGNMENT — one list per customer PER BRAND (enforced)
 // ---------------------------------------------------------------
 export class AssignmentConflict extends Error {

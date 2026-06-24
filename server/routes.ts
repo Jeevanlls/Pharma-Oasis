@@ -3940,6 +3940,36 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
     res.json(await pricingStore.expiredCostBrands());
   });
 
+  // ===== CURRENT COSTS — view & quick-edit a brand's live costs =====
+  app.get("/api/admin/current-costs/:brandId", requireAdmin, async (req, res) => {
+    try {
+      res.json(await pricingV2.getCurrentCosts(parseInt(req.params.brandId, 10)));
+    } catch (e: any) {
+      res.status(500).json({ message: e.message || "Failed to load current costs" });
+    }
+  });
+  // Impact preview: which customer prices change if these cost edits are applied.
+  app.post("/api/admin/current-costs/:brandId/preview", requireAdmin, async (req, res) => {
+    try {
+      const edits = Array.isArray(req.body?.edits) ? req.body.edits : [];
+      res.json(await pricingV2.previewCostEdits(parseInt(req.params.brandId, 10), edits));
+    } catch (e: any) {
+      res.status(500).json({ message: e.message || "Failed to preview cost edits" });
+    }
+  });
+  // Apply: publish a new cost version + reprice affected customer lists.
+  app.post("/api/admin/current-costs/:brandId/apply", requireAdmin, async (req: any, res) => {
+    try {
+      const edits = Array.isArray(req.body?.edits) ? req.body.edits : [];
+      const result = await pricingV2.applyCostEdits(parseInt(req.params.brandId, 10), edits, {
+        uploadedBy: req.session?.userId ?? null,
+      });
+      res.json({ success: true, ...result });
+    } catch (e: any) {
+      res.status(400).json({ message: e.message || "Failed to apply cost edits" });
+    }
+  });
+
   // ==================== PRICING v2 — STANDALONE BRANDS ====================
   app.get("/api/admin/pricing-brands", requireAdmin, async (req, res) => {
     res.json(await pricingV2.listPricingBrands());

@@ -63,6 +63,7 @@ import AdminBlogPage from "@/pages/admin/blog";
 import AdminProductRotationPage from "@/pages/admin/product-rotation";
 import AdminOffersPage from "@/pages/admin/offers";
 import AdminCostUploadsPage from "@/pages/admin/cost-uploads";
+import AdminCurrentCostsPage from "@/pages/admin/current-costs";
 import AdminPriceListsPage from "@/pages/admin/price-lists";
 import AdminPricingBrandsPage from "@/pages/admin/pricing-brands";
 import AdminPricingCategoriesPage from "@/pages/admin/pricing-categories";
@@ -185,6 +186,7 @@ function Router() {
       <Route path="/admin/offers">{() => <AdminRoute component={AdminOffersPage} />}</Route>
       <Route path="/admin/orders">{() => <AdminRoute component={AdminOrdersPage} />}</Route>
       <Route path="/admin/cost-uploads">{() => <AdminRoute component={AdminCostUploadsPage} />}</Route>
+      <Route path="/admin/current-costs">{() => <AdminRoute component={AdminCurrentCostsPage} />}</Route>
       <Route path="/admin/price-lists">{() => <AdminRoute component={AdminPriceListsPage} />}</Route>
       <Route path="/admin/pricing-brands">{() => <AdminRoute component={AdminPricingBrandsPage} />}</Route>
       <Route path="/admin/pricing-categories">{() => <AdminRoute component={AdminPricingCategoriesPage} />}</Route>
