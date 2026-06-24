@@ -1,16 +1,29 @@
 # Price List Builder — Session Handoff
 
-_Last updated: 2026-06-23. Written so a new agent (or future session) can continue seamlessly._
+_Last updated: 2026-06-24. Written so a new agent (or future session) can continue seamlessly._
 
 ## Where we are
 
-Working on branch **`feature/price-list-builder`** (off `main`, NOT yet merged). Three commits, all built + tested live + committed:
+Working on branch **`feature/price-list-builder`** (off `main`, NOT yet merged). Commits, all built + committed:
 
 1. `fdf5340` — **Price List Builder** admin tool (recovered from a lost session that never committed it).
 2. `856f339` — **Bulk pricing**: tiered cost bands + cost+£.
 3. `e6e855d` — **Cost reconciliation**: review a new supplier cost before applying.
+4. `4bba613` — **Fix cost-upload EAN matching** (the bug below). Built + type-checked + synthetic-tested. ⚠️ NOT yet click-tested in the UI.
 
 > Context: a previous session built the Price List Builder but the workspace reset before committing, so it looked like "nothing happened." It was all recovered and is now safely committed. **Commit work promptly.**
+
+## 👉 RESUME HERE (left off 2026-06-24, user stepped away)
+
+**State:** the EAN-matching fix is committed locally as `4bba613`. **It is NOT pushed anywhere.**
+
+**Why not pushed:** the only git remote is `gitsafe-backup` (a local backup mirror) and its pre-receive hook **rejects every branch except `main`** ("Only pushes to main branch are allowed"). There is **no GitHub `origin`**. So the feature branch cannot be pushed as-is.
+
+**Two open decisions for the user (do NOT do either without explicit go-ahead):**
+1. **Push path** — to get the commit onto the remote, the only route is **merge `feature/price-list-builder` → `main`, then `git push gitsafe-backup main`**. (Alternative: add a real GitHub `origin` that accepts feature branches.) User had not chosen when they left.
+2. **Pre-merge test** — user still needs to **click through a REAL cost upload that has ~20 lines removed** in the UI and confirm: every row is no longer "EAN not found"; previous-cost/change% populate; new EANs show blue "new"; the amber "X product(s) … NOT in this upload" panel lists the removed lines. Only synthetic-data tested so far.
+
+**So next session, after the user confirms:** (a) help them run the UI test, then (b) if happy, merge to `main` and push `main`. Both are pending the user's word.
 
 ## ✅ FIXED 2026-06-24 — cost-upload EAN matching (was: KNOWN BUG below)
 
