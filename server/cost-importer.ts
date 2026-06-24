@@ -98,7 +98,7 @@ function parseQty(v: any): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-type ColMap = { ean?: number; description?: number; caseSize?: number; costPrice?: number; supplierQty?: number };
+type ColMap = { ean?: number; description?: number; caseSize?: number; costPrice?: number; supplierQty?: number; comment?: number };
 
 function detectHeader(cells: string[]): ColMap | null {
   const map: ColMap = {};
@@ -110,6 +110,7 @@ function detectHeader(cells: string[]): ColMap | null {
     else if (map.caseSize === undefined && /case/.test(c)) map.caseSize = i;
     else if (map.costPrice === undefined && /cost|price/.test(c)) map.costPrice = i;
     else if (map.supplierQty === undefined && /qty|quant|stock/.test(c)) map.supplierQty = i;
+    else if (map.comment === undefined && /note|comment|remark/.test(c)) map.comment = i;
   });
   // A real header has at least an EAN/barcode column plus a cost column.
   if (map.ean !== undefined && map.costPrice !== undefined) return map;
@@ -169,6 +170,7 @@ export function parseCostFile(buffer: Buffer): ParsedFile {
         costPrice,
         supplierQty: colMap.supplierQty !== undefined ? parseQty(cells[colMap.supplierQty]) : null,
         categoryName: currentCategory,
+        comment: colMap.comment !== undefined ? (cells[colMap.comment] || null) : null,
       });
       continue;
     }
@@ -311,15 +313,15 @@ export function buildTemplateWorkbook(): Buffer {
   const aoa = [
     ["<BRAND NAME>"],
     ["Category: <CATEGORY NAME>"],
-    ["EAN", "Description", "Case Size", "Cost Price", "QTY"],
-    ["5060000000000", "Example Product 1kg", "12", "8.40", "100"],
-    ["5060000000001", "Example Product 500g", "24", "4.95", "250"],
+    ["EAN", "Description", "Case Size", "Cost Price", "QTY", "Notes"],
+    ["5060000000000", "Example Product 1kg", "12", "8.40", "100", "Optional internal note"],
+    ["5060000000001", "Example Product 500g", "24", "4.95", "250", ""],
     ["Category: <ANOTHER CATEGORY (optional)>"],
-    ["EAN", "Description", "Case Size", "Cost Price", "QTY"],
-    ["5060000000002", "Another Example Item", "6", "12.00", "40"],
+    ["EAN", "Description", "Case Size", "Cost Price", "QTY", "Notes"],
+    ["5060000000002", "Another Example Item", "6", "12.00", "40", ""],
   ];
   const ws = XLSX.utils.aoa_to_sheet(aoa);
-  ws["!cols"] = [{ wch: 16 }, { wch: 32 }, { wch: 12 }, { wch: 12 }, { wch: 8 }];
+  ws["!cols"] = [{ wch: 16 }, { wch: 32 }, { wch: 12 }, { wch: 12 }, { wch: 8 }, { wch: 28 }];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Cost Upload");
   return XLSX.write(wb, { type: "buffer", bookType: "xlsx" });

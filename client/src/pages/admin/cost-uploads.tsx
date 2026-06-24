@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -43,6 +44,12 @@ interface CostUpload {
 
 const money = (n: number | null) => (n === null ? "—" : `£${Number(n).toFixed(2)}`);
 
+// Mirror the server's EAN normalisation + rounding so the review screen can
+// re-validate duplicates and cost changes live as the admin types, before Save.
+const normEan = (v: string | null | undefined) =>
+  (v ?? "").toString().replace(/\s+/g, "").replace(/\.0$/, "").trim();
+const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+
 export default function AdminCostUploadsPage() {
   const { toast } = useToast();
   const [brandId, setBrandId] = useState<string>("");
@@ -60,6 +67,9 @@ export default function AdminCostUploadsPage() {
   const [keepRemoved, setKeepRemoved] = useState<Record<string, boolean>>({});
   const [statusFilter, setStatusFilter] = useState<RowStatus | "all">("all");
   const [dirty, setDirty] = useState(false);
+  // Big cost changes the admin has explicitly ticked to confirm. Keyed by EAN+cost
+  // so that editing the cost (or EAN) invalidates an earlier confirmation.
+  const [confirmedChanges, setConfirmedChanges] = useState<Record<string, boolean>>({});
 
   // Re-seed the editable copy whenever a fresh preview arrives (upload or save).
   useEffect(() => {
@@ -76,6 +86,11 @@ export default function AdminCostUploadsPage() {
 
   function patchRow(i: number, patch: Partial<PreviewRow>) {
     setEditRows((rows) => rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
+    setDirty(true);
+  }
+
+  function removeRow(i: number) {
+    setEditRows((rows) => rows.filter((_, idx) => idx !== i));
     setDirty(true);
   }
 
@@ -102,6 +117,7 @@ export default function AdminCostUploadsPage() {
     if (!file) { toast({ title: "Choose a file", variant: "destructive" }); return; }
     setUploading(true);
     setPreview(null);
+    setConfirmedChanges({});
     try {
       const fd = new FormData();
       fd.append("file", file);
@@ -264,9 +280,6 @@ export default function AdminCostUploadsPage() {
       {preview && (() => {
         const s = preview.summary;
         const busy = saveDraftMut.isPending;
-        const visible = editRows
-          .map((r, i) => ({ r, i }))
-          .filter(({ r }) => statusFilter === "all" || r.rowStatus === statusFilter);
         const statusMeta: Record<RowStatus, { label: string; cls: string }> = {
           duplicate: { label: "duplicate", cls: "text-red-600" },
           missing_info: { label: "missing info", cls: "text-red-600" },
@@ -274,34 +287,75 @@ export default function AdminCostUploadsPage() {
           new: { label: "new", cls: "text-blue-600" },
           ok: { label: "ok", cls: "text-green-700" },
         };
+
+        // Re-derive each row's status LIVE from the current edits (duplicate EANs,
+        // cost change %, missing info) so the screen reacts instantly to typing —
+        // no Save round-trip needed. The server re-checks authoritatively on save/publish.
+        const eanCounts: Record<string, number> = {};
+        for (const r of editRows) { const k = normEan(r.ean); if (k) eanCounts[k] = (eanCounts[k] ?? 0) + 1; }
+        const liveRows = editRows.map((r) => {
+          const key = normEan(r.ean);
+          const prev = r.previousCost;
+          const hasCost = r.costPrice !== null && r.costPrice > 0;
+          const changePercent =
+            prev !== null && prev > 0 && r.costPrice !== null ? round2(((r.costPrice - prev) / prev) * 100) : null;
+          const isDuplicate = !!key && (eanCounts[key] ?? 0) > 1;
+          const missingEan = !key;
+          const missingCost = !hasCost;
+          const costChanged = prev !== null && r.costPrice !== null && round2(r.costPrice) !== round2(prev);
+          let rowStatus: RowStatus;
+          if (isDuplicate) rowStatus = "duplicate";
+          else if (missingEan || missingCost) rowStatus = "missing_info";
+          else if (r.matchStatus === "new") rowStatus = "new";
+          else if (costChanged) rowStatus = "changed";
+          else rowStatus = "ok";
+          return { ...r, changePercent, rowStatus, publishable: !isDuplicate && !missingEan && !missingCost };
+        });
+
+        const counts: Record<RowStatus, number> = { duplicate: 0, missing_info: 0, changed: 0, new: 0, ok: 0 };
+        for (const r of liveRows) counts[r.rowStatus]++;
+        const total = liveRows.length;
+        const liveHasDuplicates = counts.duplicate > 0;
+
+        const visible = liveRows
+          .map((r, i) => ({ r, i }))
+          .filter(({ r }) => statusFilter === "all" || r.rowStatus === statusFilter);
+
+        // A "big" cost change (beyond the ± threshold) must be ticked to confirm
+        // before publishing — guards against a mistyped cost going live unnoticed.
+        const changeKey = (r: PreviewRow) => `${r.ean}|${r.costPrice}`;
+        const needsConfirm = (r: PreviewRow) =>
+          r.rowStatus === "changed" && r.changePercent !== null && Math.abs(r.changePercent) > s.threshold;
+        const unconfirmed = liveRows.filter((r) => needsConfirm(r) && !confirmedChanges[changeKey(r)]).length;
+        const canPublish = !liveHasDuplicates && unconfirmed === 0;
         return (
         <Card>
           <CardHeader>
             <CardTitle>Review before publishing</CardTitle>
             <CardDescription className="flex flex-wrap gap-2 pt-1">
-              <Badge variant="outline">{s.total} rows</Badge>
-              <Badge className="bg-green-100 text-green-800">{s.matched} updated</Badge>
-              {s.changedCount > 0 && <Badge className="bg-amber-100 text-amber-800">{s.changedCount} cost changed</Badge>}
-              {s.newCount > 0 && <Badge className="bg-blue-100 text-blue-800">{s.newCount} new</Badge>}
+              <Badge variant="outline">{total} rows</Badge>
+              {counts.changed > 0 && <Badge className="bg-amber-100 text-amber-800">{counts.changed} cost changed</Badge>}
+              {counts.new > 0 && <Badge className="bg-blue-100 text-blue-800">{counts.new} new</Badge>}
               {s.removedCount > 0 && <Badge className="bg-amber-100 text-amber-800">{s.removedCount} missing</Badge>}
-              {s.duplicateCount > 0 && <Badge className="bg-red-100 text-red-800">{s.duplicateCount} duplicate</Badge>}
-              {s.missingInfoCount > 0 && <Badge className="bg-red-100 text-red-800">{s.missingInfoCount} missing info</Badge>}
+              {counts.duplicate > 0 && <Badge className="bg-red-100 text-red-800">{counts.duplicate} duplicate</Badge>}
+              {counts.missing_info > 0 && <Badge className="bg-red-100 text-red-800">{counts.missing_info} missing info</Badge>}
+              {counts.ok > 0 && <Badge className="bg-green-100 text-green-800">{counts.ok} unchanged</Badge>}
               {s.brandNameInFile && <Badge variant="outline">File brand: {s.brandNameInFile}</Badge>}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {s.hasDuplicates && (
+            {liveHasDuplicates && (
               <Alert variant="destructive">
                 <AlertTriangle className="h-4 w-4" />
                 <AlertTitle>Duplicate EANs must be fixed before publishing</AlertTitle>
                 <AlertDescription>
-                  {s.duplicateCount} line(s) share an EAN with another line. The same EAN can't carry two products or costs.
-                  Filter to “Duplicate” below, correct or clear the duplicate EAN, click <strong>Save changes</strong> to re-check — or fix the file and re-upload.
+                  {counts.duplicate} line(s) share an EAN with another line. The same EAN can't carry two products or costs.
+                  Filter to “Duplicate” below, then correct the EAN or delete the extra line — the status updates as you type. Click <strong>Save changes</strong> to store your fixes.
                 </AlertDescription>
               </Alert>
             )}
             {dirty && (
-              <p className="text-xs text-amber-700">You have unsaved edits — click <strong>Save changes</strong> to re-check statuses.</p>
+              <p className="text-xs text-amber-700">Statuses update live as you edit. Click <strong>Save changes</strong> to store them (Publish also saves automatically).</p>
             )}
 
             <div className="flex items-center gap-2">
@@ -309,15 +363,15 @@ export default function AdminCostUploadsPage() {
               <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as RowStatus | "all")}>
                 <SelectTrigger className="w-56"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All rows ({s.total})</SelectItem>
-                  <SelectItem value="changed">Cost changed ({s.changedCount})</SelectItem>
-                  <SelectItem value="new">New ({s.newCount})</SelectItem>
-                  <SelectItem value="duplicate">Duplicate ({s.duplicateCount})</SelectItem>
-                  <SelectItem value="missing_info">Missing info ({s.missingInfoCount})</SelectItem>
-                  <SelectItem value="ok">Unchanged ({s.okCount})</SelectItem>
+                  <SelectItem value="all">All rows ({total})</SelectItem>
+                  <SelectItem value="changed">Cost changed ({counts.changed})</SelectItem>
+                  <SelectItem value="new">New ({counts.new})</SelectItem>
+                  <SelectItem value="duplicate">Duplicate ({counts.duplicate})</SelectItem>
+                  <SelectItem value="missing_info">Missing info ({counts.missing_info})</SelectItem>
+                  <SelectItem value="ok">Unchanged ({counts.ok})</SelectItem>
                 </SelectContent>
               </Select>
-              <span className="text-xs text-muted-foreground">Showing {visible.length} of {s.total}. Cost, EAN, QTY &amp; Notes are editable.</span>
+              <span className="text-xs text-muted-foreground">Showing {visible.length} of {total}. Cost, EAN, QTY &amp; Notes are editable.</span>
             </div>
 
             <div className="max-h-[460px] overflow-auto border rounded">
@@ -332,11 +386,12 @@ export default function AdminCostUploadsPage() {
                     <TableHead className="text-right w-[80px]">QTY</TableHead>
                     <TableHead className="w-[180px]">Notes</TableHead>
                     <TableHead className="w-[120px]">Status</TableHead>
+                    <TableHead className="w-[50px]"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {visible.length === 0 && (
-                    <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground text-sm">No rows for this filter</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground text-sm">No rows for this filter</TableCell></TableRow>
                   )}
                   {visible.map(({ r, i }) => (
                     <TableRow key={i} className={r.rowStatus === "duplicate" || r.rowStatus === "missing_info" ? "bg-red-50" : ""}>
@@ -370,6 +425,19 @@ export default function AdminCostUploadsPage() {
                         <span className={`text-xs ${statusMeta[r.rowStatus].cls}`} title={r.flagReason}>
                           {statusMeta[r.rowStatus].label}
                         </span>
+                        {needsConfirm(r) && (
+                          <label className="flex items-center gap-1 mt-1 text-xs text-red-600 cursor-pointer">
+                            <Checkbox checked={!!confirmedChanges[changeKey(r)]}
+                              onCheckedChange={(v) => setConfirmedChanges((p) => ({ ...p, [changeKey(r)]: !!v }))} />
+                            confirm {r.changePercent! > 0 ? "+" : ""}{r.changePercent}%
+                          </label>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                          title="Delete this line" onClick={() => removeRow(i)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -436,18 +504,20 @@ export default function AdminCostUploadsPage() {
                 {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
                 Save changes
               </Button>
-              <Button onClick={() => handlePublish(preview.uploadId)} disabled={busy || s.hasDuplicates}>
+              <Button onClick={() => handlePublish(preview.uploadId)} disabled={busy || !canPublish}>
                 <CheckCircle2 className="h-4 w-4 mr-2" />
                 Publish — make these costs live
               </Button>
               <Button variant="outline" onClick={() => deleteMut.mutate(preview.uploadId)} disabled={busy}>
                 <Trash2 className="h-4 w-4 mr-2" /> Discard draft
               </Button>
-              {s.hasDuplicates
+              {liveHasDuplicates
                 ? <span className="text-xs text-red-600">Resolve duplicate EANs to enable publishing.</span>
-                : s.missingInfoCount > 0
-                  ? <span className="text-xs text-amber-700">{s.missingInfoCount} incomplete line(s) will be skipped on publish.</span>
-                  : null}
+                : unconfirmed > 0
+                  ? <span className="text-xs text-red-600">{unconfirmed} large cost change(s) need confirming (tick the box) before publishing.</span>
+                  : counts.missing_info > 0
+                    ? <span className="text-xs text-amber-700">{counts.missing_info} incomplete line(s) will be skipped on publish.</span>
+                    : null}
             </div>
           </CardContent>
         </Card>
