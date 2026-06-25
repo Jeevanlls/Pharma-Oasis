@@ -1061,8 +1061,46 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
       }
       
       const updatedQuote = await storage.updateQuote(quoteId, { status });
-      
-      res.json(updatedQuote);
+
+      // Accepting a quote turns it into a confirmed order automatically (no re-entry),
+      // linked back via order.quoteId. Guard against creating a second order.
+      let createdOrderId: number | null = null;
+      if (status === "accepted") {
+        const existing = await pricingStore.getOrderByQuoteId(quoteId);
+        if (existing) {
+          createdOrderId = existing.id;
+        } else {
+          const full = await storage.getQuoteWithItems(quoteId);
+          const items = full?.items ?? [];
+          const lines = items.map((it: any) => ({
+            productId: it.productId ?? null,
+            priceListItemId: it.priceListItemId ?? null,
+            ean: it.ean ?? null,
+            description: it.description ?? it.product?.productName ?? null,
+            quantity: it.quantity,
+            unitCost: it.unitCost != null ? Number(it.unitCost) : null,
+            unitPrice: it.unitPrice != null ? Number(it.unitPrice) : null,
+            marginApplied: it.marginApplied != null ? Number(it.marginApplied) : null,
+            lineTotal: it.lineTotal != null ? Number(it.lineTotal) : 0,
+          }));
+          const total = quote.totalEstimate != null
+            ? Number(quote.totalEstimate)
+            : lines.reduce((s, l) => s + (l.lineTotal || 0), 0);
+          const customer = await storage.getUser(quote.userId);
+          const order = await pricingStore.createOrder({
+            userId: quote.userId,
+            priceListId: (customer as any)?.priceListId ?? null,
+            quoteId,
+            status: "confirmed", // an accepted quote is a firm order ready to fulfil
+            totalAmount: total,
+            customerNotes: `Order from accepted quote #${quoteId}.` + (quote.customerNotes ? ` ${quote.customerNotes}` : ""),
+            lines,
+          });
+          createdOrderId = order.id;
+        }
+      }
+
+      res.json({ ...updatedQuote, orderId: createdOrderId });
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid status. Must be 'accepted' or 'declined'" });

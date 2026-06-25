@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useParams, useLocation } from "wouter";
 import { PublicLayout } from "@/components/layout/public-layout";
@@ -80,6 +81,7 @@ export default function QuoteDetailPage() {
   const { isAuthenticated, isCustomer, isAdmin } = useAuth();
   const { addItem, items: basketItems } = useQuoteBasket();
   const { toast } = useToast();
+  const [createdOrderId, setCreatedOrderId] = useState<number | null>(null);
 
   const { data: quote, isLoading, error } = useQuery<QuoteWithItems>({
     queryKey: ["/api/quotes", id],
@@ -91,18 +93,27 @@ export default function QuoteDetailPage() {
     enabled: isAuthenticated && !!id,
   });
 
+  // To show the linked order on an already-accepted quote (revisits).
+  const { data: myOrders } = useQuery<any[]>({
+    queryKey: ["/api/portal/orders"],
+    enabled: isAuthenticated && isCustomer,
+  });
+  const linkedOrderId = createdOrderId ?? myOrders?.find((o) => o.quoteId === quote?.id)?.id ?? null;
+
   const updateQuoteMutation = useMutation({
     mutationFn: async (status: string) => {
       const res = await apiRequest("PATCH", `/api/quotes/${id}`, { status });
       return res.json();
     },
-    onSuccess: (_, status) => {
+    onSuccess: (data, status) => {
       queryClient.invalidateQueries({ queryKey: ["/api/quotes", id] });
       queryClient.invalidateQueries({ queryKey: ["/api/quotes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/portal/orders"] });
+      if (status === "accepted" && data?.orderId) setCreatedOrderId(data.orderId);
       toast({
-        title: status === "accepted" ? "Quote Accepted" : "Quote Declined",
-        description: status === "accepted" 
-          ? "Thank you! Our team will contact you to proceed with your order."
+        title: status === "accepted" ? "Quote accepted — order created" : "Quote Declined",
+        description: status === "accepted"
+          ? `We've created order #${data?.orderId ?? ""} from this quote. You can track it under My Orders.`
           : "The quote has been declined.",
       });
     },
@@ -311,6 +322,14 @@ export default function QuoteDetailPage() {
                     {isExpired && quote.status === "quoted" && (
                       <p className="text-sm text-destructive mt-1">
                         This quote has expired. Please contact us if you'd like a new quote.
+                      </p>
+                    )}
+                    {quote.status === "accepted" && linkedOrderId && (
+                      <p className="text-sm mt-1">
+                        Order <span className="font-medium">#{linkedOrderId}</span> was created from this quote.{" "}
+                        <Link href="/portal/orders" className="text-primary font-medium hover:underline" data-testid="link-view-order">
+                          View in My Orders
+                        </Link>
                       </p>
                     )}
                   </div>

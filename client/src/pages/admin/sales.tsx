@@ -25,6 +25,7 @@ interface Row {
   status: string;
   date: string;
   archived: boolean;
+  fromQuoteId?: number | null;
 }
 
 const statusBadge: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
@@ -99,6 +100,7 @@ export default function AdminSalesPage() {
       status: o.status,
       date: o.createdAt,
       archived: !!o.archivedAt,
+      fromQuoteId: o.quoteId ?? null,
     }));
     const quoteRows: Row[] = (quotes || [])
       .filter((q) => (tab === "active" ? QUOTE_ACTIVE.includes(q.status) : !QUOTE_ACTIVE.includes(q.status)))
@@ -222,7 +224,10 @@ export default function AdminSalesPage() {
                     <TableCell>
                       {selectable && <Checkbox checked={selected.has(r.id)} onCheckedChange={() => toggleOne(r.id)} data-testid={`checkbox-${r.ref}`} />}
                     </TableCell>
-                    <TableCell className="font-medium">{r.ref}</TableCell>
+                    <TableCell className="font-medium">
+                      {r.ref}
+                      {r.fromQuoteId ? <span className="block text-xs font-normal text-muted-foreground">↳ from Q-{r.fromQuoteId}</span> : null}
+                    </TableCell>
                     <TableCell>
                       <Badge variant="outline" className="gap-1">
                         {r.kind === "order" ? <ClipboardList className="h-3 w-3" /> : <FileText className="h-3 w-3" />}

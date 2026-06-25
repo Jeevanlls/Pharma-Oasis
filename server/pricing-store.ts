@@ -358,13 +358,16 @@ export async function createOrder(input: {
   totalAmount: number;
   customerNotes: string | null;
   lines: OrderLineInput[];
+  quoteId?: number | null; // set when this order came from an accepted quote
+  status?: string; // defaults to "submitted"
 }): Promise<Order> {
   const [order] = await db
     .insert(orders)
     .values({
       userId: input.userId,
-      status: "submitted",
+      status: input.status ?? "submitted",
       priceListId: input.priceListId,
+      quoteId: input.quoteId ?? null,
       totalAmount: toStr(input.totalAmount),
       customerNotes: input.customerNotes,
     })
@@ -391,6 +394,12 @@ export async function createOrder(input: {
 
 export async function getOrdersByUser(userId: number): Promise<Order[]> {
   return db.select().from(orders).where(eq(orders.userId, userId)).orderBy(desc(orders.createdAt));
+}
+
+/** The order created from a given quote, if any (prevents duplicate conversion). */
+export async function getOrderByQuoteId(quoteId: number): Promise<Order | undefined> {
+  const [order] = await db.select().from(orders).where(eq(orders.quoteId, quoteId));
+  return order;
 }
 
 export async function getOrderWithItems(

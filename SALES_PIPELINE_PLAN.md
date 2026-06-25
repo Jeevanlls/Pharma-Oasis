@@ -77,10 +77,13 @@ Added idempotently in `server/db.ts` startup SQL (the project's migration patter
 
 ---
 
-## PHASE B — connect the two halves (LATER)
-- **Accept a quote → auto-create a linked order** (uses `quote_id`); no re-entry.
-- Consolidate the two customer quote screens into one.
-- Proper **PDF / emailed quotation** (today "mark as quoted" is just a status + internal note).
+## PHASE B — connect the two halves
+
+- ✅ **B1 — Accept a quote → auto-create a linked order** (DONE 2026-06-25). When a customer accepts a quote, an order is created automatically from the quote's line snapshots, with `order.quote_id` set and status **"confirmed"** (a firm order ready to fulfil). Guarded against duplicates via `getOrderByQuoteId`. Wired into `PATCH /api/quotes/:id` (the accept path used by both customer screens); `createOrder` extended with optional `quoteId`/`status`. The accept response returns `orderId`. Admin **Sales** rows show "↳ from Q-x" on converted orders.
+- ✅ **B2 — Consolidate the customer quote experience** (DONE 2026-06-25). `/portal/quotes` was a read-only dead-end; it now funnels into the existing rich detail/accept page (`/my-quotes/:id`) with **Review & respond** / **View details** buttons and shows the **linked order** ("Order #X") once accepted. The quote-detail page now surfaces "Order #X created — View in My Orders" after accept (and on revisits, by matching `order.quoteId`). The widely-linked `/my-quotes` stays as the canonical detail/accept flow; both list views share it.
+- ⏳ **B3 — Proper PDF / emailed quotation** (NOT done). Today "mark as quoted" is a status + internal note; there's a customer email (`sendCustomerResponseEmail`) but no formal document. Next: a printable/PDF quotation (line items, prices, expiry) the admin can send. Lowest-risk v1 = a printable HTML quote view (browser "print to PDF"); later a real PDF + attach-to-email.
+
+**Verified (B1+B2):** 13-assertion end-to-end test passed (accept → one linked confirmed order with copied line snapshots + carried total; duplicate-accept returns the same order, never a second; decline creates no order). Type-checks clean; build succeeds.
 
 ## PHASE C — inventory-aware niceties (LATER, optional)
 - Low-stock warning when confirming an order.
