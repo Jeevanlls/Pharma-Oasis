@@ -963,7 +963,7 @@ export async function assignAllCustomers(priceListId: number, assignedBy?: numbe
   const custs = await db
     .select({ id: users.id })
     .from(users)
-    .where(and(eq(users.role, "customer"), eq(users.status, "approved")));
+    .where(and(eq(users.role, "customer"), eq(users.status, "active")));
   const res = await assignCustomers(priceListId, custs.map((c) => c.id), { replace: true, assignedBy });
   return res.assigned;
 }
