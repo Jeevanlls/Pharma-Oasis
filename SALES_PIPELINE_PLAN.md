@@ -88,9 +88,10 @@ Added idempotently in `server/db.ts` startup SQL (the project's migration patter
 **Phase B COMPLETE.** Next is Phase C (below).
 
 ## PHASE C — inventory-aware niceties (LATER, optional)
-- Low-stock warning when confirming an order.
-- Optional pick/pack/ship sub-statuses.
+- Low-stock warning when confirming an order. _(Not started — small, self-contained.)_
+- Optional pick/pack/ship sub-statuses. _(Not started.)_
 - **API integration** to push orders straight into the inventory system (replaces manual/CSV).
+  **⏸ DEFERRED by the owner (2026-06-25) — do this later.** When picking it up, first find out which inventory system it is and whether it has an API (auth, endpoints, order payload format). Until then, the manual-entry + CSV export handoff from Phase A is the workflow.
 
 ## Conventions to respect (don't break)
 - Admin pages must NOT self-wrap in `<AdminLayout>` — `AdminRoute` provides the shell; page root is a bare `<div className="space-y-6">`, no `p-6`.
