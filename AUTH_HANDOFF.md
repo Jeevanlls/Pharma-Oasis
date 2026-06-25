@@ -41,18 +41,42 @@ The work was done in phases (P1 → P2 → P3).
 - `client/src/pages/admin/staff.tsx` → new **"Invite by Email"** button (primary action) + dialog (Full Name, Email, Role = Staff/Admin). Calls the endpoint, shows a toast, refreshes the staff list. The old password-typing flow is kept as a secondary **"Add with Password"** button.
 - Type-checks clean; full `npm run build` succeeds.
 
+## ✅ P4 — Two-factor authentication (TOTP) for admins (DONE this session)
+
+**Decision:** Google Authenticator / authenticator-app codes (TOTP), **required for admins only** (staff and customers are unaffected).
+
+**How it works**
+- An admin signs in with email + password as normal. Then a **second step** is required:
+  - If they haven't set up 2FA yet → they're walked through **enrolment**: scan a QR code with Google Authenticator (or Authy), enter the 6-digit code to confirm, and are shown **10 one-time backup codes** (saved once).
+  - If 2FA is already on → they enter the current 6-digit code (or a backup code) to finish signing in.
+- Admins **cannot skip** setup — no admin session is granted until 2FA is enrolled.
+- Staff/customers log in exactly as before (no 2FA).
+
+**Where it lives**
+- Helper: `server/twofa.ts` (otplib v12 `authenticator` API + bcrypt-hashed, single-use backup codes).
+- Backend (`server/routes.ts`): `/api/auth/login` gates admins; `/api/auth/login/2fa` (verify code/backup), `/api/admin/2fa/setup` (QR), `/api/admin/2fa/enable` (confirm + issue backup codes), `/api/admin/2fa/disable`, `/api/admin/2fa/backup-codes` (regenerate). All code endpoints are rate-limited (10 / 15 min). A `publicUser()` helper now strips the password hash, TOTP secret, and backup codes from every user returned to a client.
+- DB: `users.two_factor_secret`, `two_factor_enabled` (default false), `two_factor_backup_codes` (JSON of bcrypt hashes). Added idempotently in `server/db.ts` startup SQL + typed in `shared/schema.ts`.
+- Frontend: `client/src/pages/login.tsx` (3-step flow: credentials → code → first-time QR enrolment + backup codes); `client/src/pages/admin/security.tsx` (`/admin/security`, sidebar "Security (2FA)") to regenerate backup codes or turn 2FA off.
+- Libraries added: `otplib@^12`, `qrcode`, `@types/qrcode`.
+
+**Verified:** 22-assertion end-to-end HTTP test passed (staff unaffected; admin forced to enrol; wrong code rejected; correct code + backup code log in; backup codes single-use; secret/backup codes never leaked via `/me`; disable requires password and re-prompts setup). Type-checks clean; `npm run build` succeeds.
+
+### 🔑 BREAK-GLASS — if an admin is locked out of 2FA
+If someone loses both their authenticator app **and** their backup codes, clear 2FA directly on the Neon DB, then they can sign in with just their password and re-enrol:
+```sql
+UPDATE users
+SET two_factor_enabled = false, two_factor_secret = NULL, two_factor_backup_codes = NULL
+WHERE email = 'their@email.com';
+```
+(There's no separate prod DB — this is the one live Neon DB. Never delete user rows.)
+
 ## ⏳ What still needs doing (next session)
 
-1. **Hands-on test of the invite flow** (not yet click-tested live):
-   - As admin, open **Staff Management** (`/admin/staff`) → **Invite by Email** → send to a real inbox you control.
-   - Confirm the email arrives, the **Set My Password** link opens `/reset-password`, you can set a password, and then sign in at **`/staff`**.
-   - ⚠️ **Dev server**: P3 changes touch server files. If the running dev server predates these changes, **restart it** (`npm run dev`, port 5000) before testing — front-end hot-reloads, server code does not.
-   - ⚠️ **`SITE_URL`**: the invite link uses `process.env.SITE_URL` (falls back to `https://pharmaoasis.co.uk`). Make sure that env var points to the real site in production, or invite links will be wrong.
-   - ⚠️ **Email sending**: confirm the email provider is configured (check how `sendPasswordResetEmail` is set up in `server/email.ts`). If `inviteSent` comes back false, the account is still created — the person can use **Forgot Password** instead.
+1. ✅ **Invite flow** — confirmed working by the owner (email arrives, link sets password, sign-in at `/staff`). *(Still good to set `SITE_URL` in production so invite links point at the live domain.)*
 
-2. **Rotate the original live admin password.** Per P1's note, `admin@pharmaoasis.com` still has its **old password** until done operationally. Now that invites work: create a fresh owner admin via invite (or Forgot Password), verify it works, then change/retire the old credential. **Do this against the live Neon DB carefully — 22 real customer accounts live there; never delete users.**
+2. **Rotate the original live admin password.** Per P1's note, `admin@pharmaoasis.com` still has its **old password** until done operationally. Now that invites work: create a fresh owner admin via invite (or Forgot Password), verify it works, then change/retire the old credential. **Do this against the live Neon DB carefully — 22 real customer accounts live there; never delete users.** Note: with P4 live, the first time any admin signs in they'll be required to set up 2FA.
 
-3. **(Optional — NOT started) 2-factor authentication (2FA).** The owner asked about this; nothing has been built. There is only an unused `client/src/components/ui/input-otp.tsx` (a generic UI widget). If wanted, this is a fresh piece of work (e.g. TOTP/authenticator-app or email-code 2FA for admin logins). Decide scope with the owner first.
+3. **Hands-on test of 2FA** (built + automated-tested, not yet click-tested by a human): sign in at `/staff` as an admin → you should be walked through the QR setup → confirm with Google Authenticator → save the backup codes → land in `/admin`. Next sign-in should ask for a code. Check the **Security (2FA)** page (`/admin/security`) for regenerate/disable. Keep the break-glass SQL above handy the first time.
 
 ## Quick reference
 
@@ -60,6 +84,8 @@ The work was done in phases (P1 → P2 → P3).
 - Invite endpoint: `server/routes.ts` (search `/api/admin/team/invite`)
 - Invite email: `server/email.ts` (search `sendInviteEmail`)
 - Staff login page: `/staff` (route in `client/src/App.tsx`); customer login: `/login`
+- 2FA helper: `server/twofa.ts`; 2FA endpoints in `server/routes.ts` (search `2fa`)
+- 2FA login UI: `client/src/pages/login.tsx`; admin Security page: `client/src/pages/admin/security.tsx` (`/admin/security`)
 - Seed/bootstrap: `server/seed.ts`, auto-seed gate in `server/app.ts`
 
 ## Owner context

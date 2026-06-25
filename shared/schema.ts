@@ -57,6 +57,11 @@ export const users = pgTable("users", {
   passwordResetToken: varchar("password_reset_token", { length: 128 }),
   passwordResetExpiry: timestamp("password_reset_expiry"),
 
+  // Two-factor authentication (TOTP / authenticator app). Required for admins.
+  twoFactorSecret: varchar("two_factor_secret", { length: 64 }), // base32 secret; null until set up
+  twoFactorEnabled: boolean("two_factor_enabled").default(false).notNull(),
+  twoFactorBackupCodes: text("two_factor_backup_codes"), // JSON array of bcrypt-hashed single-use codes
+
   priceListId: integer("price_list_id"), // assigned customer price list
 
   createdAt: timestamp("created_at").defaultNow().notNull(),

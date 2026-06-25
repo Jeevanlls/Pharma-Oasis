@@ -7,7 +7,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isAdmin: boolean;
   isCustomer: boolean;
-  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string; twoFactorRequired?: boolean; twoFactorSetupRequired?: boolean }>;
   logout: () => Promise<void>;
   refetch: () => Promise<void>;
 }
@@ -52,6 +52,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const data = await response.json();
 
       if (response.ok) {
+        // Admin two-factor gates: password was correct but the session is not
+        // granted until the second step completes.
+        if (data.twoFactorRequired) return { success: false, twoFactorRequired: true };
+        if (data.twoFactorSetupRequired) return { success: false, twoFactorSetupRequired: true };
         setUser(data.user);
         return { success: true };
       } else {

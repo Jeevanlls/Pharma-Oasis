@@ -54,6 +54,7 @@ import AdminHomepagePage from "@/pages/admin/homepage";
 import AdminFooterContentPage from "@/pages/admin/footer-content";
 import AdminCompanyLocationsPage from "@/pages/admin/company-locations";
 import AdminStaffPage from "@/pages/admin/staff";
+import AdminSecurityPage from "@/pages/admin/security";
 import AdminAnalyticsPage from "@/pages/admin/analytics";
 import AdminSeoPage from "@/pages/admin/seo";
 import AdminGooglePricingPage from "@/pages/admin/google-pricing";
@@ -165,6 +166,7 @@ function Router() {
       <Route path="/admin">{() => <AdminRoute component={AdminDashboard} />}</Route>
       <Route path="/admin/users">{() => <AdminRoute component={AdminUsersPage} />}</Route>
       <Route path="/admin/staff">{() => <AdminRoute component={AdminStaffPage} />}</Route>
+      <Route path="/admin/security">{() => <AdminRoute component={AdminSecurityPage} />}</Route>
       <Route path="/admin/analytics">{() => <AdminRoute component={AdminAnalyticsPage} />}</Route>
       <Route path="/admin/products">{() => <AdminRoute component={AdminProductsPage} />}</Route>
       <Route path="/admin/brands">{() => <AdminRoute component={AdminBrandsPage} />}</Route>

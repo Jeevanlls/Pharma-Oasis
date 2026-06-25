@@ -16,6 +16,14 @@ import {
 } from "@shared/schema";
 import { eq, desc } from "drizzle-orm";
 import bcrypt from "bcryptjs";
+import QRCode from "qrcode";
+import {
+  generateSecret as gen2faSecret,
+  buildOtpauthUrl,
+  verifyToken as verify2faToken,
+  generateBackupCodes,
+  consumeBackupCode,
+} from "./twofa";
 import { z } from "zod";
 import { processImage, deleteImageFile, validateImageFile, getImageCategories, isValidImageCategory } from "./imageProcessor";
 import { ObjectStorageService, ObjectNotFoundError, ObjectStorageConfigError } from "./objectStorage";
@@ -54,7 +62,18 @@ import {
 declare module "express-session" {
   interface SessionData {
     userId: number;
+    // Set after a correct admin password but before the 2FA code is verified.
+    // The full session (userId) is only granted once 2FA passes.
+    pending2faUserId?: number;
   }
+}
+
+// Strip secrets before returning a user to any client. Never expose the password
+// hash, the TOTP secret, or backup codes.
+function publicUser(user: any) {
+  if (!user) return user;
+  const { passwordHash, twoFactorSecret, twoFactorBackupCodes, ...rest } = user;
+  return rest;
 }
 
 export async function registerRoutes(server: Server, app: Express): Promise<void> {
@@ -180,8 +199,7 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     if (!user) {
       return res.status(401).json({ message: "User not found" });
     }
-    const { passwordHash, ...safeUser } = user;
-    res.json({ user: safeUser });
+    res.json({ user: publicUser(user) });
   });
 
   app.post("/api/auth/login", async (req, res) => {
@@ -206,6 +224,33 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
         return res.status(403).json({ message: "Your account application was not approved. Please contact support for more information." });
       }
 
+      // Two-factor gate for admins. Password is correct at this point, but we do
+      // NOT grant the session yet — we stash a pending id and require a second step.
+      if (user.role === "admin") {
+        if ((user as any).twoFactorEnabled) {
+          // 2FA is set up → require an authenticator code.
+          req.session.regenerate((err) => {
+            if (err) {
+              console.error("Session regeneration error:", err);
+              return res.status(500).json({ message: "Login failed" });
+            }
+            req.session.pending2faUserId = user.id;
+            return res.json({ twoFactorRequired: true });
+          });
+          return;
+        }
+        // Admin without 2FA yet → must set it up before getting in (required for admins).
+        req.session.regenerate((err) => {
+          if (err) {
+            console.error("Session regeneration error:", err);
+            return res.status(500).json({ message: "Login failed" });
+          }
+          req.session.pending2faUserId = user.id;
+          return res.json({ twoFactorSetupRequired: true });
+        });
+        return;
+      }
+
       // Regenerate session to prevent session fixation attacks
       req.session.regenerate((err) => {
         if (err) {
@@ -213,8 +258,7 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
           return res.status(500).json({ message: "Login failed" });
         }
         req.session.userId = user.id;
-        const { passwordHash, ...safeUser } = user;
-        res.json({ user: safeUser });
+        res.json({ user: publicUser(user) });
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -387,6 +431,171 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     }
   });
 
+  // ==================== TWO-FACTOR AUTH (TOTP) — admins ====================
+  // Throttle code-guessing on the second login step and on enable.
+  const twoFaLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { message: "Too many attempts. Please wait a few minutes and try again." },
+  });
+
+  // Resolve the admin currently allowed to manage 2FA: either a fully-authed admin,
+  // or one mid-login who has passed the password step (pending2faUserId).
+  const getEnrollingAdmin = async (req: any) => {
+    const id = req.session.userId || req.session.pending2faUserId;
+    if (!id) return null;
+    const user = await storage.getUser(id);
+    if (!user || user.role !== "admin") return null;
+    return user;
+  };
+
+  // Step 2 of login: verify the authenticator code (or a backup code).
+  app.post("/api/auth/login/2fa", twoFaLimiter, async (req, res) => {
+    try {
+      const pendingId = req.session.pending2faUserId;
+      if (!pendingId) {
+        return res.status(401).json({ message: "No login in progress. Please sign in again." });
+      }
+      const code = String(req.body?.code || "").trim();
+      if (!code) return res.status(400).json({ message: "Enter your 6-digit code or a backup code." });
+
+      const user = await storage.getUser(pendingId);
+      if (!user || !(user as any).twoFactorEnabled || !(user as any).twoFactorSecret) {
+        return res.status(400).json({ message: "Two-factor is not set up for this account." });
+      }
+
+      let verified = verify2faToken(code, (user as any).twoFactorSecret);
+
+      // Fall back to single-use backup codes.
+      if (!verified) {
+        const consumed = await consumeBackupCode(code, (user as any).twoFactorBackupCodes);
+        if (consumed) {
+          verified = true;
+          await storage.updateUser(user.id, { twoFactorBackupCodes: consumed.remainingJson } as any);
+        }
+      }
+
+      if (!verified) {
+        return res.status(401).json({ message: "That code wasn't valid. Try again." });
+      }
+
+      req.session.regenerate((err) => {
+        if (err) {
+          console.error("Session regeneration error:", err);
+          return res.status(500).json({ message: "Login failed" });
+        }
+        req.session.userId = user.id;
+        res.json({ user: publicUser(user) });
+      });
+    } catch (error) {
+      console.error("2FA verify error:", error);
+      res.status(500).json({ message: "Login failed" });
+    }
+  });
+
+  // Begin 2FA setup: generate a secret + QR for the authenticator app.
+  // Works for a logged-in admin OR an admin mid-login who must enrol.
+  app.post("/api/admin/2fa/setup", async (req, res) => {
+    try {
+      const user = await getEnrollingAdmin(req);
+      if (!user) return res.status(401).json({ message: "Admin sign-in required." });
+
+      const secret = gen2faSecret();
+      // Store as the (not-yet-enabled) secret; enable only after a code is confirmed.
+      await storage.updateUser(user.id, { twoFactorSecret: secret } as any);
+
+      const otpauthUrl = buildOtpauthUrl(user.email, secret);
+      const qrDataUrl = await QRCode.toDataURL(otpauthUrl);
+      res.json({ secret, otpauthUrl, qrDataUrl });
+    } catch (error) {
+      console.error("2FA setup error:", error);
+      res.status(500).json({ message: "Could not start 2FA setup." });
+    }
+  });
+
+  // Confirm setup: verify the first code, enable 2FA, return one-time backup codes.
+  // If the admin was mid-login (enrolment forced), also completes the login.
+  app.post("/api/admin/2fa/enable", twoFaLimiter, async (req, res) => {
+    try {
+      const user = await getEnrollingAdmin(req);
+      if (!user) return res.status(401).json({ message: "Admin sign-in required." });
+
+      const secret = (user as any).twoFactorSecret;
+      if (!secret) return res.status(400).json({ message: "Start setup first." });
+
+      const code = String(req.body?.code || "").trim();
+      if (!verify2faToken(code, secret)) {
+        return res.status(400).json({ message: "That code wasn't valid. Check your app and try again." });
+      }
+
+      const { plain, hashedJson } = await generateBackupCodes(10);
+      await storage.updateUser(user.id, {
+        twoFactorEnabled: true,
+        twoFactorBackupCodes: hashedJson,
+      } as any);
+
+      // Complete login if this was a forced first-time enrolment.
+      const wasPending = !req.session.userId && req.session.pending2faUserId === user.id;
+      if (wasPending) {
+        req.session.regenerate((err) => {
+          if (err) {
+            console.error("Session regeneration error:", err);
+            return res.status(500).json({ message: "Login failed" });
+          }
+          req.session.userId = user.id;
+          res.json({ enabled: true, backupCodes: plain, user: publicUser({ ...user, twoFactorEnabled: true }) });
+        });
+        return;
+      }
+      res.json({ enabled: true, backupCodes: plain });
+    } catch (error) {
+      console.error("2FA enable error:", error);
+      res.status(500).json({ message: "Could not enable 2FA." });
+    }
+  });
+
+  // Turn 2FA off (requires the account password as confirmation).
+  app.post("/api/admin/2fa/disable", requireAdmin, async (req: any, res) => {
+    try {
+      const user = req.user;
+      const password = String(req.body?.password || "");
+      const ok = password && (await bcrypt.compare(password, user.passwordHash));
+      if (!ok) return res.status(400).json({ message: "Password is incorrect." });
+
+      await storage.updateUser(user.id, {
+        twoFactorEnabled: false,
+        twoFactorSecret: null,
+        twoFactorBackupCodes: null,
+      } as any);
+      res.json({ disabled: true });
+    } catch (error) {
+      console.error("2FA disable error:", error);
+      res.status(500).json({ message: "Could not disable 2FA." });
+    }
+  });
+
+  // Regenerate backup codes (requires the account password).
+  app.post("/api/admin/2fa/backup-codes", requireAdmin, twoFaLimiter, async (req: any, res) => {
+    try {
+      const user = req.user;
+      if (!(user as any).twoFactorEnabled) {
+        return res.status(400).json({ message: "Enable 2FA first." });
+      }
+      const password = String(req.body?.password || "");
+      const ok = password && (await bcrypt.compare(password, user.passwordHash));
+      if (!ok) return res.status(400).json({ message: "Password is incorrect." });
+
+      const { plain, hashedJson } = await generateBackupCodes(10);
+      await storage.updateUser(user.id, { twoFactorBackupCodes: hashedJson } as any);
+      res.json({ backupCodes: plain });
+    } catch (error) {
+      console.error("2FA backup-codes error:", error);
+      res.status(500).json({ message: "Could not regenerate backup codes." });
+    }
+  });
+
   // Profile update endpoint for customers
   app.patch("/api/profile", requireAuth, async (req, res) => {
     try {
@@ -412,8 +621,7 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
         return res.status(404).json({ message: "User not found" });
       }
 
-      const { passwordHash, ...safeUser } = user;
-      res.json({ user: safeUser });
+      res.json({ user: publicUser(user) });
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid input", errors: error.errors });
@@ -927,10 +1135,7 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
   app.get("/api/admin/users", requireAdmin, async (req, res) => {
     try {
       const userList = await storage.getAllUsers();
-      res.json(userList.map(u => {
-        const { passwordHash, ...safe } = u;
-        return safe;
-      }));
+      res.json(userList.map(u => publicUser(u)));
     } catch (error) {
       console.error("Error fetching users:", error);
       res.status(500).json({ message: "Failed to fetch users" });
@@ -963,8 +1168,7 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
         });
       }
 
-      const { passwordHash, ...safeUser } = user;
-      res.json(safeUser);
+      res.json(publicUser(user));
     } catch (error) {
       console.error("Error updating user:", error);
       res.status(500).json({ message: "Failed to update user" });
@@ -984,10 +1188,7 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     try {
       const userList = await storage.getAllUsers();
       const staffList = userList.filter(u => u.role === "staff" || u.role === "admin");
-      res.json(staffList.map(u => {
-        const { passwordHash, ...safe } = u;
-        return safe;
-      }));
+      res.json(staffList.map(u => publicUser(u)));
     } catch (error) {
       console.error("Error fetching staff:", error);
       res.status(500).json({ message: "Failed to fetch staff" });
@@ -1097,8 +1298,7 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
         return res.status(404).json({ message: "Staff member not found" });
       }
 
-      const { passwordHash, ...safeUser } = user;
-      res.json(safeUser);
+      res.json(publicUser(user));
     } catch (error) {
       console.error("Error updating staff:", error);
       res.status(500).json({ message: "Failed to update staff member" });

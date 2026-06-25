@@ -174,6 +174,10 @@ pool.query(`
   ALTER TABLE products ADD COLUMN IF NOT EXISTS cost_status VARCHAR(20) DEFAULT 'none';
   ALTER TABLE products ADD COLUMN IF NOT EXISTS available_qty INTEGER;
   ALTER TABLE users ADD COLUMN IF NOT EXISTS price_list_id INTEGER;
+  -- Two-factor auth (TOTP) columns
+  ALTER TABLE users ADD COLUMN IF NOT EXISTS two_factor_secret VARCHAR(64);
+  ALTER TABLE users ADD COLUMN IF NOT EXISTS two_factor_enabled BOOLEAN NOT NULL DEFAULT false;
+  ALTER TABLE users ADD COLUMN IF NOT EXISTS two_factor_backup_codes TEXT;
   ALTER TABLE quote_items ADD COLUMN IF NOT EXISTS unit_cost DECIMAL(10,2);
   ALTER TABLE quote_items ADD COLUMN IF NOT EXISTS margin_applied DECIMAL(6,2);
   -- Price list publish/archive tracking (v2)
