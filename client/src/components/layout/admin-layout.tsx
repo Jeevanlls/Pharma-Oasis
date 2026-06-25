@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
@@ -42,6 +43,7 @@ import {
   Coins,
   ClipboardList,
   PoundSterling,
+  BookOpen,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 
@@ -67,6 +69,7 @@ const mainMenuItems = [
 ];
 
 const pricingMenuItems = [
+  { title: "How this works (guide)", href: "/admin/pricing-guide", icon: BookOpen, staffAccess: true },
   { title: "1. Brands", href: "/admin/pricing-brands", icon: Building2, staffAccess: false },
   { title: "2. Categories", href: "/admin/pricing-categories", icon: Tag, staffAccess: false },
   { title: "3. Cost Uploads", href: "/admin/cost-uploads", icon: FileUp, staffAccess: false },
@@ -99,6 +102,15 @@ const siteMenuItems = [
 export function AdminLayout({ children }: AdminLayoutProps) {
   const [location] = useLocation();
   const { user, logout } = useAuth();
+
+  // Keep the active menu item visible: navigating between pages resets the
+  // sidebar scroll to the top, which buried the lower groups (e.g. Customer
+  // Pricing) and made it feel like the menu "jumped" away. After each route
+  // change, scroll the highlighted item back into view.
+  useEffect(() => {
+    const el = document.querySelector('[data-sidebar="menu-button"][data-active="true"]');
+    el?.scrollIntoView({ block: "nearest" });
+  }, [location]);
 
   const isStaff = user?.role === "staff";
   const isAdmin = user?.role === "admin";
@@ -154,13 +166,19 @@ export function AdminLayout({ children }: AdminLayoutProps) {
             </SidebarGroup>
 
             {filteredPricingMenuItems.length > 0 && (
-              <SidebarGroup>
-                <SidebarGroupLabel>Customer Pricing</SidebarGroupLabel>
+              <SidebarGroup className="my-1 mx-2 rounded-lg border border-emerald-200 bg-emerald-50/60 dark:border-emerald-900/50 dark:bg-emerald-950/20">
+                <SidebarGroupLabel className="text-emerald-700 dark:text-emerald-400 font-semibold">
+                  <PoundSterling className="h-3.5 w-3.5 mr-1" /> Customer Pricing
+                </SidebarGroupLabel>
                 <SidebarGroupContent>
                   <SidebarMenu>
                     {filteredPricingMenuItems.map((item) => (
                       <SidebarMenuItem key={item.href}>
-                        <SidebarMenuButton asChild isActive={location === item.href}>
+                        <SidebarMenuButton
+                          asChild
+                          isActive={location === item.href}
+                          className="text-emerald-900/90 dark:text-emerald-100/90 data-[active=true]:bg-emerald-600 data-[active=true]:text-white"
+                        >
                           <Link href={item.href}>
                             <item.icon className="h-4 w-4" />
                             <span>{item.title}</span>
