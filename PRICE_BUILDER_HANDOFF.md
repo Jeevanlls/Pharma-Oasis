@@ -31,14 +31,16 @@ Working on branch **`feature/price-list-builder`** (off `main`, NOT yet merged).
 > **For the next-session agent:** everything below was BUILT + type-checked + built clean + (for the backend) synthetic-tested, and the dev server was restarted so it's all live. The user has NOT yet click-tested it. When the user returns they will report what they found. **Do not re-build or assume anything is broken** — wait for their testing feedback, then fix only what they flag, or proceed to merge if they're happy. The exact things awaiting their hands-on test are in the "⚠️ PENDING YOUR TEST" list just below.
 </details>
 
-**State:** commits up to `e09ca03` are on the local branch. **Nothing is pushed.** The dev server (`npm run dev`, plain `tsx` — NO watch) was **restarted** (now running in the background, port 5000) so the new server code + routes are live; if you change server files again you MUST restart it (front-end Vite hot-reloads, server does not).
+**State (2026-06-25):** branch merged to `main` (`b09b468`) and **pushed to `gitsafe-backup`** — see "✅ MERGE STATUS" below. The dev server (`npm run dev`, plain `tsx` — NO watch) is **running in the background on port 5000** (started manually this session because the Replit workflow's auto-respawn was flaky). If you change **server** files you MUST restart it; front-end changes hot-reload via Vite.
+
+**How to merge (for future sessions):** `git branch -f main feature/price-list-builder && git push gitsafe-backup main`. Do NOT `git checkout main` — the harness continuously rewrites `.claude/settings.local.json`, leaving the tree dirty so the checkout aborts. `git branch -f` moves `main` without switching, which works because it's always a clean fast-forward.
 
 **Latest session (2026-06-24, later) added — all built, type-checked, built clean, server restarted:**
 - Cost-upload review **delete-line + big-change confirm-tick + live validation + file Notes column** (`fa025c9`).
 - **Current Costs editor** `/admin/current-costs` — quick-edit live costs with a customer-price impact confirmation, auto-applies + republishes (`e09ca03`). Synthetic test passed.
 - ⚠️ Still NOT click-tested in the UI by the user; merge/push still pending user go-ahead.
 
-**Why not pushed:** the only git remote is `gitsafe-backup` (a local backup mirror); its pre-receive hook **rejects every branch except `main`**. There is **no GitHub `origin`**. So the feature branch can't be pushed; the only route to the remote is **merge → `main`, then `git push gitsafe-backup main`**.
+**Remote constraint (still true):** the only git remote is `gitsafe-backup` (a local backup mirror); its pre-receive hook **rejects every branch except `main`**. There is **no GitHub `origin`**. So the feature branch itself can't be pushed — the only route to the remote is **merge → `main`, then `git push gitsafe-backup main`** (done this session).
 
 **Latest feature — interactive cost-upload review (`1d2b678`), built per the user's 2026-06-24 spec. Behaviour:**
 - **Duplicate EANs**: every occurrence flagged; **publish hard-blocked** until fixed (server `publishUpload` throws; UI disables Publish). User can edit the EAN inline + Save to re-check, or fix the file & re-upload.
@@ -48,18 +50,20 @@ Working on branch **`feature/price-list-builder`** (off `main`, NOT yet merged).
 - **Missing products** (in last published costs, absent from new file): per-line **Keep at old price** (decision: **carried forward into this upload** at old cost) or **Remove**; Keep-all / Remove-all buttons.
 - New endpoint `PATCH /api/admin/cost-uploads/:id/draft` re-validates via shared `analyzeRows()` + persists draft (`replaceDraftRows`). Save-before-publish wired in the UI.
 
-**⚠️ PENDING YOUR TEST (what to click through next session) — nothing here is known-broken; these just haven't been hands-on tested by the user yet:**
+**✅ MERGE STATUS (2026-06-25): DONE.** `feature/price-list-builder` was fast-forwarded into `main` (now at `b09b468`) and **pushed to `gitsafe-backup` successfully** (`3f03f33..b09b468  main -> main`). The feature branch still exists locally and matches `main`. Future commits can continue on the feature branch and be merged the same way (`git branch -f main feature/price-list-builder` then `git push gitsafe-backup main` — see "How to merge" note below; direct checkout of `main` is blocked because the harness keeps rewriting `.claude/settings.local.json`, so use `git branch -f` instead of `git checkout main`).
 
-A. **Cost Uploads review screen** (`/admin/cost-uploads`) — upload a brand file (e.g. the 436/413/309-row brand) and confirm:
-   - Duplicate EANs flag + block Publish; **editing the EAN OR clicking the new red trash-icon** clears it **live as you type** (no Save needed); Publish re-enables.
-   - A big cost change (beyond the ±% threshold box) shows a red **"confirm +X%"** tick that **must be ticked** before Publish enables.
-   - Missing-info lines skip on publish (count reported); keep/remove carry-forward works; status filter works; NO "EAN not found".
-   - Download the template → it now has a **Notes** column; fill it → those notes show after upload.
-B. **Current Costs editor** (`/admin/current-costs`, NEW) — pick a brand → live costs + "published N days ago" badge → search → edit a few costs/notes → **Review & apply** → the confirm dialog lists every affected customer price (old→new cost, old→new price, per list + customers) → **Confirm & apply** republishes costs + reprices. Verify the toast counts and that customer prices actually moved.
+**⚠️ STILL PENDING THE USER'S HANDS-ON TEST — nothing is known-broken; just not click-tested yet:**
 
-**Then (only once the user is happy):**
-1. **Merge + push** — merge `feature/price-list-builder` → `main`, then `git push gitsafe-backup main` (the feature branch itself can't be pushed — see "Why not pushed" above).
-2. Possible follow-ups the user hinted at: dedupe **across the whole brand/system** (cost-upload dedupe is within-file only); persist bands so reconcile can re-apply them across band boundaries.
+A. ✅ **Cost Uploads review** (`/admin/cost-uploads`) — **TESTED OK by the user 2026-06-25.** (Duplicate block + live-clear, big-change confirm tick, missing-info skip, keep/remove carry-forward, status filter, Notes column — all working.)
+B. **Current Costs editor** (`/admin/current-costs`) — pick a brand → live costs + "published N days ago" badge → edit a few costs/notes → **Review & apply** → confirm dialog lists every affected customer price → **Confirm & apply** republishes + reprices. Verify toast counts + that customer prices actually moved.
+C. **Price List Builder layout** (`/admin/price-builder`, `eafe2fc`) — list panel is slimmer, working sheet wider/taller; the **collapse toggle** (PanelLeft icon, top-left of the sheet header) hides/shows the saved-lists panel. Check it feels roomy and the toggle works.
+D. **Customer Assignments overview** (`/admin/assignments`, NEW `eafe2fc`) — brand → list → customers; lists with 0 customers show amber; search filters by customer/list/brand. Confirm it shows the real assignments.
+E. **Clarity-pass wording** (`d15a9ec`) — sidebar tools numbered 1–6; "Step N" helper lines; relabelled buttons ("Check for cost changes", "Bulk price (cost bands)"); below-cost line counter; "nothing changes until Confirm" in the Current Costs dialog. Just sanity-check the wording reads well.
+
+**Possible follow-ups the user hinted at (not started):**
+- Dedupe **across the whole brand/system** (cost-upload dedupe is within-file only).
+- Persist bands on a list so reconcile can re-apply them when a cost crosses a band boundary (currently apply-time only).
+- Fully delete the legacy Price Lists page + its v1 backend once confident (currently just hidden from the sidebar; route still registered in `App.tsx`).
 
 ## ✅ FIXED 2026-06-24 — cost-upload EAN matching (was: KNOWN BUG below)
 
