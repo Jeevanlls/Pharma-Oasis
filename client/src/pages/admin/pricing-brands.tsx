@@ -75,7 +75,7 @@ export default function PricingBrandsPage() {
               <Building2 className="h-6 w-6" /> Pricing Brands
             </h1>
             <p className="text-muted-foreground">
-              Standalone brands for the customer-pricing side — separate from the public catalogue brands.
+              <b>Step 1.</b> Add the brands you price for. Each brand gets its own cost uploads and price lists. (Separate from the public catalogue brands.)
             </p>
           </div>
           <Button onClick={openCreate} data-testid="button-add-brand">

@@ -69,7 +69,7 @@ export default function AssignmentsPage() {
             <Users className="h-6 w-6" /> Customer Assignments
           </h1>
           <p className="text-muted-foreground">
-            A clear picture of which customers see which price list, for each brand. A customer can only be on
+            <b>Step 6.</b> A clear picture of which customers see which price list, for each brand. A customer can only be on
             one list per brand — change assignments from the <b>Price List Builder</b>.
           </p>
         </div>

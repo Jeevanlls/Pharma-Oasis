@@ -67,12 +67,12 @@ const mainMenuItems = [
 ];
 
 const pricingMenuItems = [
-  { title: "Pricing Brands", href: "/admin/pricing-brands", icon: Building2, staffAccess: false },
-  { title: "Pricing Categories", href: "/admin/pricing-categories", icon: Tag, staffAccess: false },
-  { title: "Cost Uploads", href: "/admin/cost-uploads", icon: FileUp, staffAccess: false },
-  { title: "Current Costs", href: "/admin/current-costs", icon: PoundSterling, staffAccess: false },
-  { title: "Price List Builder", href: "/admin/price-builder", icon: Coins, staffAccess: false },
-  { title: "Customer Assignments", href: "/admin/assignments", icon: Users, staffAccess: false },
+  { title: "1. Brands", href: "/admin/pricing-brands", icon: Building2, staffAccess: false },
+  { title: "2. Categories", href: "/admin/pricing-categories", icon: Tag, staffAccess: false },
+  { title: "3. Cost Uploads", href: "/admin/cost-uploads", icon: FileUp, staffAccess: false },
+  { title: "4. Current Costs", href: "/admin/current-costs", icon: PoundSterling, staffAccess: false },
+  { title: "5. Price Lists", href: "/admin/price-builder", icon: Coins, staffAccess: false },
+  { title: "6. Who Sees What", href: "/admin/assignments", icon: Users, staffAccess: false },
   // Legacy "Price Lists" page hidden from the sidebar — superseded by the Price List Builder.
   // Route still registered in App.tsx (/admin/price-lists) so it's reversible; no data removed.
   // { title: "Price Lists (legacy)", href: "/admin/price-lists", icon: Coins, staffAccess: false },

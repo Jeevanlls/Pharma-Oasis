@@ -104,6 +104,13 @@ export default function PriceBuilderPage() {
     if (!ps.length) return null;
     return { min: Math.min(...ps), max: Math.max(...ps) };
   }, [items, edits]);
+  const belowCostCount = useMemo(
+    () => items.filter((it) => {
+      const m = merged(it); const c = num(m.costPrice); const p = livePrice(m);
+      return p != null && c != null && p < c;
+    }).length,
+    [items, edits],
+  );
 
   const editItem = (id: number, patch: Partial<PriceListItem>) => {
     setManualIds((prev) => { const n = new Set(prev); n.add(id); return n; });
@@ -234,7 +241,7 @@ export default function PriceBuilderPage() {
               <Coins className="h-6 w-6" /> Price List Builder
             </h1>
             <p className="text-muted-foreground">
-              A working sheet: see each product's cost and selling price, set one margin for all, override a few lines, then save &amp; assign.
+              <b>Step 5.</b> Set your selling prices for one brand. Pick a list on the left, set a margin, tweak any lines, then <b>Save</b> and choose who gets it.
             </p>
           </div>
           <Button onClick={() => setCreateOpen(true)} data-testid="button-new-list">
@@ -261,7 +268,10 @@ export default function PriceBuilderPage() {
                     <Badge variant={l.status === "published" ? "default" : "secondary"}>{l.status}</Badge>
                   </div>
                   <div className="text-xs text-muted-foreground mt-1">
-                    {l.brandName ?? "—"} · {l.itemCount} items · {l.customerCount} customers
+                    {l.brandName ?? "—"} · {l.itemCount} items ·{" "}
+                    <span className={l.customerCount === 0 ? "text-amber-600 font-medium" : ""}>
+                      {l.customerCount} customers
+                    </span>
                   </div>
                 </button>
               ))}
@@ -299,8 +309,8 @@ export default function PriceBuilderPage() {
                       <Button size="sm" variant="outline" onClick={() => setAssignOpen(true)} data-testid="button-assign">
                         <Users className="h-4 w-4 mr-1" /> Assign ({selected.customerCount})
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => setReconcileOpen(true)} title="Review a new supplier cost before applying" data-testid="button-reconcile">
-                        <RefreshCw className="h-4 w-4 mr-1" /> Review new cost
+                      <Button size="sm" variant="outline" onClick={() => setReconcileOpen(true)} title="Compare this list to the brand's latest published costs" data-testid="button-reconcile">
+                        <RefreshCw className="h-4 w-4 mr-1" /> Check for cost changes
                       </Button>
                       {selected.status === "published" ? (
                         <Button size="sm" variant="outline" onClick={() => setStatus.mutate("draft")}>Unpublish</Button>
@@ -339,7 +349,7 @@ export default function PriceBuilderPage() {
                           </div>
                         </div>
                         <div>
-                          <Label htmlFor="bulk-margin" className="text-xs">Margin % for all lines</Label>
+                          <Label htmlFor="bulk-margin" className="text-xs">Set one margin % for every line</Label>
                           <div className="flex gap-1">
                             <Input id="bulk-margin" className="w-24" type="number" value={bulkMargin}
                               onChange={(e) => setBulkMargin(e.target.value)} placeholder="e.g. 20" data-testid="input-bulk-margin" />
@@ -347,9 +357,9 @@ export default function PriceBuilderPage() {
                           </div>
                         </div>
                         <div>
-                          <Label className="text-xs">Or price by cost band / cost+£</Label>
+                          <Label className="text-xs">Or price by cost band</Label>
                           <Button variant="outline" className="w-full" onClick={() => setBulkOpen(true)} data-testid="button-bulk-pricing">
-                            <SlidersHorizontal className="h-4 w-4 mr-1" /> Bands &amp; Cost+£
+                            <SlidersHorizontal className="h-4 w-4 mr-1" /> Bulk price (cost bands)
                           </Button>
                         </div>
                         <Button onClick={() => saveItems.mutate()} disabled={!dirtyCount || saveItems.isPending} data-testid="button-save-items">
@@ -361,6 +371,11 @@ export default function PriceBuilderPage() {
                       <div className="text-xs text-muted-foreground flex gap-4 flex-wrap">
                         <span>Showing {filtered.length} of {items.length}</span>
                         <span>{overrides} line override(s)</span>
+                        {belowCostCount > 0 && (
+                          <span className="text-destructive font-medium flex items-center gap-1">
+                            <AlertTriangle className="h-3 w-3" /> {belowCostCount} line(s) priced below cost
+                          </span>
+                        )}
                         {dirtyCount > 0 && <span className="text-amber-600 font-medium">{dirtyCount} unsaved — review prices, then Save</span>}
                       </div>
 

@@ -141,7 +141,7 @@ export default function AdminCurrentCostsPage() {
       <div>
         <h1 className="text-2xl font-bold">Current Costs</h1>
         <p className="text-muted-foreground">
-          See and quickly edit a brand's live cost prices without re-uploading a file. Changing a cost will update the
+          <b>Step 4 (optional).</b> Quickly fix a brand's live cost prices without re-uploading a file. Changing a cost updates the
           customer prices built from it — you'll see exactly what changes before confirming.
         </p>
       </div>
@@ -264,7 +264,7 @@ export default function AdminCurrentCostsPage() {
             <DialogTitle>Confirm cost changes</DialogTitle>
             <DialogDescription>
               {preview && preview.itemsAffected > 0
-                ? <>These cost changes will update <strong>{preview.itemsAffected} customer price(s)</strong> across <strong>{preview.listsAffected} price list(s)</strong>. Review the new customer prices below, then confirm.</>
+                ? <>These cost changes will update <strong>{preview.itemsAffected} customer price(s)</strong> across <strong>{preview.listsAffected} price list(s)</strong>. Review the new customer prices below. <strong>Nothing changes until you press Confirm &amp; apply.</strong></>
                 : <>{preview?.costsChanged ?? 0} cost(s) will change. No customer price lists reference these products yet, so no customer prices change.</>}
             </DialogDescription>
           </DialogHeader>

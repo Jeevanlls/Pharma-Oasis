@@ -207,7 +207,7 @@ export default function AdminCostUploadsPage() {
     <div className="space-y-6 max-w-6xl">
       <div>
         <h1 className="text-2xl font-bold">Cost Uploads</h1>
-        <p className="text-muted-foreground">Upload supplier cost prices per brand. Review the preview, then publish to make costs live.</p>
+        <p className="text-muted-foreground"><b>Step 3.</b> Upload a supplier cost file for a brand. Review the preview, then <b>Publish</b> to make those costs live.</p>
       </div>
 
       {alerts.length > 0 && (

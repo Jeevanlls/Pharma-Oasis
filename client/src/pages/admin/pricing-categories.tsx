@@ -71,7 +71,7 @@ export default function PricingCategoriesPage() {
               <Tag className="h-6 w-6" /> Pricing Categories
             </h1>
             <p className="text-muted-foreground">
-              Standalone categories for the pricing side. Cost uploads auto-create these from the file's Category: blocks; add or tidy them here.
+              <b>Step 2 (optional).</b> Groups for your products. Cost uploads create these automatically from the file's Category: blocks — add or tidy them here.
             </p>
           </div>
           <Button onClick={() => { reset(); setOpen(true); }} data-testid="button-add-category">
