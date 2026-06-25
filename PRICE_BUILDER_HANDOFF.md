@@ -2,6 +2,19 @@
 
 _Last updated: 2026-06-25. Written so a new agent (or future session) can continue seamlessly._
 
+## 🚨 PRODUCTION / DATABASE TOPOLOGY (verified 2026-06-25 — read before any DB work or deploy)
+
+- **The app (dev AND the deployed Cloud Run app) use the SAME Neon database.** `server/db.ts` prefers `NEON_DATABASE_URL` → Neon cloud `neondb` (host `ep-broad-bread-...eu-west-2.aws.neon.tech`). `.replit` deploys the same server code with `[userenv.shared]` env, so **dev and production share one live Neon DB.** There is **no separate prod DB and no data migration on deploy** — deploying just ships code pointing at this one DB.
+- `DATABASE_URL` (Replit-internal `heliumdb`, host "helium") is **unused by the app** — only `drizzle-kit push` targets it (which is why push doesn't migrate the live DB — see the migration gotcha below).
+- **Implication:** publishing/deploying will NOT lose data (nothing is migrated). But any DB cleanup happens directly on the **live** DB, which already holds **22 real customer accounts** (real businesses) — those must NEVER be deleted.
+
+## 🧹 DEFERRED: pre-launch customer-pricing cleanup (DO NOT run yet — user testing more first)
+
+The user wants to keep testing (more brand uploads, assigning customers) and develop further **before** any cleanup. **Do not delete anything until the user explicitly says go, and only after a Neon snapshot/point-in-time backup exists.** When the time comes, the user will pick the scope:
+- **(A) Full wipe:** clear `customer_price_lists`, `price_list_items`, `price_lists`, `cost_upload_rows`, `cost_uploads`, `pricing_categories`, `pricing_brands` → empty pricing section.
+- **(B) Keep brand + real costs:** keep `pricing_brands` (Applied Nutrition, id 3) + its published cost upload; delete only the test price lists (ids 8 "Applied test", 9 "TEst 25/06", 11 "test applied nuti - again") + their items, the test/superseded cost uploads, and the 3 test assignments.
+- **NEVER touch the `users` table / customer accounts** (22 real customers). Inventory snapshot as of 2026-06-25: 1 brand, 3 test price lists, 4 cost uploads (1 orphaned at brand 288), 1,239 price_list_items, 3 customer_price_lists, 0 orders.
+
 ## Where we are
 
 Working on branch **`feature/price-list-builder`** (off `main`, NOT yet merged). Commits, all built + committed:
