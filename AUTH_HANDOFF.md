@@ -61,6 +61,13 @@ The work was done in phases (P1 → P2 → P3).
 
 **Verified:** 22-assertion end-to-end HTTP test passed (staff unaffected; admin forced to enrol; wrong code rejected; correct code + backup code log in; backup codes single-use; secret/backup codes never leaked via `/me`; disable requires password and re-prompts setup). Type-checks clean; `npm run build` succeeds.
 
+### "Remember this device for 30 days" (trusted devices)
+On the code-entry screen an admin can tick **"Remember this device for 30 days"**. After a valid code, the browser gets an http-only cookie (`po_td`); for 30 days that browser **skips the code step** (password is still required). Other browsers still need a code.
+- Storage: `trusted_devices` table (`server/trusted-devices.ts`, table in `shared/schema.ts` + created in `server/db.ts`). The cookie holds a random token; only its **SHA-256 hash** is stored, with a 30-day expiry.
+- Manage on the Security page: shows how many devices are remembered + **"Forget all trusted devices"** (also cleared automatically when 2FA is turned off).
+- Endpoints: `GET /api/admin/2fa/trusted-devices` (count), `POST /api/admin/2fa/forget-devices`. The skip is applied in `/api/auth/login`; the cookie is set in `/api/auth/login/2fa` when `rememberDevice` is true.
+- **Verified:** 14-assertion end-to-end test passed (remember sets cookie; trusted browser skips the code; token stored hashed; other browsers still prompted; forget + disable both revoke).
+
 ### 🔑 BREAK-GLASS — if an admin is locked out of 2FA
 If someone loses both their authenticator app **and** their backup codes, clear 2FA directly on the Neon DB, then they can sign in with just their password and re-enrol:
 ```sql
@@ -76,7 +83,9 @@ WHERE email = 'their@email.com';
 
 2. **Rotate the original live admin password.** Per P1's note, `admin@pharmaoasis.com` still has its **old password** until done operationally. Now that invites work: create a fresh owner admin via invite (or Forgot Password), verify it works, then change/retire the old credential. **Do this against the live Neon DB carefully — 22 real customer accounts live there; never delete users.** Note: with P4 live, the first time any admin signs in they'll be required to set up 2FA.
 
-3. **Hands-on test of 2FA** (built + automated-tested, not yet click-tested by a human): sign in at `/staff` as an admin → you should be walked through the QR setup → confirm with Google Authenticator → save the backup codes → land in `/admin`. Next sign-in should ask for a code. Check the **Security (2FA)** page (`/admin/security`) for regenerate/disable. Keep the break-glass SQL above handy the first time.
+3. **Hands-on test of 2FA** (built + automated-tested, not yet click-tested by a human): sign in at `/staff` as an admin → you should be walked through the QR setup → confirm with Google Authenticator → save the backup codes → land in `/admin`. Next sign-in should ask for a code; tick **"Remember this device for 30 days"** to skip it next time. Check the **Security (2FA)** page (`/admin/security`) for regenerate/disable/forget-devices. Keep the break-glass SQL above handy the first time.
+
+4. **⚠️ Set `SESSION_SECRET` in production.** `server/session-store.ts` falls back to a hardcoded dev default (`"pharma-oasis-dev-secret-change-in-production"`). If that default is used in production, login sessions can be forged. Set a strong random `SESSION_SECRET` env var on the deployed app. (Also set `SITE_URL` so invite/reset links point at the live domain.)
 
 ## Quick reference
 

@@ -69,6 +69,19 @@ export const users = pgTable("users", {
 });
 
 // ============================================
+// TRUSTED DEVICES (2FA "remember this device")
+// ============================================
+export const trustedDevices = pgTable("trusted_devices", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  tokenHash: varchar("token_hash", { length: 64 }).notNull(), // sha256 of the device token
+  label: varchar("label", { length: 255 }), // e.g. browser/user-agent hint
+  expiresAt: timestamp("expires_at").notNull(),
+  lastUsedAt: timestamp("last_used_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ============================================
 // BRANDS TABLE
 // ============================================
 export const brands = pgTable("brands", {

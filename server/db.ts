@@ -187,3 +187,21 @@ pool.query(`
   UPDATE price_lists SET published_at = updated_at WHERE status = 'published' AND published_at IS NULL;
 `).then(() => console.log('Customer pricing & portal tables ready'))
   .catch((err: Error) => console.warn('Customer pricing tables setup:', err.message));
+
+// ============================================================
+// Trusted devices for 2FA ("remember this device for 30 days")
+// ============================================================
+pool.query(`
+  CREATE TABLE IF NOT EXISTS trusted_devices (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    token_hash VARCHAR(64) NOT NULL,
+    label VARCHAR(255),
+    expires_at TIMESTAMP NOT NULL,
+    last_used_at TIMESTAMP,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+  );
+  CREATE INDEX IF NOT EXISTS idx_trusted_devices_token ON trusted_devices(token_hash);
+  CREATE INDEX IF NOT EXISTS idx_trusted_devices_user ON trusted_devices(user_id);
+`).then(() => console.log('Trusted devices table ready'))
+  .catch((err: Error) => console.warn('Trusted devices setup:', err.message));

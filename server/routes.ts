@@ -24,6 +24,14 @@ import {
   generateBackupCodes,
   consumeBackupCode,
 } from "./twofa";
+import {
+  rememberDevice,
+  isDeviceTrusted,
+  forgetAllDevices,
+  countTrustedDevices,
+  TRUSTED_COOKIE,
+  TRUSTED_DAYS,
+} from "./trusted-devices";
 import { z } from "zod";
 import { processImage, deleteImageFile, validateImageFile, getImageCategories, isValidImageCategory } from "./imageProcessor";
 import { ObjectStorageService, ObjectNotFoundError, ObjectStorageConfigError } from "./objectStorage";
@@ -74,6 +82,31 @@ function publicUser(user: any) {
   if (!user) return user;
   const { passwordHash, twoFactorSecret, twoFactorBackupCodes, ...rest } = user;
   return rest;
+}
+
+// Read a single cookie value from the raw header (no cookie-parser in use).
+function readCookie(req: any, name: string): string | undefined {
+  const header = req.headers?.cookie;
+  if (!header) return undefined;
+  for (const part of header.split(";")) {
+    const [k, ...v] = part.trim().split("=");
+    if (k === name) return decodeURIComponent(v.join("="));
+  }
+  return undefined;
+}
+
+function setTrustedCookie(res: any, token: string) {
+  res.cookie(TRUSTED_COOKIE, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: TRUSTED_DAYS * 24 * 60 * 60 * 1000,
+    path: "/",
+  });
+}
+
+function clearTrustedCookie(res: any) {
+  res.clearCookie(TRUSTED_COOKIE, { path: "/" });
 }
 
 export async function registerRoutes(server: Server, app: Express): Promise<void> {
@@ -228,6 +261,19 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
       // NOT grant the session yet — we stash a pending id and require a second step.
       if (user.role === "admin") {
         if ((user as any).twoFactorEnabled) {
+          // Skip the code step if this browser is a remembered/trusted device.
+          const trusted = await isDeviceTrusted(user.id, readCookie(req, TRUSTED_COOKIE));
+          if (trusted) {
+            req.session.regenerate((err) => {
+              if (err) {
+                console.error("Session regeneration error:", err);
+                return res.status(500).json({ message: "Login failed" });
+              }
+              req.session.userId = user.id;
+              return res.json({ user: publicUser(user) });
+            });
+            return;
+          }
           // 2FA is set up → require an authenticator code.
           req.session.regenerate((err) => {
             if (err) {
@@ -481,12 +527,19 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
         return res.status(401).json({ message: "That code wasn't valid. Try again." });
       }
 
+      // Optionally remember this browser so it can skip the code for 30 days.
+      let trustToken: string | null = null;
+      if (req.body?.rememberDevice === true) {
+        trustToken = await rememberDevice(user.id, req.headers["user-agent"] as string | undefined);
+      }
+
       req.session.regenerate((err) => {
         if (err) {
           console.error("Session regeneration error:", err);
           return res.status(500).json({ message: "Login failed" });
         }
         req.session.userId = user.id;
+        if (trustToken) setTrustedCookie(res, trustToken);
         res.json({ user: publicUser(user) });
       });
     } catch (error) {
@@ -569,10 +622,36 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
         twoFactorSecret: null,
         twoFactorBackupCodes: null,
       } as any);
+      // Turning 2FA off invalidates any remembered devices.
+      await forgetAllDevices(user.id);
+      clearTrustedCookie(res);
       res.json({ disabled: true });
     } catch (error) {
       console.error("2FA disable error:", error);
       res.status(500).json({ message: "Could not disable 2FA." });
+    }
+  });
+
+  // How many browsers are currently remembered for this admin.
+  app.get("/api/admin/2fa/trusted-devices", requireAdmin, async (req: any, res) => {
+    try {
+      const count = await countTrustedDevices(req.user.id);
+      res.json({ count });
+    } catch (error) {
+      console.error("2FA trusted-devices count error:", error);
+      res.status(500).json({ message: "Could not load trusted devices." });
+    }
+  });
+
+  // Forget all remembered devices (every browser will need a code next sign-in).
+  app.post("/api/admin/2fa/forget-devices", requireAdmin, async (req: any, res) => {
+    try {
+      await forgetAllDevices(req.user.id);
+      clearTrustedCookie(res);
+      res.json({ ok: true });
+    } catch (error) {
+      console.error("2FA forget-devices error:", error);
+      res.status(500).json({ message: "Could not forget devices." });
     }
   });
 

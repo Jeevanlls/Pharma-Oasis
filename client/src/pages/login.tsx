@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
@@ -22,6 +23,7 @@ export default function LoginPage({ adminMode = false }: { adminMode?: boolean }
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState<Step>("credentials");
   const [code, setCode] = useState("");
+  const [rememberDevice, setRememberDevice] = useState(false);
   // Setup (first-time enrolment) state
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [secret, setSecret] = useState<string>("");
@@ -81,7 +83,7 @@ export default function LoginPage({ adminMode = false }: { adminMode?: boolean }
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ code }),
+      body: JSON.stringify({ code, rememberDevice }),
     });
     const data = await res.json();
     setIsLoading(false);
@@ -218,6 +220,18 @@ export default function LoginPage({ adminMode = false }: { adminMode?: boolean }
                   <p className="text-xs text-muted-foreground">
                     Lost your phone? Enter one of your backup codes instead.
                   </p>
+                </div>
+                <div className="flex items-start gap-2">
+                  <Checkbox
+                    id="remember-device"
+                    checked={rememberDevice}
+                    onCheckedChange={(v) => setRememberDevice(v === true)}
+                    data-testid="checkbox-remember-device"
+                  />
+                  <Label htmlFor="remember-device" className="text-sm font-normal leading-snug">
+                    Remember this device for 30 days
+                    <span className="block text-xs text-muted-foreground">Only on your own private computer.</span>
+                  </Label>
                 </div>
                 <Button type="submit" className="w-full" disabled={isLoading} data-testid="button-verify-2fa">
                   {isLoading ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />Verifying...</>) : "Verify & Sign In"}

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,7 +10,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
-import { ShieldCheck, ShieldAlert, KeyRound, Loader2 } from "lucide-react";
+import { ShieldCheck, ShieldAlert, KeyRound, Loader2, Smartphone } from "lucide-react";
 
 export default function AdminSecurityPage() {
   const { user, refetch } = useAuth();
@@ -23,6 +23,29 @@ export default function AdminSecurityPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [newCodes, setNewCodes] = useState<string[] | null>(null);
+  const [trustedCount, setTrustedCount] = useState<number | null>(null);
+
+  const loadTrusted = useCallback(async () => {
+    if (!enabled) return;
+    try {
+      const res = await fetch("/api/admin/2fa/trusted-devices", { credentials: "include" });
+      if (res.ok) setTrustedCount((await res.json()).count ?? 0);
+    } catch { /* ignore */ }
+  }, [enabled]);
+
+  useEffect(() => { loadTrusted(); }, [loadTrusted]);
+
+  const forgetDevices = async () => {
+    setBusy(true);
+    const res = await fetch("/api/admin/2fa/forget-devices", { method: "POST", credentials: "include" });
+    setBusy(false);
+    if (res.ok) {
+      toast({ title: "Trusted devices cleared", description: "Every browser will need a code at next sign-in." });
+      setTrustedCount(0);
+    } else {
+      toast({ title: "Could not clear devices", variant: "destructive" });
+    }
+  };
 
   const closeDialogs = () => {
     setRegenOpen(false);
@@ -105,6 +128,26 @@ export default function AdminSecurityPage() {
                 </Button>
                 <Button variant="destructive" onClick={() => setDisableOpen(true)} data-testid="button-disable-2fa">
                   Turn off 2FA
+                </Button>
+              </div>
+
+              <div className="border-t pt-4">
+                <h4 className="font-medium text-sm flex items-center gap-2"><Smartphone className="h-4 w-4" /> Trusted devices</h4>
+                <p className="text-sm text-muted-foreground mt-1">
+                  At sign-in you can tick <em>"Remember this device for 30 days"</em> to skip the code on that browser.
+                  {trustedCount !== null && (
+                    <> Currently remembered: <strong data-testid="text-trusted-count">{trustedCount}</strong> {trustedCount === 1 ? "device" : "devices"}.</>
+                  )}
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-3"
+                  onClick={forgetDevices}
+                  disabled={busy || trustedCount === 0}
+                  data-testid="button-forget-devices"
+                >
+                  Forget all trusted devices
                 </Button>
               </div>
             </>
