@@ -33,6 +33,7 @@ import {
   UserX,
   UserCheck,
   Eye,
+  Send,
 } from "lucide-react";
 
 type StaffUser = Omit<User, "passwordHash">;
@@ -52,10 +53,14 @@ const statusConfig: Record<string, { label: string; variant: "default" | "second
 export default function AdminStaffPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState<StaffUser | null>(null);
   const [newStaffEmail, setNewStaffEmail] = useState("");
   const [newStaffPassword, setNewStaffPassword] = useState("");
   const [newStaffName, setNewStaffName] = useState("");
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteName, setInviteName] = useState("");
+  const [inviteRole, setInviteRole] = useState<"admin" | "staff">("staff");
   const [pendingActionId, setPendingActionId] = useState<number | null>(null);
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
@@ -81,6 +86,32 @@ export default function AdminStaffPage() {
         title: "Failed to create staff member", 
         description: error?.message || "Please try again",
         variant: "destructive" 
+      });
+    },
+  });
+
+  const inviteMutation = useMutation({
+    mutationFn: async (data: { email: string; primaryContactName: string; role: "admin" | "staff" }) => {
+      return apiRequest("POST", "/api/admin/team/invite", data);
+    },
+    onSuccess: (result: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/staff"] });
+      toast({
+        title: "Invite sent",
+        description: result?.inviteSent === false
+          ? "Account created, but the invite email could not be sent. Use Forgot Password to set their password."
+          : `An invite email was sent to ${inviteEmail}. The link is valid for 7 days.`,
+      });
+      setInviteDialogOpen(false);
+      setInviteEmail("");
+      setInviteName("");
+      setInviteRole("staff");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to send invite",
+        description: error?.message || "Please try again",
+        variant: "destructive",
       });
     },
   });
@@ -150,6 +181,19 @@ export default function AdminStaffPage() {
     });
   };
 
+  const handleInvite = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inviteEmail || !inviteName) {
+      toast({ title: "Please enter a name and email", variant: "destructive" });
+      return;
+    }
+    inviteMutation.mutate({
+      email: inviteEmail,
+      primaryContactName: inviteName,
+      role: inviteRole,
+    });
+  };
+
   const handleToggleStatus = (staff: StaffUser) => {
     if (staff.id === currentUser?.id) {
       toast({ title: "You cannot change your own status", variant: "destructive" });
@@ -186,11 +230,74 @@ export default function AdminStaffPage() {
             Manage admin and staff accounts
           </p>
         </div>
+        <div className="flex flex-wrap items-center gap-2">
+        <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
+          <DialogTrigger asChild>
+            <Button data-testid="button-invite-team">
+              <Send className="h-4 w-4 mr-2" />
+              Invite by Email
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <form onSubmit={handleInvite}>
+              <DialogHeader>
+                <DialogTitle>Invite a Team Member</DialogTitle>
+                <DialogDescription>
+                  Send an email invite. They set their own password — you never type one for them. The link is valid for 7 days.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="invite-name">Full Name</Label>
+                  <Input
+                    id="invite-name"
+                    value={inviteName}
+                    onChange={(e) => setInviteName(e.target.value)}
+                    placeholder="John Smith"
+                    data-testid="input-invite-name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="invite-email">Email</Label>
+                  <Input
+                    id="invite-email"
+                    type="email"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    placeholder="person@pharmaoasis.com"
+                    data-testid="input-invite-email"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="invite-role">Role</Label>
+                  <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as "admin" | "staff")}>
+                    <SelectTrigger id="invite-role" data-testid="select-invite-role">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="staff">Staff — limited access (Products, Categories, Brands)</SelectItem>
+                      <SelectItem value="admin">Admin — full access</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setInviteDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={inviteMutation.isPending} data-testid="button-submit-invite">
+                  {inviteMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Send Invite
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
         <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
           <DialogTrigger asChild>
-            <Button data-testid="button-create-staff">
+            <Button variant="outline" data-testid="button-create-staff">
               <Plus className="h-4 w-4 mr-2" />
-              Add Staff Member
+              Add with Password
             </Button>
           </DialogTrigger>
           <DialogContent>
@@ -247,6 +354,7 @@ export default function AdminStaffPage() {
             </form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       <div className="relative max-w-md">

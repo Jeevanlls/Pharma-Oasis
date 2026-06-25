@@ -1025,6 +1025,58 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     }
   });
 
+  // Invite an admin or staff member by email — they set their own password (no password typed by the owner).
+  const inviteSchema = z.object({
+    email: z.string().email(),
+    primaryContactName: z.string().min(1),
+    role: z.enum(["admin", "staff"]),
+  });
+  app.post("/api/admin/team/invite", requireAdmin, async (req, res) => {
+    try {
+      const data = inviteSchema.parse(req.body);
+      const email = data.email.toLowerCase().trim();
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ message: "An account with this email already exists" });
+      }
+
+      const crypto = await import("node:crypto");
+      // Random placeholder password (never used — they set their own via the invite link).
+      const passwordHash = await bcrypt.hash(crypto.randomBytes(24).toString("hex"), 12);
+      const token = crypto.randomBytes(32).toString("hex");
+      const expiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
+      const user = await storage.createUser({
+        email,
+        passwordHash,
+        role: data.role,
+        status: "active",
+        primaryContactName: data.primaryContactName,
+        passwordResetToken: token,
+        passwordResetExpiry: expiry,
+      } as any);
+
+      const SITE_URL = process.env.SITE_URL || "https://pharmaoasis.co.uk";
+      const inviteUrl = `${SITE_URL}/reset-password?token=${token}`;
+      const { sendInviteEmail } = await import("./email");
+      const emailResult = await sendInviteEmail({
+        email,
+        contactName: data.primaryContactName,
+        roleLabel: data.role === "admin" ? "Administrator" : "Staff member",
+        inviteUrl,
+      });
+
+      const { passwordHash: _, ...safeUser } = user;
+      res.status(201).json({ ...safeUser, inviteSent: emailResult.success });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      console.error("Error inviting team member:", error);
+      res.status(500).json({ message: "Failed to send invite" });
+    }
+  });
+
   // Update staff member (role, status)
   app.patch("/api/admin/staff/:id", requireAdmin, async (req: any, res) => {
     try {

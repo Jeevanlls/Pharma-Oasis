@@ -503,6 +503,46 @@ export async function sendPasswordResetEmail(data: {
   return sendEmail(data.email, subject, html);
 }
 
+export async function sendInviteEmail(data: {
+  email: string;
+  contactName: string;
+  roleLabel: string; // "Administrator" | "Staff member"
+  inviteUrl: string;
+}): Promise<EmailResult> {
+  const subject = `You've been invited to the Pharma Oasis admin`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background: #047857; color: white; padding: 20px; text-align: center;">
+        <h1 style="margin: 0;">Welcome to the team</h1>
+      </div>
+      <div style="padding: 20px; background: #f8fafc;">
+        <p style="font-size: 16px;">Hello ${data.contactName || "there"},</p>
+        <p>You've been invited to the Pharma Oasis admin as a <strong>${data.roleLabel}</strong> (account: <strong>${data.email}</strong>).</p>
+        <p>Click below to set your password and activate your account. This invite is valid for <strong>7 days</strong>.</p>
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${data.inviteUrl}"
+             style="display: inline-block; background: #047857; color: white; padding: 14px 32px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">
+            Set My Password
+          </a>
+        </div>
+        <p style="font-size: 13px; color: #6b7280;">
+          If the button doesn't work, copy and paste this link into your browser:<br/>
+          <a href="${data.inviteUrl}" style="color: #047857; word-break: break-all;">${data.inviteUrl}</a>
+        </p>
+        <div style="padding: 15px; background: #fef3c7; border-radius: 8px; margin: 20px 0;">
+          <p style="margin: 0; color: #92400e; font-size: 13px;">
+            <strong>Didn't expect this?</strong> If you weren't expecting an invite, you can safely ignore this email.
+          </p>
+        </div>
+      </div>
+      <div style="padding: 15px; background: #e2e8f0; text-align: center; font-size: 12px; color: #64748b;">
+        Pharma Oasis &mdash; Your Trusted Wholesale Partner
+      </div>
+    </div>
+  `;
+  return sendEmail(data.email, subject, html);
+}
+
 export async function sendChatLeadNotification(data: {
   name?: string;
   email?: string;
