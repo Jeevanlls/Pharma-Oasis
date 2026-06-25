@@ -1368,13 +1368,18 @@ export type PriceListRule = typeof priceListRules.$inferSelect;
 export const orders = pgTable("orders", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
-  status: varchar("status", { length: 20 }).notNull().default("submitted"), // submitted | confirmed | processing | completed | cancelled
+  status: varchar("status", { length: 20 }).notNull().default("submitted"), // submitted | confirmed | entered | cancelled (legacy: processing | completed)
   priceListId: integer("price_list_id"), // snapshot of which list priced it
+  quoteId: integer("quote_id"), // originating quote, if this order came from an accepted quote (Phase B link)
   totalAmount: decimal("total_amount", { precision: 12, scale: 2 }),
   customerNotes: text("customer_notes"),
   adminNotes: text("admin_notes"),
   adminResponse: text("admin_response"), // reply shown in portal
   respondedAt: timestamp("responded_at"),
+  // Handoff to the external inventory system
+  enteredToInventoryAt: timestamp("entered_to_inventory_at"), // when an admin keyed it into the inventory system
+  enteredBy: integer("entered_by"), // admin user id who marked it entered
+  archivedAt: timestamp("archived_at"), // when it left the active worklist
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

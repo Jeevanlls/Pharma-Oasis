@@ -4770,13 +4770,66 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
 
   // ===== Admin: orders =====
   app.get("/api/admin/orders", requireAdmin, async (req, res) => {
-    res.json(await pricingStore.listAllOrders());
+    // ?archived=true → archived (entered/cancelled) only; ?archived=false → active worklist only; omitted → all
+    const q = req.query.archived;
+    const archived = q === "true" ? true : q === "false" ? false : undefined;
+    res.json(await pricingStore.listAllOrders({ archived }));
+  });
+
+  app.get("/api/admin/orders/stats", requireAdmin, async (req, res) => {
+    res.json(await pricingStore.getOrderStats());
   });
 
   app.get("/api/admin/orders/:id", requireAdmin, async (req, res) => {
     const found = await pricingStore.getOrderWithItems(Number(req.params.id));
     if (!found) return res.status(404).json({ message: "Order not found" });
     res.json(found);
+  });
+
+  // Export an order's lines as CSV (for manual entry / Excel upload into the inventory system).
+  app.get("/api/admin/orders/:id/export", requireAdmin, async (req, res) => {
+    const found = await pricingStore.getOrderWithItems(Number(req.params.id));
+    if (!found) return res.status(404).json({ message: "Order not found" });
+    const csvCell = (v: any) => {
+      const s = v === null || v === undefined ? "" : String(v);
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const header = ["Order", "EAN", "Description", "Quantity", "UnitPrice", "LineTotal"];
+    const rows = found.items.map((it) =>
+      [found.order.id, it.ean ?? "", it.productName ?? it.description ?? "", it.quantity, it.unitPrice ?? "", it.lineTotal ?? ""].map(csvCell).join(","),
+    );
+    const csv = [header.join(","), ...rows].join("\r\n");
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Disposition", `attachment; filename="order-${found.order.id}.csv"`);
+    res.send(csv);
+  });
+
+  // Mark an order as entered into the external inventory system → archives it off the active worklist.
+  app.post("/api/admin/orders/:id/enter", requireAdmin, async (req: any, res) => {
+    try {
+      const order = await pricingStore.enterOrderToInventory(Number(req.params.id), req.user.id);
+      res.json(order);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to mark entered" });
+    }
+  });
+
+  // Bulk: mark many entered, or set a status on many (skips invalid transitions).
+  app.post("/api/admin/orders/bulk", requireAdmin, async (req: any, res) => {
+    try {
+      const ids: number[] = Array.isArray(req.body?.ids) ? req.body.ids.map(Number).filter((n: number) => Number.isFinite(n)) : [];
+      if (!ids.length) return res.status(400).json({ message: "No orders selected." });
+      const action = req.body?.action === "enter"
+        ? { type: "enter" as const, adminId: req.user.id }
+        : req.body?.status
+        ? { type: "status" as const, status: String(req.body.status) }
+        : null;
+      if (!action) return res.status(400).json({ message: "Specify action 'enter' or a status." });
+      const count = await pricingStore.bulkUpdateOrders(ids, action);
+      res.json({ updated: count, requested: ids.length });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Bulk update failed" });
+    }
   });
 
   app.post("/api/admin/orders/:id/respond", requireAdmin, async (req, res) => {
@@ -4790,7 +4843,9 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
       }
       res.json(order);
     } catch (error: any) {
-      res.status(500).json({ message: error.message || "Failed to respond" });
+      const msg = error.message || "Failed to respond";
+      const code = /Cannot change order|not found/i.test(msg) ? 400 : 500;
+      res.status(code).json({ message: msg });
     }
   });
 

@@ -43,7 +43,11 @@ Key files:
 
 ---
 
-## PHASE A — high-volume worklist + clean handoff (BUILDING NOW)
+## PHASE A — high-volume worklist + clean handoff ✅ DONE (2026-06-25)
+
+**Built, type-checked, built clean, and verified by a 15-assertion end-to-end test** (order status rules incl. invalid-transition rejection; CSV export; mark-entered → archives off the active worklist; bulk enter; stats; admin-auth required). New unified **Sales** page at `/admin/sales` (sidebar "Sales (pipeline)"), dashboard now shows an "Orders to handle" alert + Sales quick-action. The existing `/admin/quotes` and `/admin/orders` pages are kept (detailed modals/actions live there; the Sales page links to them via "Open"). Files: `client/src/pages/admin/sales.tsx`, `server/trusted-devices.ts` n/a, `server/pricing-store.ts` (order methods), `server/routes.ts` (order endpoints), `server/db.ts` + `shared/schema.ts` (columns).
+
+_Original Phase A spec below (kept for reference):_
 
 ### Data model changes (orders)
 Added idempotently in `server/db.ts` startup SQL (the project's migration pattern — `db:push` does NOT hit the live Neon DB) + typed in `shared/schema.ts`:

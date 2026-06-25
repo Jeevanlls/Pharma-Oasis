@@ -22,6 +22,7 @@ import {
   Globe,
   AlertCircle,
   Home,
+  ShoppingCart,
 } from "lucide-react";
 
 interface DashboardStats {
@@ -41,6 +42,12 @@ export default function AdminDashboard() {
     queryKey: ["/api/admin/stats"],
     enabled: isAdmin,
   });
+
+  const { data: orderStats } = useQuery<{ newCount: number; toFulfil: number; doneThisWeek: number; activeTotal: number }>({
+    queryKey: ["/api/admin/orders/stats"],
+    enabled: isAdmin,
+  });
+  const ordersToHandle = (orderStats?.newCount || 0) + (orderStats?.toFulfil || 0);
 
   if (!isAdmin) {
     return (
@@ -62,6 +69,7 @@ export default function AdminDashboard() {
   }
 
   const quickActions = [
+    { label: "Sales (orders)", icon: ShoppingCart, href: "/admin/sales", badge: ordersToHandle || undefined },
     { label: "User Approvals", icon: Users, href: "/admin/users", badge: stats?.pendingApprovals },
     { label: "Quote Requests", icon: FileText, href: "/admin/quotes", badge: stats?.pendingQuotes },
     { label: "Products", icon: Package, href: "/admin/products" },
@@ -153,7 +161,7 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {(stats?.pendingApprovals || stats?.pendingQuotes) ? (
+      {(stats?.pendingApprovals || stats?.pendingQuotes || ordersToHandle) ? (
         <Card className="border-orange-200 bg-orange-50/50 dark:border-orange-800 dark:bg-orange-950/20">
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
@@ -163,6 +171,15 @@ export default function AdminDashboard() {
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-4">
+              {ordersToHandle ? (
+                <Link href="/admin/sales">
+                  <Button variant="outline" className="gap-2">
+                    <ShoppingCart className="h-4 w-4" />
+                    {ordersToHandle} Order{ordersToHandle > 1 ? "s" : ""} to handle
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </Link>
+              ) : null}
               {stats?.pendingApprovals ? (
                 <Link href="/admin/users">
                   <Button variant="outline" className="gap-2">

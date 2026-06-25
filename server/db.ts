@@ -185,6 +185,11 @@ pool.query(`
   ALTER TABLE price_lists ADD COLUMN IF NOT EXISTS archived_at TIMESTAMP;
   -- Backfill publish date for lists already live (idempotent: only fills nulls)
   UPDATE price_lists SET published_at = updated_at WHERE status = 'published' AND published_at IS NULL;
+  -- Orders: quote link + inventory-handoff/archive tracking (Sales pipeline Phase A)
+  ALTER TABLE orders ADD COLUMN IF NOT EXISTS quote_id INTEGER;
+  ALTER TABLE orders ADD COLUMN IF NOT EXISTS entered_to_inventory_at TIMESTAMP;
+  ALTER TABLE orders ADD COLUMN IF NOT EXISTS entered_by INTEGER;
+  ALTER TABLE orders ADD COLUMN IF NOT EXISTS archived_at TIMESTAMP;
 `).then(() => console.log('Customer pricing & portal tables ready'))
   .catch((err: Error) => console.warn('Customer pricing tables setup:', err.message));
 

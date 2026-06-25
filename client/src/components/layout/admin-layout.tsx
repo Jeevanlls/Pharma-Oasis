@@ -43,6 +43,7 @@ import {
   FileUp,
   Coins,
   ClipboardList,
+  ShoppingCart,
   PoundSterling,
   BookOpen,
 } from "lucide-react";
@@ -61,6 +62,7 @@ const mainMenuItems = [
   { title: "Products", href: "/admin/products", icon: Package, staffAccess: true },
   { title: "Brands", href: "/admin/brands", icon: Building2, staffAccess: true },
   { title: "Categories", href: "/admin/categories", icon: Tag, staffAccess: true },
+  { title: "Sales (pipeline)", href: "/admin/sales", icon: ShoppingCart, staffAccess: false },
   { title: "Quotes", href: "/admin/quotes", icon: FileText, staffAccess: false },
   { title: "Orders", href: "/admin/orders", icon: ClipboardList, staffAccess: false },
   { title: "CSV Import", href: "/admin/import", icon: Upload, staffAccess: true },

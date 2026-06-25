@@ -55,6 +55,7 @@ import AdminFooterContentPage from "@/pages/admin/footer-content";
 import AdminCompanyLocationsPage from "@/pages/admin/company-locations";
 import AdminStaffPage from "@/pages/admin/staff";
 import AdminSecurityPage from "@/pages/admin/security";
+import AdminSalesPage from "@/pages/admin/sales";
 import AdminAnalyticsPage from "@/pages/admin/analytics";
 import AdminSeoPage from "@/pages/admin/seo";
 import AdminGooglePricingPage from "@/pages/admin/google-pricing";
@@ -171,6 +172,7 @@ function Router() {
       <Route path="/admin/products">{() => <AdminRoute component={AdminProductsPage} />}</Route>
       <Route path="/admin/brands">{() => <AdminRoute component={AdminBrandsPage} />}</Route>
       <Route path="/admin/categories">{() => <AdminRoute component={AdminCategoriesPage} />}</Route>
+      <Route path="/admin/sales">{() => <AdminRoute component={AdminSalesPage} />}</Route>
       <Route path="/admin/quotes">{() => <AdminRoute component={AdminQuotesPage} />}</Route>
       <Route path="/admin/import">{() => <AdminRoute component={AdminImportPage} />}</Route>
       <Route path="/admin/suppliers">{() => <AdminRoute component={AdminSuppliersPage} />}</Route>

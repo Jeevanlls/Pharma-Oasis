@@ -15,7 +15,7 @@ import {
   orders,
   orderItems,
 } from "@shared/schema";
-import { eq, and, desc, ne, lt, sql, inArray } from "drizzle-orm";
+import { eq, and, desc, ne, lt, sql, inArray, isNull, isNotNull, gte } from "drizzle-orm";
 import type {
   CostUpload,
   CostUploadRow,
@@ -406,19 +406,50 @@ export async function getOrderWithItems(
   return { order, items: items.map((r) => ({ ...r.item, productName: r.productName ?? r.item.description })) };
 }
 
-export async function listAllOrders(): Promise<(Order & { companyName: string | null; email: string | null })[]> {
+export async function listAllOrders(
+  opts?: { archived?: boolean },
+): Promise<(Order & { companyName: string | null; email: string | null })[]> {
+  const where =
+    opts?.archived === true ? isNotNull(orders.archivedAt)
+    : opts?.archived === false ? isNull(orders.archivedAt)
+    : undefined;
   const rows = await db
     .select({ order: orders, companyName: users.companyName, email: users.email })
     .from(orders)
     .leftJoin(users, eq(orders.userId, users.id))
+    .where(where as any)
     .orderBy(desc(orders.createdAt));
   return rows.map((r) => ({ ...r.order, companyName: r.companyName, email: r.email }));
+}
+
+// Allowed order status moves. "entered" = keyed into the external inventory
+// system (terminal/archived). Legacy "processing"/"completed" are tolerated.
+const ORDER_TRANSITIONS: Record<string, string[]> = {
+  submitted: ["confirmed", "entered", "cancelled"],
+  confirmed: ["entered", "cancelled"],
+  processing: ["confirmed", "entered", "cancelled"],
+  completed: ["entered", "cancelled"],
+  entered: ["cancelled"],
+  cancelled: [],
+};
+
+export function canTransitionOrder(from: string, to: string): boolean {
+  if (from === to) return true;
+  return (ORDER_TRANSITIONS[from] ?? []).includes(to);
 }
 
 export async function respondToOrder(
   id: number,
   data: { status?: string; adminResponse?: string; adminNotes?: string },
 ): Promise<Order> {
+  // Validate a status change against the allowed transitions.
+  if (data.status) {
+    const [current] = await db.select().from(orders).where(eq(orders.id, id));
+    if (!current) throw new Error("Order not found");
+    if (!canTransitionOrder(current.status, data.status)) {
+      throw new Error(`Cannot change order from "${current.status}" to "${data.status}".`);
+    }
+  }
   const [order] = await db
     .update(orders)
     .set({
@@ -430,6 +461,58 @@ export async function respondToOrder(
     .where(eq(orders.id, id))
     .returning();
   return order;
+}
+
+/** Mark an order as keyed into the external inventory system → archives it off the active worklist. */
+export async function enterOrderToInventory(id: number, adminId: number): Promise<Order> {
+  const now = new Date();
+  const [order] = await db
+    .update(orders)
+    .set({ status: "entered", enteredToInventoryAt: now, enteredBy: adminId, archivedAt: now, updatedAt: now })
+    .where(eq(orders.id, id))
+    .returning();
+  return order;
+}
+
+/** Bulk action over many orders: mark entered, or set a status (validated per order). */
+export async function bulkUpdateOrders(
+  ids: number[],
+  action: { type: "enter"; adminId: number } | { type: "status"; status: string },
+): Promise<number> {
+  if (!ids.length) return 0;
+  let count = 0;
+  for (const id of ids) {
+    try {
+      if (action.type === "enter") {
+        await enterOrderToInventory(id, action.adminId);
+      } else {
+        await respondToOrder(id, { status: action.status });
+      }
+      count++;
+    } catch {
+      // Skip ones whose transition isn't allowed; report how many succeeded.
+    }
+  }
+  return count;
+}
+
+/** Dashboard KPIs for the Sales worklist. */
+export async function getOrderStats(): Promise<{ newCount: number; toFulfil: number; doneThisWeek: number; activeTotal: number }> {
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const [newRow] = await db.select({ n: sql<number>`count(*)::int` }).from(orders)
+    .where(and(eq(orders.status, "submitted"), isNull(orders.archivedAt)));
+  const [fulfilRow] = await db.select({ n: sql<number>`count(*)::int` }).from(orders)
+    .where(and(eq(orders.status, "confirmed"), isNull(orders.archivedAt)));
+  const [doneRow] = await db.select({ n: sql<number>`count(*)::int` }).from(orders)
+    .where(and(isNotNull(orders.enteredToInventoryAt), gte(orders.enteredToInventoryAt, weekAgo)));
+  const [activeRow] = await db.select({ n: sql<number>`count(*)::int` }).from(orders)
+    .where(isNull(orders.archivedAt));
+  return {
+    newCount: newRow?.n ?? 0,
+    toFulfil: fulfilRow?.n ?? 0,
+    doneThisWeek: doneRow?.n ?? 0,
+    activeTotal: activeRow?.n ?? 0,
+  };
 }
 
 /** Ensure a baseline default list exists; returns its id. */
