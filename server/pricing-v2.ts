@@ -968,6 +968,26 @@ export async function assignmentsForCustomer(customerId: number) {
     .where(eq(customerPriceLists.customerId, customerId));
 }
 
+/** Every customer→list assignment, with brand + list + customer names — for the admin Assignments overview. */
+export async function allAssignments() {
+  return db
+    .select({
+      brandId: customerPriceLists.brandId,
+      brandName: pricingBrands.name,
+      priceListId: customerPriceLists.priceListId,
+      listName: priceLists.name,
+      listStatus: priceLists.status,
+      customerId: customerPriceLists.customerId,
+      customerEmail: users.email,
+      customerCompany: users.companyName,
+      assignedAt: customerPriceLists.assignedAt,
+    })
+    .from(customerPriceLists)
+    .leftJoin(pricingBrands, eq(customerPriceLists.brandId, pricingBrands.id))
+    .leftJoin(priceLists, eq(customerPriceLists.priceListId, priceLists.id))
+    .innerJoin(users, eq(customerPriceLists.customerId, users.id));
+}
+
 // ---------------------------------------------------------------
 // PORTAL — what a customer sees (prepared prices across assigned lists)
 // ---------------------------------------------------------------

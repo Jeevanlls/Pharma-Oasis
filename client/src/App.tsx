@@ -68,6 +68,7 @@ import AdminPriceListsPage from "@/pages/admin/price-lists";
 import AdminPricingBrandsPage from "@/pages/admin/pricing-brands";
 import AdminPricingCategoriesPage from "@/pages/admin/pricing-categories";
 import AdminPriceBuilderPage from "@/pages/admin/price-builder";
+import AdminAssignmentsPage from "@/pages/admin/assignments";
 import AdminOrdersPage from "@/pages/admin/orders";
 
 import PortalCataloguePage from "@/pages/portal/catalogue";
@@ -188,6 +189,7 @@ function Router() {
       <Route path="/admin/cost-uploads">{() => <AdminRoute component={AdminCostUploadsPage} />}</Route>
       <Route path="/admin/current-costs">{() => <AdminRoute component={AdminCurrentCostsPage} />}</Route>
       <Route path="/admin/price-lists">{() => <AdminRoute component={AdminPriceListsPage} />}</Route>
+      <Route path="/admin/assignments">{() => <AdminRoute component={AdminAssignmentsPage} />}</Route>
       <Route path="/admin/pricing-brands">{() => <AdminRoute component={AdminPricingBrandsPage} />}</Route>
       <Route path="/admin/pricing-categories">{() => <AdminRoute component={AdminPricingCategoriesPage} />}</Route>
       <Route path="/admin/price-builder">{() => <AdminRoute component={AdminPriceBuilderPage} />}</Route>

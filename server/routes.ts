@@ -4139,6 +4139,11 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
     res.json(await pricingV2.assignmentsForCustomer(parseInt(req.params.id, 10)));
   });
 
+  // Every assignment (which customers are on which list, per brand) — admin Assignments overview.
+  app.get("/api/admin/v2/assignments", requireAdmin, async (_req, res) => {
+    res.json(await pricingV2.allAssignments());
+  });
+
   // ==================== CUSTOMER PRICING — PRICE LISTS (legacy v1) ====================
   app.get("/api/admin/price-lists", requireAdmin, async (req, res) => {
     res.json(await pricingStore.listPriceLists());

@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Coins, Users, RefreshCw, Trash2, Save, CheckCircle2, Search, Eye, AlertTriangle, SlidersHorizontal } from "lucide-react";
+import { Plus, Coins, Users, RefreshCw, Trash2, Save, CheckCircle2, Search, Eye, AlertTriangle, SlidersHorizontal, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 
 interface PricingBrand { id: number; name: string; }
 interface PriceListSummary {
@@ -47,6 +47,7 @@ export default function PriceBuilderPage() {
   const { toast } = useToast();
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [listsOpen, setListsOpen] = useState(true); // collapse the Saved-lists panel for more sheet width
   const [assignOpen, setAssignOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
 
@@ -241,8 +242,9 @@ export default function PriceBuilderPage() {
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-6">
+        <div className={`grid grid-cols-1 gap-4 ${listsOpen ? "lg:grid-cols-[220px_minmax(0,1fr)]" : "lg:grid-cols-1"}`}>
           {/* Lists */}
+          {listsOpen && (
           <Card>
             <CardHeader><CardTitle className="text-base">Saved lists</CardTitle></CardHeader>
             <CardContent className="space-y-2">
@@ -265,6 +267,7 @@ export default function PriceBuilderPage() {
               ))}
             </CardContent>
           </Card>
+          )}
 
           {/* Working sheet */}
           <Card>
@@ -276,12 +279,18 @@ export default function PriceBuilderPage() {
               <>
                 <CardHeader>
                   <div className="flex items-center justify-between flex-wrap gap-2">
-                    <div>
+                    <div className="flex items-start gap-2">
+                      <Button size="icon" variant="ghost" className="mt-0.5 shrink-0" onClick={() => setListsOpen((v) => !v)}
+                        title={listsOpen ? "Hide the saved-lists panel for more room" : "Show the saved-lists panel"} data-testid="button-toggle-lists">
+                        {listsOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
+                      </Button>
+                      <div>
                       <CardTitle>{selected.name}</CardTitle>
                       <CardDescription>
                         {selected.brandName} · {items.length} products · base margin {selected.defaultMarginPercent ?? "—"}%
                         {priceRange && ` · selling £${priceRange.min.toFixed(2)}–£${priceRange.max.toFixed(2)}`}
                       </CardDescription>
+                      </div>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
                       <Button size="sm" variant="outline" onClick={() => setPreviewOpen(true)} data-testid="button-preview-customer">
@@ -355,7 +364,7 @@ export default function PriceBuilderPage() {
                         {dirtyCount > 0 && <span className="text-amber-600 font-medium">{dirtyCount} unsaved — review prices, then Save</span>}
                       </div>
 
-                      <div className="overflow-x-auto max-h-[60vh] overflow-y-auto border rounded-md">
+                      <div className="overflow-x-auto max-h-[72vh] overflow-y-auto border rounded-md">
                         <Table>
                           <TableHeader className="sticky top-0 bg-background z-10">
                             <TableRow>
