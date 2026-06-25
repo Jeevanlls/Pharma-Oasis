@@ -13,7 +13,7 @@ import { PublicLayout } from "@/components/layout/public-layout";
 import { Package, Loader2, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
-export default function LoginPage() {
+export default function LoginPage({ adminMode = false }: { adminMode?: boolean }) {
   const [, setLocation] = useLocation();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +42,7 @@ export default function LoginPage() {
         description: "You have successfully logged in.",
       });
       const redirect = new URLSearchParams(window.location.search).get("redirect");
-      setLocation(redirect || "/products");
+      setLocation(redirect || (adminMode ? "/admin" : "/products"));
     } else {
       setError(result.error || "Login failed. Please check your credentials.");
     }
@@ -58,10 +58,10 @@ export default function LoginPage() {
             </div>
             <div>
               <CardTitle className="text-2xl" style={{ fontFamily: "DM Sans, sans-serif" }}>
-                Welcome Back
+                {adminMode ? "Staff & Admin sign-in" : "Welcome Back"}
               </CardTitle>
               <CardDescription>
-                Sign in to access your account
+                {adminMode ? "Authorised access only." : "Sign in to access your account"}
               </CardDescription>
             </div>
           </CardHeader>
@@ -139,12 +139,14 @@ export default function LoginPage() {
               </Link>
             </div>
 
-            <div className="mt-4 text-center text-sm text-muted-foreground">
-              Don't have an account?{" "}
-              <Link href="/register" className="font-medium text-primary hover:underline">
-                Register as a Customer
-              </Link>
-            </div>
+            {!adminMode && (
+              <div className="mt-4 text-center text-sm text-muted-foreground">
+                Don't have an account?{" "}
+                <Link href="/register" className="font-medium text-primary hover:underline">
+                  Register as a Customer
+                </Link>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

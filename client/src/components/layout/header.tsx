@@ -159,11 +159,8 @@ export function Header() {
               </DropdownMenu>
             ) : (
               <div className="hidden sm:flex items-center gap-2">
-                <Link href="/login">
-                  <Button variant="ghost" size="sm" data-testid="button-login">
-                    Login
-                  </Button>
-                </Link>
+                {/* Admin/staff sign-in is intentionally NOT linked here — it lives at a private URL (/staff).
+                    Customers sign in via the "Customer Portal" button. */}
                 <Link href="/register">
                   <Button size="sm" data-testid="button-register">
                     Register
@@ -273,15 +270,8 @@ export function Header() {
                       </div>
                     ) : (
                       <div className="flex flex-col gap-2">
-                        <Link href="/login">
-                          <Button
-                            variant="outline"
-                            className="w-full"
-                            onClick={() => setMobileMenuOpen(false)}
-                          >
-                            Login
-                          </Button>
-                        </Link>
+                        {/* Admin/staff sign-in lives at a private URL (/staff) and is not linked here.
+                            Customers sign in via "Customer Portal" above. */}
                         <Link href="/register">
                           <Button
                             className="w-full"

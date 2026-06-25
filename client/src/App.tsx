@@ -136,7 +136,9 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={HomePage} />
-      <Route path="/login" component={LoginPage} />
+      <Route path="/login">{() => <LoginPage />}</Route>
+      {/* Private admin/staff sign-in — intentionally NOT linked from the public site. */}
+      <Route path="/staff">{() => <LoginPage adminMode />}</Route>
       <Route path="/forgot-password" component={ForgotPasswordPage} />
       <Route path="/reset-password" component={ResetPasswordPage} />
       <Route path="/register" component={RegisterPage} />
