@@ -176,5 +176,10 @@ pool.query(`
   ALTER TABLE users ADD COLUMN IF NOT EXISTS price_list_id INTEGER;
   ALTER TABLE quote_items ADD COLUMN IF NOT EXISTS unit_cost DECIMAL(10,2);
   ALTER TABLE quote_items ADD COLUMN IF NOT EXISTS margin_applied DECIMAL(6,2);
+  -- Price list publish/archive tracking (v2)
+  ALTER TABLE price_lists ADD COLUMN IF NOT EXISTS published_at TIMESTAMP;
+  ALTER TABLE price_lists ADD COLUMN IF NOT EXISTS archived_at TIMESTAMP;
+  -- Backfill publish date for lists already live (idempotent: only fills nulls)
+  UPDATE price_lists SET published_at = updated_at WHERE status = 'published' AND published_at IS NULL;
 `).then(() => console.log('Customer pricing & portal tables ready'))
   .catch((err: Error) => console.warn('Customer pricing tables setup:', err.message));

@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Users, Search, Coins, ArrowRight } from "lucide-react";
+import { Users, Search, Coins, ArrowRight, CheckCircle2, AlertTriangle } from "lucide-react";
 
 interface Assignment {
   brandId: number | null;
@@ -22,6 +22,7 @@ interface PriceListSummary {
   id: number; name: string; brandId: number | null; brandName: string | null;
   status: string; itemCount: number; customerCount: number;
 }
+interface PricingBrand { id: number; name: string; }
 
 const cust = (a: Pick<Assignment, "customerCompany" | "customerEmail">) =>
   a.customerCompany?.trim() || a.customerEmail;
@@ -30,6 +31,14 @@ export default function AssignmentsPage() {
   const [search, setSearch] = useState("");
   const { data: assignments = [] } = useQuery<Assignment[]>({ queryKey: ["/api/admin/v2/assignments"] });
   const { data: lists = [] } = useQuery<PriceListSummary[]>({ queryKey: ["/api/admin/v2/price-lists"] });
+  const { data: brands = [] } = useQuery<PricingBrand[]>({ queryKey: ["/api/admin/pricing-brands"] });
+
+  // Coverage: a brand is "covered" if it has at least one price list with at least one customer.
+  const coverage = useMemo(() => {
+    const coveredBrandIds = new Set(lists.filter((l) => l.customerCount > 0 && l.brandId != null).map((l) => l.brandId));
+    const gaps = brands.filter((b) => !coveredBrandIds.has(b.id));
+    return { covered: brands.length - gaps.length, total: brands.length, gaps };
+  }, [brands, lists]);
 
   // Group: brand -> list -> customers. Seed from all lists so empty lists show up too.
   const grouped = useMemo(() => {
@@ -78,6 +87,34 @@ export default function AssignmentsPage() {
           <Badge variant="secondary">{customersWithAList} customer(s) assigned</Badge>
           <Badge variant="secondary">{totalCustomers} assignment(s) across brands</Badge>
         </div>
+
+        {/* Brand coverage: make sure every brand has at least one list customers can see */}
+        {brands.length > 0 && (
+          coverage.gaps.length === 0 ? (
+            <div className="rounded-md border border-emerald-200 bg-emerald-50/70 dark:border-emerald-900/50 dark:bg-emerald-950/20 p-3 text-sm flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+              <span>All <b>{coverage.total}</b> brand(s) have customers on a price list. Every brand is covered.</span>
+            </div>
+          ) : (
+            <div className="rounded-md border border-amber-300 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/20 p-3 text-sm">
+              <div className="flex items-center gap-2 font-medium text-amber-800 dark:text-amber-300">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                {coverage.covered} of {coverage.total} brand(s) have customers on a price list — {coverage.gaps.length} need attention.
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                No customer can see prices for these brands yet (no list, or a list with nobody assigned):
+              </p>
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {coverage.gaps.map((b) => <Badge key={b.id} variant="outline" className="border-amber-400 text-amber-800 dark:text-amber-300">{b.name}</Badge>)}
+              </div>
+              <Link href="/admin/price-builder">
+                <span className="text-xs text-emerald-700 dark:text-emerald-400 hover:underline cursor-pointer inline-flex items-center gap-1 mt-2">
+                  Fix in Price List Builder <ArrowRight className="h-3 w-3" />
+                </span>
+              </Link>
+            </div>
+          )
+        )}
 
         <div className="relative max-w-md">
           <Search className="h-4 w-4 absolute left-2 top-2.5 text-muted-foreground" />

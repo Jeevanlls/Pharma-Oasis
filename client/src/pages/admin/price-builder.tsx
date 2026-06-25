@@ -16,12 +16,13 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Coins, Users, RefreshCw, Trash2, Save, CheckCircle2, Search, Eye, AlertTriangle, SlidersHorizontal, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Plus, Coins, Users, RefreshCw, Trash2, Save, CheckCircle2, Search, Eye, AlertTriangle, SlidersHorizontal, PanelLeftClose, PanelLeftOpen, Archive } from "lucide-react";
 
 interface PricingBrand { id: number; name: string; }
 interface PriceListSummary {
   id: number; name: string; brandId: number | null; brandName: string | null;
   defaultMarginPercent: string | null; status: string; itemCount: number; customerCount: number;
+  publishedAt: string | null; updatedAt: string | null;
 }
 interface PriceListItem {
   id: number; ean: string | null; description: string | null; caseSize: string | null;
@@ -43,6 +44,19 @@ function preview(method: string, cost: number | null, margin: number | null, fix
 }
 const availLabel = (qty: number | null) => (qty == null ? "On request" : qty <= 0 ? "Out of stock" : qty < 20 ? `Low (${qty})` : "In stock");
 
+// "Published 3 days ago" style relative date for price-list cards.
+function publishedAgo(iso: string | null): string | null {
+  if (!iso) return null;
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return null;
+  const days = Math.floor((Date.now() - then) / 86400000);
+  if (days <= 0) return "Published today";
+  if (days === 1) return "Published yesterday";
+  if (days < 30) return `Published ${days} days ago`;
+  if (days < 60) return "Published last month";
+  return `Published ${Math.floor(days / 30)} months ago`;
+}
+
 export default function PriceBuilderPage() {
   const { toast } = useToast();
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -50,6 +64,10 @@ export default function PriceBuilderPage() {
   const [listsOpen, setListsOpen] = useState(true); // collapse the Saved-lists panel for more sheet width
   const [assignOpen, setAssignOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+
+  // Saved-lists panel filters
+  const [panelBrand, setPanelBrand] = useState("all"); // "all" or a brandId
+  const [showArchived, setShowArchived] = useState(false);
 
   const [newBrandId, setNewBrandId] = useState("");
   const [newName, setNewName] = useState("");
@@ -76,7 +94,12 @@ export default function PriceBuilderPage() {
   ]);
 
   const { data: brands = [] } = useQuery<PricingBrand[]>({ queryKey: ["/api/admin/pricing-brands"] });
-  const { data: lists = [] } = useQuery<PriceListSummary[]>({ queryKey: ["/api/admin/v2/price-lists"] });
+  // Two-element key so prefix-invalidation of ["/api/admin/v2/price-lists"] still refreshes it.
+  const { data: lists = [] } = useQuery<PriceListSummary[]>({
+    queryKey: ["/api/admin/v2/price-lists", showArchived ? "only" : "active"],
+    queryFn: async () =>
+      (await fetch(`/api/admin/v2/price-lists${showArchived ? "?archived=only" : ""}`, { credentials: "include" })).json(),
+  });
   const { data: detail } = useQuery<{ list: PriceListSummary; brandName: string | null; items: PriceListItem[] }>({
     queryKey: [`/api/admin/v2/price-lists/${selectedId}`],
     enabled: selectedId != null,
@@ -221,20 +244,42 @@ export default function PriceBuilderPage() {
     },
   });
 
+  const archive = useMutation({
+    mutationFn: async (id: number) => apiRequest("POST", `/api/admin/v2/price-lists/${id}/archive`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/v2/price-lists"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/v2/assignments"] });
+      setSelectedId(null);
+      toast({ title: "Price list archived", description: "Customers were unassigned. Find it under Archived to restore." });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const restore = useMutation({
+    mutationFn: async (id: number) => apiRequest("POST", `/api/admin/v2/price-lists/${id}/restore`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/v2/price-lists"] });
+      toast({ title: "Price list restored", description: "It's back as a draft — re-publish and assign customers when ready." });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
   const del = useMutation({
     mutationFn: async (id: number) => apiRequest("DELETE", `/api/admin/v2/price-lists/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/v2/price-lists"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/v2/assignments"] });
       setSelectedId(null);
-      toast({ title: "Price list deleted" });
+      toast({ title: "Price list deleted permanently" });
     },
   });
 
   const selected = lists.find((l) => l.id === selectedId);
+  const panelLists = panelBrand === "all" ? lists : lists.filter((l) => String(l.brandId) === panelBrand);
 
   return (
     <AdminLayout>
-      <div className="p-6 space-y-6">
+      <div className="space-y-4">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">
@@ -253,27 +298,62 @@ export default function PriceBuilderPage() {
           {/* Lists */}
           {listsOpen && (
           <Card>
-            <CardHeader><CardTitle className="text-base">Saved lists</CardTitle></CardHeader>
+            <CardHeader className="pb-2"><CardTitle className="text-base">Saved lists</CardTitle></CardHeader>
             <CardContent className="space-y-2">
-              {lists.length === 0 && <p className="text-muted-foreground text-sm">No price lists yet.</p>}
-              {lists.map((l) => (
-                <button
+              {/* Filters: brand + active/archived */}
+              <Select value={panelBrand} onValueChange={setPanelBrand}>
+                <SelectTrigger className="h-8 text-xs" data-testid="select-panel-brand"><SelectValue placeholder="All brands" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All brands</SelectItem>
+                  {brands.map((b) => <SelectItem key={b.id} value={String(b.id)}>{b.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <div className="flex gap-1">
+                <Button size="sm" variant={!showArchived ? "default" : "outline"} className="flex-1 h-7 text-xs"
+                  onClick={() => { setShowArchived(false); setSelectedId(null); }} data-testid="button-show-active">Active</Button>
+                <Button size="sm" variant={showArchived ? "default" : "outline"} className="flex-1 h-7 text-xs"
+                  onClick={() => { setShowArchived(true); setSelectedId(null); }} data-testid="button-show-archived">Archived</Button>
+              </div>
+
+              {panelLists.length === 0 && (
+                <p className="text-muted-foreground text-sm pt-1">{showArchived ? "No archived lists." : "No price lists yet."}</p>
+              )}
+              {panelLists.map((l) => (
+                <div
                   key={l.id}
-                  onClick={() => { setSelectedId(l.id); setEdits({}); setSearch(""); setBulkMargin(""); setManualIds(new Set()); }}
-                  className={`w-full text-left rounded-md border p-3 hover-elevate ${selectedId === l.id ? "border-primary bg-accent" : ""}`}
+                  className={`w-full rounded-md border p-3 ${selectedId === l.id ? "border-primary bg-accent" : ""}`}
                   data-testid={`list-item-${l.id}`}
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-medium truncate">{l.name}</span>
-                    <Badge variant={l.status === "published" ? "default" : "secondary"}>{l.status}</Badge>
-                  </div>
-                  <div className="text-xs text-muted-foreground mt-1">
-                    {l.brandName ?? "—"} · {l.itemCount} items ·{" "}
-                    <span className={l.customerCount === 0 ? "text-amber-600 font-medium" : ""}>
-                      {l.customerCount} customers
-                    </span>
-                  </div>
-                </button>
+                  <button
+                    className="w-full text-left hover-elevate rounded-sm"
+                    onClick={() => { setSelectedId(l.id); setEdits({}); setSearch(""); setBulkMargin(""); setManualIds(new Set()); }}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-medium truncate">{l.name}</span>
+                      <Badge variant={l.status === "published" ? "default" : l.status === "archived" ? "outline" : "secondary"}>{l.status}</Badge>
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {l.brandName ?? "—"} · {l.itemCount} items ·{" "}
+                      <span className={l.customerCount === 0 && !showArchived ? "text-amber-600 font-medium" : ""}>
+                        {l.customerCount} customers
+                      </span>
+                    </div>
+                    {l.status === "published" && publishedAgo(l.publishedAt ?? l.updatedAt) && (
+                      <div className="text-[11px] text-muted-foreground mt-0.5">{publishedAgo(l.publishedAt ?? l.updatedAt)}</div>
+                    )}
+                  </button>
+                  {showArchived && (
+                    <div className="flex gap-1 mt-2">
+                      <Button size="sm" variant="outline" className="h-7 text-xs flex-1" onClick={() => restore.mutate(l.id)} data-testid={`button-restore-${l.id}`}>
+                        <RefreshCw className="h-3 w-3 mr-1" /> Restore
+                      </Button>
+                      <Button size="sm" variant="ghost" className="h-7 text-xs text-destructive"
+                        onClick={() => { if (confirm("Permanently delete this archived list? This cannot be undone.")) del.mutate(l.id); }} data-testid={`button-delete-${l.id}`}>
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
               ))}
             </CardContent>
           </Card>
@@ -299,16 +379,29 @@ export default function PriceBuilderPage() {
                       <CardDescription>
                         {selected.brandName} · {items.length} products · base margin {selected.defaultMarginPercent ?? "—"}%
                         {priceRange && ` · selling £${priceRange.min.toFixed(2)}–£${priceRange.max.toFixed(2)}`}
+                        {selected.status === "published" && publishedAgo(selected.publishedAt ?? selected.updatedAt) && ` · ${publishedAgo(selected.publishedAt ?? selected.updatedAt)}`}
                       </CardDescription>
+                      {selected.customerCount === 0 && (
+                        <p className="text-xs text-amber-600 font-medium mt-1 flex items-center gap-1">
+                          <AlertTriangle className="h-3 w-3" /> Not assigned to anyone yet — no customer can see this list until you assign it.
+                        </p>
+                      )}
                       </div>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
                       <Button size="sm" variant="outline" onClick={() => setPreviewOpen(true)} data-testid="button-preview-customer">
                         <Eye className="h-4 w-4 mr-1" /> Preview as customer
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => setAssignOpen(true)} data-testid="button-assign">
-                        <Users className="h-4 w-4 mr-1" /> Assign ({selected.customerCount})
-                      </Button>
+                      {selected.customerCount === 0 ? (
+                        <Button size="sm" onClick={() => setAssignOpen(true)} data-testid="button-assign"
+                          className="bg-amber-500 hover:bg-amber-600 text-white">
+                          <Users className="h-4 w-4 mr-1" /> Assign to customers
+                        </Button>
+                      ) : (
+                        <Button size="sm" variant="outline" onClick={() => setAssignOpen(true)} data-testid="button-assign">
+                          <Users className="h-4 w-4 mr-1" /> Assigned ({selected.customerCount})
+                        </Button>
+                      )}
                       <Button size="sm" variant="outline" onClick={() => setReconcileOpen(true)} title="Compare this list to the brand's latest published costs" data-testid="button-reconcile">
                         <RefreshCw className="h-4 w-4 mr-1" /> Check for cost changes
                       </Button>
@@ -319,8 +412,10 @@ export default function PriceBuilderPage() {
                           <CheckCircle2 className="h-4 w-4 mr-1" /> Publish
                         </Button>
                       )}
-                      <Button size="sm" variant="ghost" onClick={() => { if (confirm("Delete this price list?")) del.mutate(selected.id); }}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
+                      <Button size="sm" variant="ghost" title="Archive this price list"
+                        onClick={() => { if (confirm("Archive this price list? Customers will be unassigned and it moves to Archived. You can restore it later.")) archive.mutate(selected.id); }}
+                        data-testid="button-archive">
+                        <Archive className="h-4 w-4 mr-1 text-destructive" /> Archive
                       </Button>
                     </div>
                   </div>
@@ -634,6 +729,7 @@ function AssignDialog({ open, onOpenChange, listId, listName, brandName }: {
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: [`/api/admin/v2/price-lists/${listId}/customers`] });
     queryClient.invalidateQueries({ queryKey: ["/api/admin/v2/price-lists"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/admin/v2/assignments"] }); // keep "Who Sees What" live
   };
 
   const assign = useMutation({

@@ -1300,7 +1300,9 @@ export const priceLists = pgTable("price_lists", {
   brandId: integer("brand_id"), // FK -> pricing_brands (every v2 list is scoped to one brand)
   baseCostUploadId: integer("base_cost_upload_id"), // which base cost this list was prepared from
   defaultMarginPercent: decimal("default_margin_percent", { precision: 6, scale: 2 }), // list-wide default applied on build
-  status: varchar("status", { length: 20 }).notNull().default("draft"), // draft | published
+  status: varchar("status", { length: 20 }).notNull().default("draft"), // draft | published | archived
+  publishedAt: timestamp("published_at"), // when the list last went live (status -> published)
+  archivedAt: timestamp("archived_at"), // when the list was archived (soft-delete)
   // --- legacy v1 fields (kept for backward compatibility / migration) ---
   type: varchar("type", { length: 20 }).notNull().default("tier"), // tier | customer
   isActive: boolean("is_active").default(true),

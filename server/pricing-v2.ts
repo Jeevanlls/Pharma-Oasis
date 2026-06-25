@@ -172,12 +172,19 @@ export interface PriceListSummary extends PriceList {
   customerCount: number;
 }
 
-export async function listPriceListsV2(brandId?: number): Promise<PriceListSummary[]> {
+export async function listPriceListsV2(
+  brandId?: number,
+  archived: "exclude" | "only" | "include" = "exclude",
+): Promise<PriceListSummary[]> {
+  const conds = [] as any[];
+  if (brandId) conds.push(eq(priceLists.brandId, brandId));
+  if (archived === "exclude") conds.push(ne(priceLists.status, "archived"));
+  if (archived === "only") conds.push(eq(priceLists.status, "archived"));
   const rows = await db
     .select({ list: priceLists, brandName: pricingBrands.name })
     .from(priceLists)
     .leftJoin(pricingBrands, eq(priceLists.brandId, pricingBrands.id))
-    .where(brandId ? eq(priceLists.brandId, brandId) : sql`true`)
+    .where(conds.length ? and(...conds) : sql`true`)
     .orderBy(asc(pricingBrands.name), asc(priceLists.name));
 
   const out: PriceListSummary[] = [];
@@ -268,9 +275,33 @@ export async function updatePriceListMeta(
   const patch: any = { updatedAt: new Date() };
   if (data.name !== undefined) patch.name = data.name.trim();
   if (data.defaultMarginPercent !== undefined) patch.defaultMarginPercent = toStr(data.defaultMarginPercent);
-  if (data.status !== undefined) patch.status = data.status;
+  if (data.status !== undefined) {
+    patch.status = data.status;
+    if (data.status === "published") patch.publishedAt = new Date(); // stamp when it goes live
+  }
   if (data.notes !== undefined) patch.notes = data.notes;
   const [list] = await db.update(priceLists).set(patch).where(eq(priceLists.id, id)).returning();
+  return list;
+}
+
+/** Soft-delete: archive a list and unassign its customers (kept items so it can be restored). */
+export async function archivePriceListV2(id: number): Promise<PriceList> {
+  await db.delete(customerPriceLists).where(eq(customerPriceLists.priceListId, id));
+  const [list] = await db
+    .update(priceLists)
+    .set({ status: "archived", archivedAt: new Date(), isActive: false, updatedAt: new Date() })
+    .where(eq(priceLists.id, id))
+    .returning();
+  return list;
+}
+
+/** Bring an archived list back as a draft (customers were unassigned, so re-publish + re-assign). */
+export async function restorePriceListV2(id: number): Promise<PriceList> {
+  const [list] = await db
+    .update(priceLists)
+    .set({ status: "draft", archivedAt: null, isActive: true, updatedAt: new Date() })
+    .where(eq(priceLists.id, id))
+    .returning();
   return list;
 }
 

@@ -4014,7 +4014,8 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
   // List all saved price lists (optionally for one brand), with item & customer counts.
   app.get("/api/admin/v2/price-lists", requireAdmin, async (req, res) => {
     const brandId = req.query.brandId ? parseInt(req.query.brandId as string, 10) : undefined;
-    res.json(await pricingV2.listPriceListsV2(brandId));
+    const archived = req.query.archived === "only" ? "only" : req.query.archived === "include" ? "include" : "exclude";
+    res.json(await pricingV2.listPriceListsV2(brandId, archived));
   });
 
   // Full list with its prepared items (ADMIN view — includes cost).
@@ -4096,6 +4097,17 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
     }
   });
 
+  // Archive (soft-delete): unassigns customers, hides from the active list, restorable.
+  app.post("/api/admin/v2/price-lists/:id/archive", requireAdmin, async (req, res) => {
+    res.json(await pricingV2.archivePriceListV2(parseInt(req.params.id, 10)));
+  });
+
+  // Restore an archived list back to draft.
+  app.post("/api/admin/v2/price-lists/:id/restore", requireAdmin, async (req, res) => {
+    res.json(await pricingV2.restorePriceListV2(parseInt(req.params.id, 10)));
+  });
+
+  // Permanent delete (used only from the Archived view).
   app.delete("/api/admin/v2/price-lists/:id", requireAdmin, async (req, res) => {
     await pricingV2.deletePriceListV2(parseInt(req.params.id, 10));
     res.json({ success: true });
