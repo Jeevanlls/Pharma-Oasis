@@ -921,6 +921,10 @@ export async function assignCustomers(
 ): Promise<{ assigned: number; conflicts: { customerId: number; existingListId: number }[] }> {
   const brandId = await listBrandId(priceListId);
   if (!brandId) throw new Error("Price list has no brand");
+  // A draft list isn't ready — only published lists can be assigned to customers.
+  const [pl] = await db.select({ status: priceLists.status }).from(priceLists).where(eq(priceLists.id, priceListId));
+  if (!pl) throw new Error("Price list not found");
+  if (pl.status !== "published") throw new Error("Publish the price list before assigning customers.");
   const conflicts: { customerId: number; existingListId: number }[] = [];
   let assigned = 0;
 

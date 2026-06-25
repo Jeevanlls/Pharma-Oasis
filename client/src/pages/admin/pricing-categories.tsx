@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { AdminLayout } from "@/components/layout/admin-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -63,8 +62,7 @@ export default function PricingCategoriesPage() {
   });
 
   return (
-    <AdminLayout>
-      <div className="p-6 space-y-6">
+    <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">
@@ -156,6 +154,5 @@ export default function PricingCategoriesPage() {
           </DialogContent>
         </Dialog>
       </div>
-    </AdminLayout>
   );
 }

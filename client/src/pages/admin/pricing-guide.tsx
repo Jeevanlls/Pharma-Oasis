@@ -1,5 +1,4 @@
 import { Link } from "wouter";
-import { AdminLayout } from "@/components/layout/admin-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -107,8 +106,7 @@ const glossary: [string, string][] = [
 
 export default function PricingGuidePage() {
   return (
-    <AdminLayout>
-      <div className="p-6 space-y-6 max-w-4xl">
+    <div className="space-y-6 max-w-4xl">
         {/* Header */}
         <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 dark:border-emerald-900/50 dark:bg-emerald-950/20 p-5">
           <h1 className="text-2xl font-bold flex items-center gap-2 text-emerald-800 dark:text-emerald-300">
@@ -215,6 +213,5 @@ export default function PricingGuidePage() {
           </CardContent>
         </Card>
       </div>
-    </AdminLayout>
   );
 }

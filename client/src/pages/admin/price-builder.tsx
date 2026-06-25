@@ -1,6 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { AdminLayout } from "@/components/layout/admin-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -278,7 +277,7 @@ export default function PriceBuilderPage() {
   const panelLists = panelBrand === "all" ? lists : lists.filter((l) => String(l.brandId) === panelBrand);
 
   return (
-    <AdminLayout>
+    <>
       <div className="space-y-4">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
@@ -381,18 +380,26 @@ export default function PriceBuilderPage() {
                         {priceRange && ` · selling £${priceRange.min.toFixed(2)}–£${priceRange.max.toFixed(2)}`}
                         {selected.status === "published" && publishedAgo(selected.publishedAt ?? selected.updatedAt) && ` · ${publishedAgo(selected.publishedAt ?? selected.updatedAt)}`}
                       </CardDescription>
-                      {selected.customerCount === 0 && (
+                      {selected.status !== "published" ? (
+                        <p className="text-xs text-amber-600 font-medium mt-1 flex items-center gap-1">
+                          <AlertTriangle className="h-3 w-3" /> Draft — not published yet. Publish it before you can assign customers.
+                        </p>
+                      ) : selected.customerCount === 0 ? (
                         <p className="text-xs text-amber-600 font-medium mt-1 flex items-center gap-1">
                           <AlertTriangle className="h-3 w-3" /> Not assigned to anyone yet — no customer can see this list until you assign it.
                         </p>
-                      )}
+                      ) : null}
                       </div>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
                       <Button size="sm" variant="outline" onClick={() => setPreviewOpen(true)} data-testid="button-preview-customer">
                         <Eye className="h-4 w-4 mr-1" /> Preview as customer
                       </Button>
-                      {selected.customerCount === 0 ? (
+                      {selected.status !== "published" ? (
+                        <Button size="sm" variant="outline" disabled title="Publish this list before assigning customers" data-testid="button-assign">
+                          <Users className="h-4 w-4 mr-1" /> Assign (publish first)
+                        </Button>
+                      ) : selected.customerCount === 0 ? (
                         <Button size="sm" onClick={() => setAssignOpen(true)} data-testid="button-assign"
                           className="bg-amber-500 hover:bg-amber-600 text-white">
                           <Users className="h-4 w-4 mr-1" /> Assign to customers
@@ -707,7 +714,7 @@ export default function PriceBuilderPage() {
       {selected && (
         <AssignDialog open={assignOpen} onOpenChange={setAssignOpen} listId={selected.id} listName={selected.name} brandName={selected.brandName} />
       )}
-    </AdminLayout>
+    </>
   );
 }
 

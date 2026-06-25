@@ -1,7 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { AdminLayout } from "@/components/layout/admin-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -71,8 +70,7 @@ export default function AssignmentsPage() {
   const customersWithAList = new Set(assignments.map((a) => a.customerId)).size;
 
   return (
-    <AdminLayout>
-      <div className="p-6 space-y-6">
+    <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <Users className="h-6 w-6" /> Customer Assignments
@@ -178,6 +176,5 @@ export default function AssignmentsPage() {
           </Link>
         </div>
       </div>
-    </AdminLayout>
   );
 }
