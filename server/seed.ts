@@ -6,27 +6,35 @@ import { eq } from "drizzle-orm";
 export async function seed() {
   console.log("Starting database seed...");
 
-  // Create admin user
-  const existingAdmin = await db.select().from(users).where(eq(users.email, "admin@pharmaoasis.com"));
-  
-  if (existingAdmin.length === 0) {
-    const passwordHash = await bcrypt.hash("Admin!234", 10);
-    await db.insert(users).values({
-      email: "admin@pharmaoasis.com",
-      passwordHash,
-      role: "admin",
-      status: "active",
-      companyName: "Pharma Oasis Admin",
-      primaryContactName: "System Administrator",
-      phoneNumber: "+44 20 1234 5678",
-      billingAddressLine1: "123 Healthcare Way",
-      billingCity: "London",
-      billingPostcode: "EC1A 1BB",
-      billingCountry: "United Kingdom",
-    });
-    console.log("Admin user created: admin@pharmaoasis.com / Admin!234");
+  // Create the initial admin from environment — NO hardcoded credentials, NO password logged.
+  // Set ADMIN_EMAIL (and optionally ADMIN_PASSWORD) to bootstrap a first admin. If ADMIN_PASSWORD
+  // is omitted, a random password is set and the owner uses "Forgot password" to choose one.
+  // If ADMIN_EMAIL is unset, no admin is auto-created.
+  const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+  if (adminEmail) {
+    const existingAdmin = await db.select().from(users).where(eq(users.email, adminEmail));
+    if (existingAdmin.length === 0) {
+      const crypto = await import("node:crypto");
+      const tempPassword = process.env.ADMIN_PASSWORD || crypto.randomBytes(18).toString("base64url");
+      const passwordHash = await bcrypt.hash(tempPassword, 12);
+      await db.insert(users).values({
+        email: adminEmail,
+        passwordHash,
+        role: "admin",
+        status: "active",
+        companyName: "Administrator",
+        primaryContactName: "Administrator",
+      });
+      console.log(
+        process.env.ADMIN_PASSWORD
+          ? `Initial admin created: ${adminEmail} (password from ADMIN_PASSWORD env).`
+          : `Initial admin created: ${adminEmail}. No ADMIN_PASSWORD set — use "Forgot password" to set one.`,
+      );
+    } else {
+      console.log("Admin user already exists");
+    }
   } else {
-    console.log("Admin user already exists");
+    console.log("No ADMIN_EMAIL set — skipping admin bootstrap (no default admin created).");
   }
 
   // Create sample brands - Real UK pharmaceutical and healthcare brands

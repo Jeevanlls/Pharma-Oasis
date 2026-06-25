@@ -389,11 +389,11 @@ async function initializeFullApplication() {
       log(`Password reset columns warning: ${err.message}`);
     }
 
-    // Auto-seed check
+    // Auto-seed only when the DB is genuinely fresh (no users at all) — never re-seed a live DB.
     try {
-      const adminUser = await db.select().from(users).where(eq(users.email, "admin@pharmaoasis.com"));
-      if (adminUser.length === 0) {
-        log("Database appears empty, auto-seeding demo data...");
+      const anyUser = await db.select({ id: users.id }).from(users).limit(1);
+      if (anyUser.length === 0) {
+        log("Database appears empty (no users), auto-seeding demo data...");
         const { seed } = await import("./seed");
         await seed();
         log("Auto-seed completed successfully!");

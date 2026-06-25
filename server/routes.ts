@@ -4957,24 +4957,11 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
     }
   });
 
-  // ==================== ADMIN SEED ENDPOINT (for production first-time setup) ====================
-  // This endpoint requires admin login OR works if no admin exists (first-time setup)
-  app.post("/api/admin/seed", async (req, res) => {
+  // ==================== ADMIN SEED ENDPOINT ====================
+  // Always requires an authenticated admin. (Fresh databases are seeded automatically at
+  // startup — see app.ts — so there is no open "first-time" bypass to abuse.)
+  app.post("/api/admin/seed", requireAdmin, async (req, res) => {
     try {
-      // Check if admin exists - allow seed if no admin (first-time setup) or if logged in as admin
-      const adminCheck = await storage.getUserByEmail("admin@pharmaoasis.com");
-      
-      if (adminCheck) {
-        // Admin exists - require authentication
-        if (!req.session.userId) {
-          return res.status(401).json({ message: "Authentication required" });
-        }
-        const user = await storage.getUser(req.session.userId);
-        if (!user || user.role !== "admin") {
-          return res.status(403).json({ message: "Admin access required" });
-        }
-      }
-      
       const { seed } = await import("./seed");
       await seed();
       res.json({ success: true, message: "Database seeded successfully! Refresh your browser to see the changes." });
