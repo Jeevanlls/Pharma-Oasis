@@ -661,6 +661,7 @@ export async function sendCustomerResponseEmail(data: {
   refId: number;
   status: string;
   message: string;
+  documentUrl?: string; // link to the printable quotation, when relevant
 }): Promise<EmailResult> {
   const label = data.kind === "order" ? "Order" : "Quote";
   const subject = `Update on your ${label.toLowerCase()} #${data.refId} - Pharma Oasis`;
@@ -671,6 +672,7 @@ export async function sendCustomerResponseEmail(data: {
         <p style="font-size: 16px;">Dear ${data.contactName},</p>
         <p>There's an update on your ${label.toLowerCase()} <strong>#${data.refId}</strong> — status: <strong>${data.status}</strong>.</p>
         ${data.message ? `<div style="padding: 15px; background: white; border: 1px solid #e2e8f0; border-radius: 8px; margin: 16px 0;"><p style="margin: 0; white-space: pre-wrap;">${data.message}</p></div>` : ""}
+        ${data.documentUrl ? `<div style="text-align: center; margin: 24px 0;"><a href="${data.documentUrl}" style="display: inline-block; background: #047857; color: white; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: bold;">View / print your quotation</a></div>` : ""}
         <p style="color: #6b7280;">You can view full details in your customer portal.</p>
       </div>
       <div style="padding: 15px; background: #e2e8f0; text-align: center; font-size: 12px; color: #64748b;">Pharma Oasis - Your Trusted Wholesale Partner</div>

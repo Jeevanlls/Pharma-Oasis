@@ -21,6 +21,7 @@ import HowToOrderPage from "@/pages/how-to-order";
 import QuotePage from "@/pages/quote";
 import MyQuotesPage from "@/pages/my-quotes";
 import QuoteDetailPage from "@/pages/quote-detail";
+import QuoteDocumentPage from "@/pages/quote-document";
 import SupplierRegistrationPage from "@/pages/supplier-registration";
 import DashboardPage from "@/pages/dashboard";
 import PrivacyPolicyPage from "@/pages/privacy";
@@ -153,6 +154,7 @@ function Router() {
       <Route path="/quote" component={QuotePage} />
       <Route path="/my-quotes" component={MyQuotesPage} />
       <Route path="/my-quotes/:id" component={QuoteDetailPage} />
+      <Route path="/quotes/:id/print" component={QuoteDocumentPage} />
       <Route path="/dashboard" component={DashboardPage} />
       <Route path="/supplier-registration" component={SupplierRegistrationPage} />
       <Route path="/privacy" component={PrivacyPolicyPage} />

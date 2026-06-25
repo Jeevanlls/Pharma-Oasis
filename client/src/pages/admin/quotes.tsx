@@ -29,6 +29,7 @@ import {
   CheckSquare,
   Plus,
   History,
+  Printer,
 } from "lucide-react";
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: typeof Clock }> = {
@@ -382,6 +383,15 @@ export default function AdminQuotesPage() {
                       >
                         <Eye className="h-4 w-4 mr-1" />
                         View
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => window.open(`/quotes/${quote.id}/print`, "_blank")}
+                        data-testid={`button-quotation-${quote.id}`}
+                      >
+                        <Printer className="h-4 w-4 mr-1" />
+                        Quotation
                       </Button>
                       {quote.status === "pending" && (
                         <Button

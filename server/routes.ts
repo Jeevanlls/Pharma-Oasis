@@ -2421,6 +2421,18 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     }
   });
 
+  // Single quote with items + customer (for the printable quotation document).
+  app.get("/api/admin/quotes/:id", requireAdmin, async (req, res) => {
+    try {
+      const full = await storage.getQuoteWithItems(Number(req.params.id));
+      if (!full) return res.status(404).json({ message: "Quote not found" });
+      const customer = await storage.getUser(full.userId);
+      res.json({ ...full, customer: customer ? publicUser(customer) : null });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch quote" });
+    }
+  });
+
   // Quote ID param schema for validation
   const quoteIdParamSchema = z.object({
     id: z.coerce.number().int().positive(),
@@ -4896,7 +4908,8 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
       if (sendEmail) {
         const quote = await storage.getQuote(id);
         const customer = quote ? await storage.getUser(quote.userId) : null;
-        if (customer) await sendCustomerResponseEmail({ email: customer.email, contactName: customer.primaryContactName || customer.companyName || customer.email, kind: "quote", refId: id, status: quote?.status || "updated", message: adminNotes || "" });
+        const SITE_URL = process.env.SITE_URL || "https://pharmaoasis.co.uk";
+        if (customer) await sendCustomerResponseEmail({ email: customer.email, contactName: customer.primaryContactName || customer.companyName || customer.email, kind: "quote", refId: id, status: quote?.status || "updated", message: adminNotes || "", documentUrl: `${SITE_URL}/quotes/${id}/print` });
       }
       res.json(updated);
     } catch (error: any) {

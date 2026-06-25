@@ -36,7 +36,8 @@ import {
   AlertTriangle,
   ShoppingCart,
   Loader2,
-  Info
+  Info,
+  Printer
 } from "lucide-react";
 import placeholderImage from "@assets/generated_images/product_placeholder_coming_soon.png";
 
@@ -508,10 +509,19 @@ export default function QuoteDetailPage() {
                 </>
               )}
 
+              {quote.status !== "pending" && (
+                <Link href={`/quotes/${quote.id}/print`} className="w-full sm:w-auto sm:ml-auto">
+                  <Button variant="outline" className="gap-2 w-full" data-testid="button-print-quotation">
+                    <Printer className="h-4 w-4" />
+                    Print / Download quotation
+                  </Button>
+                </Link>
+              )}
+
               {hasItems && (
-                <Button 
-                  variant="secondary" 
-                  className="gap-2 w-full sm:w-auto sm:ml-auto" 
+                <Button
+                  variant="secondary"
+                  className="gap-2 w-full sm:w-auto"
                   onClick={handleReorder}
                   data-testid="button-reorder"
                 >
