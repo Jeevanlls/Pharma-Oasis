@@ -1,6 +1,6 @@
 # Price List Builder — Session Handoff
 
-_Last updated: 2026-06-24. Written so a new agent (or future session) can continue seamlessly._
+_Last updated: 2026-06-25. Written so a new agent (or future session) can continue seamlessly._
 
 ## Where we are
 
@@ -13,12 +13,23 @@ Working on branch **`feature/price-list-builder`** (off `main`, NOT yet merged).
 5. `1d2b678` — **Interactive cost-upload review** (dedupe block, missing-info skip, keep/remove, notes, status filter). Built + type-checked + synthetic-tested.
 6. `fa025c9` — **Cost-review refinements**: per-row **Delete** button; **big-change confirm tick** (gates Publish, keyed by EAN+cost); **real-time/live validation** (statuses + change% recompute as you type); **Notes column** in the download template + parser (Notes/Comment/Remark headers). Type-checked.
 7. `e09ca03` — **Current Costs editor** (`/admin/current-costs`): pick a brand → see live costs + "published N days ago" badge → search → edit a few costs/notes → **Review & apply** confirm dialog showing every affected customer price (old→new cost, old→new price, per list + customers) → confirm publishes a NEW cost version (supersedes old) + reprices affected lists. Backend `getCurrentCosts`/`previewCostEdits`/`applyCostEdits` in pricing-v2; verified with a 12-assertion synthetic seed test (passed, data cleaned up).
+8. `eafe2fc` — **Price Builder UX + Assignments overview + hide legacy** (2026-06-25): Price Builder left panel slimmed (300→220px) with a collapse toggle, working sheet reclaims width (`minmax(0,1fr)`) and is taller (72vh). Legacy `/admin/price-lists` **hidden from the sidebar** (route still registered in App.tsx — reversible, no data removed). New **Customer Assignments** overview at `/admin/assignments` (brand → list → customers), backed by `pricingV2.allAssignments()` + `GET /api/admin/v2/assignments`. Type-checked + built clean; endpoint verified live (401 when unauth).
+9. `d15a9ec` — **Pricing UI clarity pass** (2026-06-25): sidebar tools numbered 1–6; every pricing screen has a "Step N — what to do" line; relabelled jargon ("Review new cost"→"Check for cost changes", "Bands & Cost+£"→"Bulk price (cost bands)"); safety cues (below-cost line count, amber 0-customers, "nothing changes until Confirm"). Built clean.
 
 > Context: a previous session built the Price List Builder but the workspace reset before committing, so it looked like "nothing happened." It was all recovered and is now safely committed. **Commit work promptly.**
 
-## 👉 RESUME HERE (last worked 2026-06-24 evening — user left to test in a later session)
+## 👉 RESUME HERE (last worked 2026-06-25 — Screen A tested OK by user; feature MERGED to main)
+
+> **Update 2026-06-25:** The user click-tested **Screen A (Cost Uploads review)** — all working. They then asked for and approved four improvements, all now built + type-checked + built clean + committed (`eafe2fc`, `d15a9ec`): (1) Price Builder layout fix + collapsible list panel, (2) hidden the legacy Price Lists page, (3) new Customer Assignments overview, (4) full UI clarity pass (numbered steps, plainer labels, safety cues). The user said to **merge once the clarity pass was done**, so the branch was merged to `main` and pushed to `gitsafe-backup` (see "Merge status" below).
+>
+> **Still awaiting hands-on test by the user (not known-broken):** Screen B (Current Costs editor), the new Assignments overview, the Price Builder layout/collapse, and the clarity-pass wording. The one-list-per-brand-per-customer rule the user wanted is **already enforced** (assign-time 409 + replace prompt, plus a DB unique constraint on customer+brand) — no change was needed.
+>
+> **Dev server note:** the Replit workflow's auto-respawn proved unreliable this session; the dev server is currently running as a **manually-started background `npm run dev`** (port 5000, plain tsx — NO watch). If server files change again, restart it; front-end changes hot-reload.
+
+<details><summary>Original 2026-06-24 resume note (for history)</summary>
 
 > **For the next-session agent:** everything below was BUILT + type-checked + built clean + (for the backend) synthetic-tested, and the dev server was restarted so it's all live. The user has NOT yet click-tested it. When the user returns they will report what they found. **Do not re-build or assume anything is broken** — wait for their testing feedback, then fix only what they flag, or proceed to merge if they're happy. The exact things awaiting their hands-on test are in the "⚠️ PENDING YOUR TEST" list just below.
+</details>
 
 **State:** commits up to `e09ca03` are on the local branch. **Nothing is pushed.** The dev server (`npm run dev`, plain `tsx` — NO watch) was **restarted** (now running in the background, port 5000) so the new server code + routes are live; if you change server files again you MUST restart it (front-end Vite hot-reloads, server does not).
 
