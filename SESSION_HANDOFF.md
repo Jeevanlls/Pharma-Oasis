@@ -3,19 +3,25 @@
 _Last updated: 2026-06-26 (end of session). This is the master index. Detailed docs are linked below._
 
 ## TL;DR for the next session
-- All code work is **committed and merged to `main`** and pushed to `gitsafe-backup`. Working branch is `feature/price-list-builder` (kept in sync with `main`). Tree is clean except the harness-managed `.claude/settings.local.json`.
-- Two big workstreams were completed earlier: **(1) Auth hardening** and **(2) Sales pipeline (quotes + orders) rework**. Both are built, type-checked, built clean, and each piece passed an end-to-end test.
-- **Nothing is known-broken. Production has NOT been deployed yet** — that's the next action (owner clicks Replit Deploy). See **[DEPLOY_CHECKLIST.md](DEPLOY_CHECKLIST.md)**.
+- All code is **committed on `feature/price-list-builder`, synced to `main`, pushed to `gitsafe-backup`**. Tree clean except the harness-managed `.claude/settings.local.json`.
+- **⏯ NEXT ACTION = REDEPLOY + TEST, then build E3.** Production was deployed once today (commit `b875b44`), but **everything after that — D1–D3 (consolidation) and E1–E2 (new Sales Workspace) — is NOT on production yet.** Click Replit Deploy to push it live, smoke-test (below), then continue with **E3** (sales-order PDF + Excel) in **[SALES_WORKSPACE_PLAN.md](SALES_WORKSPACE_PLAN.md)**.
+- **Nothing is known-broken.** Every phase was verified end-to-end against the real HTTP endpoints with temp data (cleaned up).
 
-## 2026-06-26 session — what was done
-- **Verified the Sales pipeline + 2FA end-to-end against the REAL HTTP endpoints** (temp data, cleaned up after): **25/25 checks passed.** Covered: customer accepts quote → linked confirmed order (B1), duplicate-accept blocked, admin 2FA login (real TOTP), order stats, active/archived worklists, CSV export, "entered-to-inventory" stamps + archive, and 2FA rejecting a bad code. Real data untouched.
-- **Confirmed production build compiles clean** (`npm run build` → `dist/index.cjs`, 3.1 MB).
-- **Prepared [DEPLOY_CHECKLIST.md](DEPLOY_CHECKLIST.md)** (full step-by-step deploy + smoke test + rollback).
-- **Secrets resolved — no action needed before deploy:**
-  - `SESSION_SECRET` — already set in Repl Secrets; **leave as-is** (overwriting logs everyone out).
-  - `NEON_DATABASE_URL` — already set; deployment inherits it.
-  - `SITE_URL` — env var is unset, but **every code usage falls back to `https://pharmaoasis.co.uk`**, so prod links are already correct. Setting it is optional/cosmetic.
-  - (`DEPLOY_SECRETS.txt` was a throwaway helper holding a *suggested* SESSION_SECRET — unused since one already exists; safe to delete, gitignored, never committed.)
+## 2026-06-26 session — what was done (in order)
+1. **Verified prior work + deployed.** 25/25 e2e on the Sales pipeline + 2FA; prepared **[DEPLOY_CHECKLIST.md](DEPLOY_CHECKLIST.md)**; owner **deployed to production** (`b875b44`). Secrets settled: `SESSION_SECRET` + `NEON_DATABASE_URL` already set (leave them); `SITE_URL` unset but code defaults to `https://pharmaoasis.co.uk` (optional).
+2. **Single-channel consolidation D1–D3** (see **[SALES_CONSOLIDATION_PLAN.md](SALES_CONSOLIDATION_PLAN.md)**):
+   - **D1** — one pricing resolver: main-catalogue quotes now use the customer's own price (matched by **EAN**), else "price on request"; orders require all lines priced. 12/12 e2e.
+   - **D2** — one shared basket across public site + portal, single `/basket` checkout; deduped quote history. Build clean.
+   - **D3** — single admin "Sales (pipeline)" nav line.
+3. **New Sales Workspace E1–E2** (see **[SALES_WORKSPACE_PLAN.md](SALES_WORKSPACE_PLAN.md)** — the ACTIVE plan):
+   - **E1** — `/admin/sales/:kind/:id` Deal Workspace showing customer + **line items** + totals + timeline (old pages never showed items). 10/11 e2e.
+   - **E2** — editable quote pricing (add/remove lines, auto margin/total), **Send quote** (email), **Mark accepted/declined** (accept → linked confirmed order). **Old `/admin/quotes` & `/admin/orders` pages deleted** (routes redirect to `/admin/sales`). 14/14 e2e.
+- **Dropped with the old pages (APIs still exist, no UI):** quote **versioning** + order **"respond" email**. Re-add to the workspace if the owner wants them.
+
+## ⏭ WHAT TO DO NEXT SESSION (start here)
+1. **Redeploy** (Replit Deploy button — no secret changes). This pushes D1–D3 + E1–E2 live.
+2. **Smoke-test the new flow** (see "verification" below + SALES_WORKSPACE_PLAN.md test steps).
+3. **Build E3** — sales-order **PDF + Excel** download from the workspace (libs already present: `pdfkit`, `xlsx` in `server/price-export.ts`). Full spec + remaining phases E4–E6 in **[SALES_WORKSPACE_PLAN.md](SALES_WORKSPACE_PLAN.md)**.
 
 ## How this project works (read before any change)
 - **One shared Neon DB for dev AND production.** Deploying ships code only — no data migration, no data loss. The app uses `NEON_DATABASE_URL`. `npm run db:push` targets a *different, unused* DB, so it does NOT migrate the live DB. **Add schema changes as idempotent `ALTER/CREATE ... IF NOT EXISTS` in `server/db.ts` startup SQL** (+ types in `shared/schema.ts`). The live DB holds **22 real customer accounts — never delete user rows.**
@@ -54,21 +60,25 @@ Decision: **one unified pipeline on screen, quotes + orders stay as linked recor
 
 ---
 
-## WHAT'S NEXT (pick up here tomorrow)
+## WHAT'S NEXT (pick up here)
 
-### Operational (owner / deploy — no code) → see [DEPLOY_CHECKLIST.md](DEPLOY_CHECKLIST.md)
-1. **Deploy to production** when ready (Replit Deploy button — owner UI action). **No secret changes are required** before deploying (see 2026-06-26 notes above: `SESSION_SECRET` + `NEON_DATABASE_URL` already set, `SITE_URL` safely defaulted in code). Build/run already correct: build `npm run build`, run `npm run start`.
-   - ⚠️ After deploy, 2FA is enforced for admins on production — have the authenticator app + backup codes ready. First prod admin login forces 2FA enrolment (QR + backup codes). Break-glass SQL is in AUTH_HANDOFF.md.
+### 1. Redeploy (owner, no code) → see [DEPLOY_CHECKLIST.md](DEPLOY_CHECKLIST.md)
+Click Replit Deploy to push D1–D3 + E1–E2 live. No secret changes needed. ⚠️ 2FA enforced for admins; break-glass SQL in AUTH_HANDOFF.md.
 
-### Features not yet built
-2. **Phase C — inventory-system API integration: ⏸ DEFERRED by owner.** When resumed: find out which inventory system it is + whether it has an API (auth, endpoints, order payload). Until then, manual entry + CSV export (Phase A) is the handoff.
-3. **Phase C small/optional** (not started): low-stock warning when confirming an order; pick/pack/ship sub-statuses.
-4. **B3 follow-up** (optional): attach a real generated **PDF** to the quote email instead of a link (needs a server-side PDF library).
+### 2. Smoke-test the new flow on the live site
+- **Quote (the main fix):** as a customer, add a product → `/basket` → "Request Quote". As admin: **Sales → Open** the quote → you now SEE the line items → price them, add a line, Save → set validity + message → **Send quote** (customer gets email) → **Mark accepted** → a linked **O-** order is created.
+- **Order:** Sales → Open an order → view lines + customer → CSV export → "Mark entered into inventory" → moves to Archived.
+- **Pricing:** a logged-in customer's main-catalogue quote uses THEIR price when the EAN is in their assigned price list, else "price on request".
 
-### Suggested verification when the owner returns (nothing known-broken, just not human-click-tested)
-- 2FA: sign in at `/staff` → QR setup → code → land in `/admin`; tick "remember this device"; check `/admin/security`.
-- Sales: `/admin/sales` — accept a "quoted" quote as a customer → order appears (status confirmed, "from Q-x"); "Mark entered into inventory" → moves to Archived; CSV export; open `/quotes/:id/print` and Save as PDF.
+### 3. Build E3 next (continue the Sales Workspace)
+**E3 = sales-order PDF + Excel download** from the workspace (for manual processing in the SaaS). Libs already in repo: `pdfkit` + `xlsx` (`server/price-export.ts` has reusable patterns). Then E4 (salesman-initiated quotes), E5 (activity timeline table), E6 (API push — deferred). **Full spec for every E-phase is in [SALES_WORKSPACE_PLAN.md](SALES_WORKSPACE_PLAN.md).**
 
-## Key endpoints / files added this session
-- Auth: `server/twofa.ts`, `server/trusted-devices.ts`, `client/src/pages/admin/security.tsx`, login flow in `client/src/pages/login.tsx`; endpoints in `server/routes.ts` (search `2fa`, `team/invite`).
-- Sales: `client/src/pages/admin/sales.tsx`, `client/src/pages/quote-document.tsx`; order methods in `server/pricing-store.ts`; endpoints in `server/routes.ts` (search `/api/admin/orders`, `/api/admin/quotes/:id`).
+### Deferred / optional (unchanged)
+- **Inventory-system API integration** — deferred by owner; becomes E6 (push confirmed orders into the SaaS). Until then: manual PDF/CSV/Excel handoff.
+- Re-add **quote versioning** UI + order **"respond" email** to the workspace if needed (APIs still exist; UI was removed with the old pages).
+- Optional: low-stock warning on confirm; pick/pack/ship sub-statuses; attach a real PDF to the quote email.
+
+## Key files (this session's new/changed)
+- **Consolidation (D1–D3):** `server/pricing-v2.ts` (`getCustomerItemByEan`), `server/routes.ts` (`buildPricedLines` unified resolver, order guard), `client/src/lib/basket.tsx` (unified basket + adapters), `client/src/pages/basket.tsx` (single checkout), `client/src/App.tsx` (routes/redirects), `admin-layout.tsx` (nav).
+- **Sales Workspace (E1–E2):** `client/src/pages/admin/deal-workspace.tsx` (the workspace), `server/routes.ts` — `createOrderFromAcceptedQuote` helper, `PUT /api/admin/quotes/:id/items`, `POST /api/admin/quotes/:id/send`, admin accept→order on `PATCH /api/admin/quotes/:id`, customer-incl. `GET /api/admin/orders/:id`. Deleted: `client/src/pages/admin/{quotes,orders}.tsx`.
+- Earlier (auth/pipeline): `server/twofa.ts`, `server/trusted-devices.ts`, `client/src/pages/admin/{security,sales}.tsx`, `client/src/pages/quote-document.tsx`.
