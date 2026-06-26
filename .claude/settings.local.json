@@ -73,7 +73,29 @@
       "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" http://localhost:5000/api/products)",
       "Bash(curl -s -w \"\\\\nHTTP %{http_code}\\\\n\" http://localhost:5000/api/admin/pricing/brands)",
       "Bash(git checkout *)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git merge *)",
+      "Bash(git branch *)",
+      "Bash(git push *)",
+      "Bash(curl -s -o /dev/null -w '%{http_code}' http://localhost:5000)",
+      "Bash(echo \"server: $\\(curl -s -o /dev/null -w '%{http_code}' http://localhost:5000 2>/dev/null\\)\")",
+      "Bash(git commit -q -m 'Handoff: record merge done + refreshed resume/pending-test list \\(2026-06-25\\) *)",
+      "Bash(echo \"server: $\\(curl -s -o /dev/null -w '%{http_code}' http://localhost:5000 \\)\")",
+      "Bash(git commit -q -m ' *)",
+      "Bash(git commit -q -m 'Handoff: record in-app guide + colour-coded sidebar + scroll fix \\(6853ec6\\) *)",
+      "Bash(git commit -m ' *)",
+      "Bash(NODE_ENV=development tsx server/index.ts)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:5000/)",
+      "Bash(tsx *)",
+      "Bash(npm install *)",
+      "Bash(cd *)",
+      "Bash(perl -0pi -e 's/res\\\\.json\\\\\\(\\(\\\\w+\\)\\\\.map\\\\\\(u => \\\\{\\\\n\\\\s*const \\\\{ passwordHash, \\\\.\\\\.\\\\.safe \\\\} = u;\\\\n\\\\s*return safe;\\\\n\\\\s*\\\\}\\\\\\)\\\\\\);/res.json\\($1.map\\(u => publicUser\\(u\\)\\)\\);/g' server/routes.ts)",
+      "Bash(perl -0pi -e 's/const \\\\{ passwordHash, \\\\.\\\\.\\\\.safeUser \\\\} = user;\\\\n\\\\s*res\\\\.json\\\\\\(\\\\{ user: safeUser \\\\}\\\\\\);/res.json\\({ user: publicUser\\(user\\) }\\);/g; s/const \\\\{ passwordHash, \\\\.\\\\.\\\\.safeUser \\\\} = user;\\\\n\\\\s*res\\\\.json\\\\\\(safeUser\\\\\\);/res.json\\(publicUser\\(user\\)\\);/g' server/routes.ts)",
+      "Bash(echo \"restarting pid $!\")",
+      "Bash(echo \"started $!\")",
+      "Bash(cp /tmp/claude-1000/-home-runner-workspace/8d2e8132-5ae7-4a40-9bfd-2d1419d72cc7/scratchpad/verify-sales.ts ./__verify_tmp.ts)",
+      "Bash(sed -i 's#\\\\.\\\\./\\\\.\\\\./\\\\.\\\\./\\\\.\\\\./\\\\.\\\\./home/runner/workspace/#./#g' ./__verify_tmp.ts)",
+      "Bash(git check-ignore *)"
     ]
   }
 }
