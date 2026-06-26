@@ -83,6 +83,16 @@ Recommend building **D1 first** (it resolves the actual reported bug), then D2, 
 - Existing old-route quotes (productId-only) remain valid and keep working.
 - Don't merge the tables. Don't show main-catalog prices on the public site (keeps the two levels distinct, per owner).
 
+## D2 design (one merged basket) — proposed
+Today there are two baskets: `useQuoteBasket` (catalog products, localStorage `…_quote_basket`, checkout `/quote`) and `usePortalBasket` (price-list items, localStorage `…_portal_basket`, checkout `/portal/basket`). Plan:
+- **One `useBasket` context**, one localStorage key, holding a discriminated line:
+  `{ key, kind: 'catalog'|'portal', refId, name, sku?, imageUrl?, price: number|null, quantity }`.
+  Catalog add-sites pass `kind:'catalog', refId=productId`; portal add-sites pass `kind:'portal', refId=priceListItemId`.
+- **One checkout** that submits `items.map(l => l.kind==='portal' ? {itemId:l.refId,qty} : {productId:l.refId,qty})` to the unified backend (already built in D1). "Place Order" enabled only when every line `price != null`; otherwise "Request Quote" only.
+- **One history** ("My Orders & Quotes"): collapse `/my-quotes` + `/portal/quotes` into one quotes list; keep `/portal/orders`; shared detail/accept stays `/my-quotes/:id`.
+- Touch points: `products.tsx`, `product-detail.tsx`, `portal/catalogue.tsx`, `portal/basket.tsx` (→ generic basket page), `quote.tsx`, `App.tsx` (provider + routes), header basket indicator(s).
+- **Open UX questions for the owner:** (a) the two catalogues stay separate (public marketing site with no prices vs portal with customer prices) — should a *logged-in* customer on the public site see one basket icon shared with the portal? (b) Where should the unified basket/checkout live — a single `/basket` route used by both surfaces? These affect layout, hence the checkpoint before building.
+
 ## Locked decisions (owner, 2026-06-26)
 1. **Unpriced main items are QUOTE-ONLY.** A firm order requires every line priced; any "price on request" line forces "Request Quote".
 2. **One merged basket** — combine the two baskets into a single basket holding both main and portal items, one checkout, one history.
@@ -90,5 +100,5 @@ Recommend building **D1 first** (it resolves the actual reported bug), then D2, 
 
 ## Build status
 - **D1 — Backend unify: ✅ DONE (2026-06-26).** Unified `buildPricedLines` resolver (routes.ts) now serves both catalogues: portal item by `itemId`, main product by `productId` matched to the customer's price via **EAN** (`pricingV2.getCustomerItemByEan`), else **price-on-request** (null). Old `POST /api/quotes` repointed through it (main-catalog quotes now use the customer's own price, carry `priceListItemId`). Orders blocked when any line is price-on-request (`allPriced` guard on `POST /api/portal/orders`, returns `needsQuote:true`). **Verified by a 12-assertion end-to-end test** (EAN-matched customer price beats wholesale; price-on-request; order guard; portal item; mixed basket). Type-checks + builds clean. No schema changes (both id columns already existed).
-- D2 — One merged basket + one history: pending.
+- D2 — One merged basket + one history: **designed, awaiting go-ahead** (largest, live-storefront UX change). Design below.
 - **D3 — Single admin nav line: ✅ DONE (2026-06-26).** Removed "Quotes" + "Orders" from the admin sidebar (`admin-layout.tsx`); "Sales (pipeline)" is the single line. `/admin/quotes` & `/admin/orders` routes stay alive and are reached via Sales' "Open" buttons (quote versioning / respond / accept actions preserved). Build clean.
