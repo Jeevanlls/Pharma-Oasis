@@ -1,11 +1,21 @@
 # Session Handoff — START HERE next session
 
-_Last updated: 2026-06-25 (end of session). This is the master index. Detailed docs are linked below._
+_Last updated: 2026-06-26 (end of session). This is the master index. Detailed docs are linked below._
 
 ## TL;DR for the next session
-- All work is **committed and merged to `main`** (`d03ae37`) and pushed to `gitsafe-backup`. Working branch is `feature/price-list-builder` (kept in sync with `main`). Tree is clean except the harness-managed `.claude/settings.local.json`.
-- Two big workstreams were completed this session: **(1) Auth hardening** and **(2) Sales pipeline (quotes + orders) rework**. Both are built, type-checked, built clean, and each piece passed an end-to-end test.
-- **Nothing is known-broken.** The main outstanding items are operational (deploy + env vars) and deferred features (inventory API). See "What's next" below.
+- All code work is **committed and merged to `main`** and pushed to `gitsafe-backup`. Working branch is `feature/price-list-builder` (kept in sync with `main`). Tree is clean except the harness-managed `.claude/settings.local.json`.
+- Two big workstreams were completed earlier: **(1) Auth hardening** and **(2) Sales pipeline (quotes + orders) rework**. Both are built, type-checked, built clean, and each piece passed an end-to-end test.
+- **Nothing is known-broken. Production has NOT been deployed yet** — that's the next action (owner clicks Replit Deploy). See **[DEPLOY_CHECKLIST.md](DEPLOY_CHECKLIST.md)**.
+
+## 2026-06-26 session — what was done
+- **Verified the Sales pipeline + 2FA end-to-end against the REAL HTTP endpoints** (temp data, cleaned up after): **25/25 checks passed.** Covered: customer accepts quote → linked confirmed order (B1), duplicate-accept blocked, admin 2FA login (real TOTP), order stats, active/archived worklists, CSV export, "entered-to-inventory" stamps + archive, and 2FA rejecting a bad code. Real data untouched.
+- **Confirmed production build compiles clean** (`npm run build` → `dist/index.cjs`, 3.1 MB).
+- **Prepared [DEPLOY_CHECKLIST.md](DEPLOY_CHECKLIST.md)** (full step-by-step deploy + smoke test + rollback).
+- **Secrets resolved — no action needed before deploy:**
+  - `SESSION_SECRET` — already set in Repl Secrets; **leave as-is** (overwriting logs everyone out).
+  - `NEON_DATABASE_URL` — already set; deployment inherits it.
+  - `SITE_URL` — env var is unset, but **every code usage falls back to `https://pharmaoasis.co.uk`**, so prod links are already correct. Setting it is optional/cosmetic.
+  - (`DEPLOY_SECRETS.txt` was a throwaway helper holding a *suggested* SESSION_SECRET — unused since one already exists; safe to delete, gitignored, never committed.)
 
 ## How this project works (read before any change)
 - **One shared Neon DB for dev AND production.** Deploying ships code only — no data migration, no data loss. The app uses `NEON_DATABASE_URL`. `npm run db:push` targets a *different, unused* DB, so it does NOT migrate the live DB. **Add schema changes as idempotent `ALTER/CREATE ... IF NOT EXISTS` in `server/db.ts` startup SQL** (+ types in `shared/schema.ts`). The live DB holds **22 real customer accounts — never delete user rows.**
@@ -44,11 +54,9 @@ Decision: **one unified pipeline on screen, quotes + orders stay as linked recor
 
 ## WHAT'S NEXT (pick up here tomorrow)
 
-### Operational (owner / deploy — no code)
-1. **Deploy to production** when ready (Replit Deploy button). Before deploying, set in the deployment's secrets:
-   - `SESSION_SECRET` — strong random value (currently falls back to a dev default → sessions forgeable in prod). A suggested value was generated this session; generate a fresh one if preferred.
-   - `SITE_URL = https://pharmaoasis.co.uk` — so invite/reset/quotation links point at the live site.
-   - ⚠️ After deploy, 2FA is enforced for admins on production — have the authenticator app + backup codes ready. Break-glass SQL is in AUTH_HANDOFF.md.
+### Operational (owner / deploy — no code) → see [DEPLOY_CHECKLIST.md](DEPLOY_CHECKLIST.md)
+1. **Deploy to production** when ready (Replit Deploy button — owner UI action). **No secret changes are required** before deploying (see 2026-06-26 notes above: `SESSION_SECRET` + `NEON_DATABASE_URL` already set, `SITE_URL` safely defaulted in code). Build/run already correct: build `npm run build`, run `npm run start`.
+   - ⚠️ After deploy, 2FA is enforced for admins on production — have the authenticator app + backup codes ready. First prod admin login forces 2FA enrolment (QR + backup codes). Break-glass SQL is in AUTH_HANDOFF.md.
 
 ### Features not yet built
 2. **Phase C — inventory-system API integration: ⏸ DEFERRED by owner.** When resumed: find out which inventory system it is + whether it has an API (auth, endpoints, order payload). Until then, manual entry + CSV export (Phase A) is the handoff.
