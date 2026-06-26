@@ -24,7 +24,6 @@ import {
   Package,
   Building2,
   Tag,
-  FileText,
   Upload,
   Globe,
   MessageSquare,
@@ -42,7 +41,6 @@ import {
   Percent,
   FileUp,
   Coins,
-  ClipboardList,
   ShoppingCart,
   PoundSterling,
   BookOpen,
@@ -63,8 +61,9 @@ const mainMenuItems = [
   { title: "Brands", href: "/admin/brands", icon: Building2, staffAccess: true },
   { title: "Categories", href: "/admin/categories", icon: Tag, staffAccess: true },
   { title: "Sales (pipeline)", href: "/admin/sales", icon: ShoppingCart, staffAccess: false },
-  { title: "Quotes", href: "/admin/quotes", icon: FileText, staffAccess: false },
-  { title: "Orders", href: "/admin/orders", icon: ClipboardList, staffAccess: false },
+  // Quotes & Orders are now a single channel under Sales. Their detail pages
+  // (/admin/quotes, /admin/orders) stay routed and are opened from the Sales worklist,
+  // but are intentionally no longer separate top-level nav lines.
   { title: "CSV Import", href: "/admin/import", icon: Upload, staffAccess: true },
   { title: "Suppliers", href: "/admin/suppliers", icon: Globe, staffAccess: false },
   { title: "Messages", href: "/admin/messages", icon: MessageSquare, staffAccess: false },
