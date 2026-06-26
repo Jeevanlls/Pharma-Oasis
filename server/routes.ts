@@ -1022,72 +1022,70 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     status: z.enum(["accepted", "declined"]),
   });
 
+  // Accepting a quote turns it into a confirmed order automatically (no re-entry),
+  // linked back via order.quoteId. Idempotent: returns the existing order id if one
+  // already exists for the quote. Used by BOTH the customer accept and the admin
+  // "mark accepted" path so they behave identically.
+  async function createOrderFromAcceptedQuote(quoteId: number): Promise<number> {
+    const existing = await pricingStore.getOrderByQuoteId(quoteId);
+    if (existing) return existing.id;
+    const quote = await storage.getQuote(quoteId);
+    if (!quote) throw new Error("Quote not found");
+    const full = await storage.getQuoteWithItems(quoteId);
+    const items = full?.items ?? [];
+    const lines = items.map((it: any) => ({
+      productId: it.productId ?? null,
+      priceListItemId: it.priceListItemId ?? null,
+      ean: it.ean ?? null,
+      description: it.description ?? it.product?.productName ?? null,
+      quantity: it.quantity,
+      unitCost: it.unitCost != null ? Number(it.unitCost) : null,
+      unitPrice: it.unitPrice != null ? Number(it.unitPrice) : null,
+      marginApplied: it.marginApplied != null ? Number(it.marginApplied) : null,
+      lineTotal: it.lineTotal != null ? Number(it.lineTotal) : 0,
+    }));
+    const total = quote.totalEstimate != null ? Number(quote.totalEstimate) : lines.reduce((s, l) => s + (l.lineTotal || 0), 0);
+    const customer = await storage.getUser(quote.userId);
+    const order = await pricingStore.createOrder({
+      userId: quote.userId,
+      priceListId: (customer as any)?.priceListId ?? null,
+      quoteId,
+      status: "confirmed", // an accepted quote is a firm order ready to fulfil
+      totalAmount: total,
+      customerNotes: `Order from accepted quote #${quoteId}.` + (quote.customerNotes ? ` ${quote.customerNotes}` : ""),
+      lines,
+    });
+    return order.id;
+  }
+
   app.patch("/api/quotes/:id", requireActiveCustomer, async (req: any, res) => {
     try {
       const quoteId = Number(req.params.id);
       const { status } = customerQuoteResponseSchema.parse(req.body);
-      
+
       const quote = await storage.getQuote(quoteId);
       if (!quote) {
         return res.status(404).json({ message: "Quote not found" });
       }
-      
+
       if (quote.userId !== req.user.id) {
         return res.status(403).json({ message: "Access denied" });
       }
-      
+
       if (quote.status !== "quoted") {
-        return res.status(400).json({ 
-          message: "Only quotes with 'quoted' status can be accepted or declined" 
+        return res.status(400).json({
+          message: "Only quotes with 'quoted' status can be accepted or declined"
         });
       }
-      
+
       if (quote.expiryDate && new Date(quote.expiryDate) < new Date()) {
-        return res.status(400).json({ 
-          message: "This quote has expired. Please request a new quote." 
+        return res.status(400).json({
+          message: "This quote has expired. Please request a new quote."
         });
       }
-      
+
       const updatedQuote = await storage.updateQuote(quoteId, { status });
-
-      // Accepting a quote turns it into a confirmed order automatically (no re-entry),
-      // linked back via order.quoteId. Guard against creating a second order.
-      let createdOrderId: number | null = null;
-      if (status === "accepted") {
-        const existing = await pricingStore.getOrderByQuoteId(quoteId);
-        if (existing) {
-          createdOrderId = existing.id;
-        } else {
-          const full = await storage.getQuoteWithItems(quoteId);
-          const items = full?.items ?? [];
-          const lines = items.map((it: any) => ({
-            productId: it.productId ?? null,
-            priceListItemId: it.priceListItemId ?? null,
-            ean: it.ean ?? null,
-            description: it.description ?? it.product?.productName ?? null,
-            quantity: it.quantity,
-            unitCost: it.unitCost != null ? Number(it.unitCost) : null,
-            unitPrice: it.unitPrice != null ? Number(it.unitPrice) : null,
-            marginApplied: it.marginApplied != null ? Number(it.marginApplied) : null,
-            lineTotal: it.lineTotal != null ? Number(it.lineTotal) : 0,
-          }));
-          const total = quote.totalEstimate != null
-            ? Number(quote.totalEstimate)
-            : lines.reduce((s, l) => s + (l.lineTotal || 0), 0);
-          const customer = await storage.getUser(quote.userId);
-          const order = await pricingStore.createOrder({
-            userId: quote.userId,
-            priceListId: (customer as any)?.priceListId ?? null,
-            quoteId,
-            status: "confirmed", // an accepted quote is a firm order ready to fulfil
-            totalAmount: total,
-            customerNotes: `Order from accepted quote #${quoteId}.` + (quote.customerNotes ? ` ${quote.customerNotes}` : ""),
-            lines,
-          });
-          createdOrderId = order.id;
-        }
-      }
-
+      const createdOrderId = status === "accepted" ? await createOrderFromAcceptedQuote(quoteId) : null;
       res.json({ ...updatedQuote, orderId: createdOrderId });
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -2472,12 +2470,114 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
       if (!quote) {
         return res.status(404).json({ message: "Quote not found" });
       }
-      res.json(quote);
+      // Admin recording acceptance must create the linked confirmed order too,
+      // exactly like a customer accepting in the portal.
+      const orderId = updates.status === "accepted" ? await createOrderFromAcceptedQuote(id) : null;
+      res.json({ ...quote, orderId });
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid input", errors: error.errors });
       }
       res.status(500).json({ message: "Failed to update quote" });
+    }
+  });
+
+  // E2: replace a quote's line items (salesman prices the enquiry). Editable only
+  // while the quote is still pending or quoted. Recomputes the total estimate.
+  app.put("/api/admin/quotes/:id/items", requireAdmin, async (req, res) => {
+    try {
+      const { id } = quoteIdParamSchema.parse(req.params);
+      const quote = await storage.getQuote(id);
+      if (!quote) return res.status(404).json({ message: "Quote not found" });
+      if (!["pending", "quoted"].includes(quote.status)) {
+        return res.status(400).json({ message: `A ${quote.status} quote can no longer be edited.` });
+      }
+      const incoming: any[] = Array.isArray(req.body?.items) ? req.body.items : [];
+      if (incoming.length === 0) return res.status(400).json({ message: "A quote must have at least one line." });
+
+      const lines = incoming.map((it) => {
+        const quantity = Math.max(1, Number(it.quantity) || 1);
+        const unitPrice = it.unitPrice === null || it.unitPrice === undefined || it.unitPrice === "" ? null : Number(it.unitPrice);
+        const unitCost = it.unitCost === null || it.unitCost === undefined || it.unitCost === "" ? null : Number(it.unitCost);
+        const marginApplied = unitPrice != null && unitCost != null && unitCost > 0 ? ((unitPrice - unitCost) / unitCost) * 100 : (it.marginApplied != null ? Number(it.marginApplied) : null);
+        const lineTotal = unitPrice != null ? unitPrice * quantity : 0;
+        return {
+          productId: it.productId ?? null,
+          priceListItemId: it.priceListItemId ?? null,
+          ean: it.ean ?? null,
+          description: it.description ?? null,
+          quantity,
+          unitPrice,
+          unitCost,
+          marginApplied,
+          lineTotal,
+        };
+      });
+      const total = lines.reduce((s, l) => s + (l.lineTotal || 0), 0);
+
+      await storage.deleteQuoteItems(id);
+      for (const l of lines) {
+        await storage.createQuoteItem({
+          quoteId: id,
+          productId: l.productId,
+          priceListItemId: l.priceListItemId,
+          ean: l.ean,
+          description: l.description,
+          quantity: l.quantity,
+          unitPrice: l.unitPrice != null ? String(l.unitPrice) : null,
+          unitCost: l.unitCost != null ? String(l.unitCost) : null,
+          marginApplied: l.marginApplied != null ? String(l.marginApplied) : null,
+          lineTotal: l.lineTotal.toFixed(2),
+        } as any);
+      }
+      const updated = await storage.updateQuote(id, { totalEstimate: total.toFixed(2) } as any);
+      res.json({ ...updated, itemCount: lines.length });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      console.error("Quote items update error:", error);
+      res.status(500).json({ message: "Failed to update quote items" });
+    }
+  });
+
+  // E2: send the quote to the customer — moves pending → quoted (or re-sends a quoted
+  // one), sets validity, stores an internal note, and emails the printable quotation.
+  app.post("/api/admin/quotes/:id/send", requireAdmin, async (req, res) => {
+    try {
+      const { id } = quoteIdParamSchema.parse(req.params);
+      const quote = await storage.getQuote(id);
+      if (!quote) return res.status(404).json({ message: "Quote not found" });
+      if (!["pending", "quoted"].includes(quote.status)) {
+        return res.status(400).json({ message: `A ${quote.status} quote cannot be sent.` });
+      }
+      const message: string = typeof req.body?.message === "string" ? req.body.message : "";
+      const expiryRaw = req.body?.expiryDate;
+      const expiryDate = expiryRaw ? new Date(expiryRaw) : null;
+      if (expiryDate && (isNaN(expiryDate.getTime()) || expiryDate <= new Date())) {
+        return res.status(400).json({ message: "Validity date must be in the future." });
+      }
+
+      const updates: any = { status: "quoted" };
+      if (expiryDate) updates.expiryDate = expiryDate;
+      if (req.body?.adminNotes !== undefined) updates.adminNotes = req.body.adminNotes;
+      const updated = await storage.updateQuote(id, updates);
+
+      const customer = await storage.getUser(quote.userId);
+      const SITE_URL = process.env.SITE_URL || "https://pharmaoasis.co.uk";
+      if (customer) {
+        await sendCustomerResponseEmail({
+          email: customer.email,
+          contactName: customer.primaryContactName || customer.companyName || customer.email,
+          kind: "quote",
+          refId: id,
+          status: "quoted",
+          message: message || "Your quotation is ready. Please review and accept or decline.",
+          documentUrl: `${SITE_URL}/quotes/${id}/print`,
+        });
+      }
+      res.json({ ...updated, sent: true });
+    } catch (error: any) {
+      console.error("Quote send error:", error);
+      res.status(500).json({ message: error.message || "Failed to send quote" });
     }
   });
 

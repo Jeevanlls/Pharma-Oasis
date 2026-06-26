@@ -41,7 +41,6 @@ import AdminUsersPage from "@/pages/admin/users";
 import AdminProductsPage from "@/pages/admin/products";
 import AdminBrandsPage from "@/pages/admin/brands";
 import AdminCategoriesPage from "@/pages/admin/categories";
-import AdminQuotesPage from "@/pages/admin/quotes";
 import AdminImportPage from "@/pages/admin/import";
 import AdminSuppliersPage from "@/pages/admin/suppliers";
 import AdminMessagesPage from "@/pages/admin/messages";
@@ -73,7 +72,6 @@ import AdminPricingCategoriesPage from "@/pages/admin/pricing-categories";
 import AdminPriceBuilderPage from "@/pages/admin/price-builder";
 import AdminAssignmentsPage from "@/pages/admin/assignments";
 import AdminPricingGuidePage from "@/pages/admin/pricing-guide";
-import AdminOrdersPage from "@/pages/admin/orders";
 
 import PortalCataloguePage from "@/pages/portal/catalogue";
 import PortalOrdersPage from "@/pages/portal/orders";
@@ -179,7 +177,8 @@ function Router() {
           & /admin/orders pages stay reachable (unlinked) as a fallback until E2
           moves pricing/respond into the workspace, then they're removed. */}
       <Route path="/admin/sales/:kind/:id">{() => <AdminRoute component={DealWorkspacePage} />}</Route>
-      <Route path="/admin/quotes">{() => <AdminRoute component={AdminQuotesPage} />}</Route>
+      {/* E2: old quote/order admin pages retired — everything is the Sales workspace now. */}
+      <Route path="/admin/quotes">{() => <Redirect to="/admin/sales" />}</Route>
       <Route path="/admin/import">{() => <AdminRoute component={AdminImportPage} />}</Route>
       <Route path="/admin/suppliers">{() => <AdminRoute component={AdminSuppliersPage} />}</Route>
       <Route path="/admin/messages">{() => <AdminRoute component={AdminMessagesPage} />}</Route>
@@ -198,7 +197,7 @@ function Router() {
       <Route path="/admin/blog">{() => <AdminRoute component={AdminBlogPage} />}</Route>
       <Route path="/admin/product-rotation">{() => <AdminRoute component={AdminProductRotationPage} />}</Route>
       <Route path="/admin/offers">{() => <AdminRoute component={AdminOffersPage} />}</Route>
-      <Route path="/admin/orders">{() => <AdminRoute component={AdminOrdersPage} />}</Route>
+      <Route path="/admin/orders">{() => <Redirect to="/admin/sales" />}</Route>
       <Route path="/admin/cost-uploads">{() => <AdminRoute component={AdminCostUploadsPage} />}</Route>
       <Route path="/admin/current-costs">{() => <AdminRoute component={AdminCurrentCostsPage} />}</Route>
       <Route path="/admin/price-lists">{() => <AdminRoute component={AdminPriceListsPage} />}</Route>

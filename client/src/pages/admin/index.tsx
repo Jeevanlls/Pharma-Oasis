@@ -71,7 +71,7 @@ export default function AdminDashboard() {
   const quickActions = [
     { label: "Sales (orders)", icon: ShoppingCart, href: "/admin/sales", badge: ordersToHandle || undefined },
     { label: "User Approvals", icon: Users, href: "/admin/users", badge: stats?.pendingApprovals },
-    { label: "Quote Requests", icon: FileText, href: "/admin/quotes", badge: stats?.pendingQuotes },
+    { label: "Quote Requests", icon: FileText, href: "/admin/sales", badge: stats?.pendingQuotes },
     { label: "Products", icon: Package, href: "/admin/products" },
     { label: "Brands", icon: Building2, href: "/admin/brands" },
     { label: "Categories", icon: Tag, href: "/admin/categories" },
@@ -190,7 +190,7 @@ export default function AdminDashboard() {
                 </Link>
               ) : null}
               {stats?.pendingQuotes ? (
-                <Link href="/admin/quotes">
+                <Link href="/admin/sales">
                   <Button variant="outline" className="gap-2">
                     <FileText className="h-4 w-4" />
                     {stats.pendingQuotes} Quote{stats.pendingQuotes > 1 ? "s" : ""} Pending Review
