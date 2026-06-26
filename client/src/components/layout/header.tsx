@@ -86,7 +86,7 @@ export function Header() {
             </Link>
 
             {isAuthenticated && (
-              <Link href="/quote" aria-label="View quote basket">
+              <Link href="/basket" aria-label="View basket">
                 <Button
                   variant="ghost"
                   size="icon"
@@ -209,7 +209,7 @@ export function Header() {
                     </Link>
                     {isAuthenticated ? (
                       <div className="flex flex-col gap-1">
-                        <Link href="/quote">
+                        <Link href="/basket">
                           <Button
                             variant="ghost"
                             className="w-full justify-start gap-2"

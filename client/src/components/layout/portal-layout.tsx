@@ -10,7 +10,7 @@ import { ShoppingCart, LogOut, LayoutGrid, FileText, Package, ClipboardList, Dow
 const navItems = [
   { href: "/portal", label: "Catalogue", icon: LayoutGrid },
   { href: "/portal/orders", label: "My Orders", icon: ClipboardList },
-  { href: "/portal/quotes", label: "My Quotes", icon: FileText },
+  { href: "/my-quotes", label: "My Quotes", icon: FileText },
   { href: "/portal/downloads", label: "Price List", icon: Download },
 ];
 
@@ -47,7 +47,7 @@ export function PortalLayout({ children }: { children: React.ReactNode }) {
             </div>
 
             <div className="flex items-center gap-2">
-              <Link href="/portal/basket" aria-label="Basket">
+              <Link href="/basket" aria-label="Basket">
                 <Button variant="ghost" size="icon" className="relative">
                   <ShoppingCart className="h-5 w-5" />
                   {itemCount > 0 && (

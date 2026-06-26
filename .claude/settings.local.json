@@ -95,7 +95,10 @@
       "Bash(echo \"started $!\")",
       "Bash(cp /tmp/claude-1000/-home-runner-workspace/8d2e8132-5ae7-4a40-9bfd-2d1419d72cc7/scratchpad/verify-sales.ts ./__verify_tmp.ts)",
       "Bash(sed -i 's#\\\\.\\\\./\\\\.\\\\./\\\\.\\\\./\\\\.\\\\./\\\\.\\\\./home/runner/workspace/#./#g' ./__verify_tmp.ts)",
-      "Bash(git check-ignore *)"
+      "Bash(git check-ignore *)",
+      "Bash(curl -s -o /dev/null -w \"health: %{http_code}\\\\n\" http://localhost:5000/)",
+      "Bash(git commit *)",
+      "Bash(git rm *)"
     ]
   }
 }

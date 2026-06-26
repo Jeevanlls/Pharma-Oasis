@@ -41,7 +41,7 @@ export default function QuoteDocumentPage() {
 
       {/* Toolbar (hidden when printing) */}
       <div className="no-print mx-auto max-w-3xl px-4 mb-4 flex items-center justify-between">
-        <Link href={isAdmin ? "/admin/quotes" : "/portal/quotes"}>
+        <Link href={isAdmin ? "/admin/quotes" : "/my-quotes"}>
           <Button variant="ghost" className="gap-2"><ArrowLeft className="h-4 w-4" /> Back</Button>
         </Link>
         <Button onClick={() => window.print()} className="gap-2" data-testid="button-print-quote">

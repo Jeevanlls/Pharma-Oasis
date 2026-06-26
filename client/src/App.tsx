@@ -1,11 +1,10 @@
-import { Switch, Route, useLocation } from "wouter";
+import { Switch, Route, Redirect, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/lib/auth";
-import { QuoteBasketProvider } from "@/lib/quote-basket";
-import { PortalBasketProvider } from "@/lib/portal-basket";
+import { BasketProvider } from "@/lib/basket";
 import { AdminLayout } from "@/components/layout/admin-layout";
 import { PortalLayout } from "@/components/layout/portal-layout";
 import { CookieConsentBanner } from "@/components/cookie-consent";
@@ -18,7 +17,7 @@ import ProductsPage from "@/pages/products";
 import BrandsPage from "@/pages/brands";
 import ContactPage from "@/pages/contact";
 import HowToOrderPage from "@/pages/how-to-order";
-import QuotePage from "@/pages/quote";
+import BasketPage from "@/pages/basket";
 import MyQuotesPage from "@/pages/my-quotes";
 import QuoteDetailPage from "@/pages/quote-detail";
 import QuoteDocumentPage from "@/pages/quote-document";
@@ -76,9 +75,7 @@ import AdminPricingGuidePage from "@/pages/admin/pricing-guide";
 import AdminOrdersPage from "@/pages/admin/orders";
 
 import PortalCataloguePage from "@/pages/portal/catalogue";
-import PortalBasketPage from "@/pages/portal/basket";
 import PortalOrdersPage from "@/pages/portal/orders";
-import PortalQuotesPage from "@/pages/portal/quotes";
 import PortalDownloadsPage from "@/pages/portal/downloads";
 
 function AdminRoute({ component: Component }: { component: React.ComponentType }) {
@@ -151,7 +148,9 @@ function Router() {
       <Route path="/distribution-network" component={DistributionNetworkPage} />
       <Route path="/contact" component={ContactPage} />
       <Route path="/how-to-order" component={HowToOrderPage} />
-      <Route path="/quote" component={QuotePage} />
+      <Route path="/basket" component={BasketPage} />
+      {/* D2: one shared basket + checkout. Old checkout routes now redirect here. */}
+      <Route path="/quote">{() => <Redirect to="/basket" />}</Route>
       <Route path="/my-quotes" component={MyQuotesPage} />
       <Route path="/my-quotes/:id" component={QuoteDetailPage} />
       <Route path="/quotes/:id/print" component={QuoteDocumentPage} />
@@ -205,9 +204,10 @@ function Router() {
       <Route path="/admin/price-builder">{() => <AdminRoute component={AdminPriceBuilderPage} />}</Route>
 
       <Route path="/portal">{() => <PortalRoute component={PortalCataloguePage} />}</Route>
-      <Route path="/portal/basket">{() => <PortalRoute component={PortalBasketPage} />}</Route>
+      {/* D2: portal basket + the duplicate portal quotes list fold into the shared basket / my-quotes. */}
+      <Route path="/portal/basket">{() => <Redirect to="/basket" />}</Route>
+      <Route path="/portal/quotes">{() => <Redirect to="/my-quotes" />}</Route>
       <Route path="/portal/orders">{() => <PortalRoute component={PortalOrdersPage} />}</Route>
-      <Route path="/portal/quotes">{() => <PortalRoute component={PortalQuotesPage} />}</Route>
       <Route path="/portal/downloads">{() => <PortalRoute component={PortalDownloadsPage} />}</Route>
 
       <Route component={NotFound} />
@@ -219,15 +219,13 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <QuoteBasketProvider>
-          <PortalBasketProvider>
-            <TooltipProvider>
-              <Toaster />
-              <Router />
-              <CookieConsentBanner />
-            </TooltipProvider>
-          </PortalBasketProvider>
-        </QuoteBasketProvider>
+        <BasketProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Router />
+            <CookieConsentBanner />
+          </TooltipProvider>
+        </BasketProvider>
       </AuthProvider>
     </QueryClientProvider>
   );
