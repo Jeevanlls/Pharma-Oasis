@@ -28,6 +28,8 @@ _Last updated: 2026-06-26 (end of session). This is the master index. Detailed d
 
 ## Detailed docs (the source of truth for each area)
 - **[AUTH_HANDOFF.md](AUTH_HANDOFF.md)** — login hardening, 2FA, trusted devices, break-glass SQL.
+- **[SALES_WORKSPACE_PLAN.md](SALES_WORKSPACE_PLAN.md)** — ACTIVE: new quote & order management (Deal Workspace) replacing the old admin pages; phases E1–E6 (E1 done).
+- **[SALES_CONSOLIDATION_PLAN.md](SALES_CONSOLIDATION_PLAN.md)** — single-channel D1–D3 (DONE): unified pricing, one shared basket, single admin nav.
 - **[SALES_PIPELINE_PLAN.md](SALES_PIPELINE_PLAN.md)** — quotes+orders rework, phases A/B/C, the unified lifecycle.
 - [PRICE_BUILDER_HANDOFF.md](PRICE_BUILDER_HANDOFF.md) — earlier pricing tool work + DB topology details.
 
