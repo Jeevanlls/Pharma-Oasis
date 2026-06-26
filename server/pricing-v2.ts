@@ -1128,3 +1128,19 @@ export async function getCustomerItem(customerId: number, itemId: number): Promi
     .where(and(eq(priceListItems.id, itemId), inArray(priceListItems.priceListId, listIds)));
   return it ?? null;
 }
+
+/**
+ * Find a customer's prepared price-list item for a catalogue product by EAN.
+ * Used to give main-catalogue products the customer's own price when the same
+ * EAN exists in one of their assigned lists. Returns null if not in any list.
+ */
+export async function getCustomerItemByEan(customerId: number, ean: string | null | undefined): Promise<PriceListItem | null> {
+  if (!ean) return null;
+  const listIds = await customerListIds(customerId);
+  if (!listIds.length) return null;
+  const [it] = await db
+    .select()
+    .from(priceListItems)
+    .where(and(eq(priceListItems.ean, ean), inArray(priceListItems.priceListId, listIds)));
+  return it ?? null;
+}

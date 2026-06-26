@@ -934,65 +934,53 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
   app.post("/api/quotes", requireActiveCustomer, async (req: any, res) => {
     try {
       const { items, customerNotes } = req.body;
-      
+
       if (!items || !Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ message: "Quote must have at least one item" });
       }
 
-      let totalEstimate = 0;
-      const validItems = [];
-
-      for (const item of items) {
-        const product = await storage.getProduct(item.productId);
-        if (!product || !product.isActive) {
-          return res.status(400).json({ message: `Invalid product: ${item.productId}` });
-        }
-        
-        const quantity = Math.max(1, Number(item.quantity) || 1);
-        const lineTotal = Number(product.wholesalePrice) * quantity;
-        totalEstimate += lineTotal;
-        
-        validItems.push({
-          productId: product.id,
-          quantity,
-          unitPrice: product.wholesalePrice,
-          lineTotal: lineTotal.toFixed(2),
-        });
-      }
-
+      // Unified single-channel resolver: applies the customer's own price where the
+      // product is in one of their assigned lists, else marks it price-on-request.
+      // Carries productId + priceListItemId so it behaves identically to portal quotes.
+      const { lines, total } = await buildPricedLines(req.user, items);
       const quote = await storage.createQuote({
         userId: req.user.id,
         status: "pending",
         customerNotes: customerNotes || null,
-        totalEstimate: totalEstimate.toFixed(2),
+        totalEstimate: total.toFixed(2),
       });
-
-      for (const item of validItems) {
+      for (const l of lines) {
         await storage.createQuoteItem({
           quoteId: quote.id,
-          productId: item.productId,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          lineTotal: item.lineTotal,
+          productId: l.productId ?? null,
+          priceListItemId: l.priceListItemId ?? null,
+          ean: l.ean ?? null,
+          description: l.description ?? null,
+          quantity: l.quantity,
+          unitPrice: l.unitPrice != null ? String(l.unitPrice) : null,
+          unitCost: l.unitCost != null ? String(l.unitCost) : null,
+          marginApplied: l.marginApplied != null ? String(l.marginApplied) : null,
+          lineTotal: l.lineTotal.toFixed(2),
         });
       }
 
-      const totalValueFormatted = `£${Number(totalEstimate).toFixed(2)}`;
-      
+      const totalValueFormatted = `£${total.toFixed(2)}`;
+      const name = req.user.primaryContactName || req.user.companyName || req.user.email;
+
       await sendQuoteSubmissionNotification({
         quoteId: quote.id,
         customerEmail: req.user.email,
-        customerName: req.user.primaryContactName || req.user.companyName,
+        customerName: name,
         companyName: req.user.companyName,
-        itemCount: validItems.length,
+        itemCount: lines.length,
         totalValue: totalValueFormatted,
       });
 
       await sendQuoteConfirmationToCustomer({
         email: req.user.email,
-        contactName: req.user.primaryContactName || req.user.companyName,
+        contactName: name,
         quoteId: quote.id,
-        itemCount: validItems.length,
+        itemCount: lines.length,
         totalValue: totalValueFormatted,
       });
 
@@ -4660,33 +4648,71 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
     });
   });
 
-  // Snapshot priced lines for an order/quote at the customer's current prepared prices.
-  // Basket items reference prepared list items by `itemId` (falls back to productId).
+  // Snapshot priced lines for an order/quote — the UNIFIED resolver for BOTH the
+  // portal catalogue and the main advertised catalogue (single sales channel).
+  // A basket line may reference either a prepared price-list item (`itemId`) or a
+  // main catalogue product (`productId`). Resolution per line:
+  //   1. itemId given            → the customer's prepared list item (priced).
+  //   2. productId, EAN in a list → the customer's prepared price for that EAN (priced).
+  //   3. productId, not in a list → "price on request": productId kept, unitPrice null.
+  // `allPriced` is false if any line is price-on-request (→ quote-only, not a firm order).
   async function buildPricedLines(user: any, items: any[]) {
     const lines: any[] = [];
     let total = 0;
+    let allPriced = true;
     for (const it of items) {
-      const itemId = Number(it.itemId ?? it.productId);
-      const li = await pricingV2.getCustomerItem(user.id, itemId);
-      if (!li) throw new Error(`Invalid item: ${itemId}`);
       const qty = Math.max(1, Number(it.quantity) || 1);
-      const unitPrice = li.preparedPrice != null ? Number(li.preparedPrice) : null;
-      const unitCost = li.costPrice != null ? Number(li.costPrice) : null;
-      const marginApplied = li.method === "margin" && li.marginPercent != null ? Number(li.marginPercent) : null;
-      const lineTotal = unitPrice != null ? unitPrice * qty : 0;
-      total += lineTotal;
-      lines.push({
-        priceListItemId: li.id,
-        ean: li.ean,
-        description: li.description,
-        quantity: qty,
-        unitCost,
-        unitPrice,
-        marginApplied,
-        lineTotal,
-      });
+
+      // Resolve to a prepared price-list item where possible.
+      let li: any = null;
+      let product: any = null;
+      if (it.itemId != null) {
+        li = await pricingV2.getCustomerItem(user.id, Number(it.itemId));
+        if (!li) throw new Error(`Invalid item: ${it.itemId}`);
+      } else if (it.productId != null) {
+        product = await storage.getProduct(Number(it.productId));
+        if (!product || !product.isActive) throw new Error(`Invalid product: ${it.productId}`);
+        li = await pricingV2.getCustomerItemByEan(user.id, product.ean);
+      } else {
+        throw new Error("Each item needs an itemId or productId");
+      }
+
+      if (li) {
+        // Priced from the customer's prepared list (portal item, or main product matched by EAN).
+        const unitPrice = li.preparedPrice != null ? Number(li.preparedPrice) : null;
+        const unitCost = li.costPrice != null ? Number(li.costPrice) : null;
+        const marginApplied = li.method === "margin" && li.marginPercent != null ? Number(li.marginPercent) : null;
+        const lineTotal = unitPrice != null ? unitPrice * qty : 0;
+        if (unitPrice == null) allPriced = false;
+        total += lineTotal;
+        lines.push({
+          productId: product?.id ?? null,
+          priceListItemId: li.id,
+          ean: li.ean ?? product?.ean ?? null,
+          description: li.description ?? product?.productName ?? null,
+          quantity: qty,
+          unitCost,
+          unitPrice,
+          marginApplied,
+          lineTotal,
+        });
+      } else {
+        // Main catalogue product with no customer price → price on request (quote-only).
+        allPriced = false;
+        lines.push({
+          productId: product.id,
+          priceListItemId: null,
+          ean: product.ean ?? null,
+          description: product.productName ?? null,
+          quantity: qty,
+          unitCost: null,
+          unitPrice: null,
+          marginApplied: null,
+          lineTotal: 0,
+        });
+      }
     }
-    return { lines, total };
+    return { lines, total, allPriced };
   }
 
   // Place an order from the basket (snapshots prices)
@@ -4694,7 +4720,8 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
     try {
       const { items, customerNotes } = req.body;
       if (!Array.isArray(items) || items.length === 0) return res.status(400).json({ message: "Order must have at least one item" });
-      const { lines, total } = await buildPricedLines(req.user, items);
+      const { lines, total, allPriced } = await buildPricedLines(req.user, items);
+      if (!allPriced) return res.status(400).json({ message: "Some items have no price yet — please request a quote for these and we'll price them for you.", needsQuote: true });
       const order = await pricingStore.createOrder({
         userId: req.user.id,
         priceListId: null, // v2: pricing is per-brand across multiple lists
