@@ -4860,7 +4860,8 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
   app.get("/api/admin/orders/:id", requireAdmin, async (req, res) => {
     const found = await pricingStore.getOrderWithItems(Number(req.params.id));
     if (!found) return res.status(404).json({ message: "Order not found" });
-    res.json(found);
+    const customer = await storage.getUser(found.order.userId);
+    res.json({ ...found, customer: customer ? publicUser(customer) : null });
   });
 
   // Export an order's lines as CSV (for manual entry / Excel upload into the inventory system).

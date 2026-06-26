@@ -250,7 +250,7 @@ export default function AdminSalesPage() {
                             <PackageCheck className="h-4 w-4 mr-1" /> Entered
                           </Button>
                         )}
-                        <Link href={r.kind === "order" ? "/admin/orders" : "/admin/quotes"}>
+                        <Link href={`/admin/sales/${r.kind}/${r.id}`}>
                           <Button size="sm" variant="ghost" data-testid={`button-open-${r.ref}`}>Open</Button>
                         </Link>
                       </div>

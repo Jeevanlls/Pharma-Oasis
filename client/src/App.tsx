@@ -56,6 +56,7 @@ import AdminCompanyLocationsPage from "@/pages/admin/company-locations";
 import AdminStaffPage from "@/pages/admin/staff";
 import AdminSecurityPage from "@/pages/admin/security";
 import AdminSalesPage from "@/pages/admin/sales";
+import DealWorkspacePage from "@/pages/admin/deal-workspace";
 import AdminAnalyticsPage from "@/pages/admin/analytics";
 import AdminSeoPage from "@/pages/admin/seo";
 import AdminGooglePricingPage from "@/pages/admin/google-pricing";
@@ -174,6 +175,10 @@ function Router() {
       <Route path="/admin/brands">{() => <AdminRoute component={AdminBrandsPage} />}</Route>
       <Route path="/admin/categories">{() => <AdminRoute component={AdminCategoriesPage} />}</Route>
       <Route path="/admin/sales">{() => <AdminRoute component={AdminSalesPage} />}</Route>
+      {/* E1: new Deal Workspace opened from the Sales worklist. The old /admin/quotes
+          & /admin/orders pages stay reachable (unlinked) as a fallback until E2
+          moves pricing/respond into the workspace, then they're removed. */}
+      <Route path="/admin/sales/:kind/:id">{() => <AdminRoute component={DealWorkspacePage} />}</Route>
       <Route path="/admin/quotes">{() => <AdminRoute component={AdminQuotesPage} />}</Route>
       <Route path="/admin/import">{() => <AdminRoute component={AdminImportPage} />}</Route>
       <Route path="/admin/suppliers">{() => <AdminRoute component={AdminSuppliersPage} />}</Route>
