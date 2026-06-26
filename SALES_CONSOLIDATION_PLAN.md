@@ -91,7 +91,10 @@ Today there are two baskets: `useQuoteBasket` (catalog products, localStorage `�
 - **One checkout** that submits `items.map(l => l.kind==='portal' ? {itemId:l.refId,qty} : {productId:l.refId,qty})` to the unified backend (already built in D1). "Place Order" enabled only when every line `price != null`; otherwise "Request Quote" only.
 - **One history** ("My Orders & Quotes"): collapse `/my-quotes` + `/portal/quotes` into one quotes list; keep `/portal/orders`; shared detail/accept stays `/my-quotes/:id`.
 - Touch points: `products.tsx`, `product-detail.tsx`, `portal/catalogue.tsx`, `portal/basket.tsx` (→ generic basket page), `quote.tsx`, `App.tsx` (provider + routes), header basket indicator(s).
-- **Open UX questions for the owner:** (a) the two catalogues stay separate (public marketing site with no prices vs portal with customer prices) — should a *logged-in* customer on the public site see one basket icon shared with the portal? (b) Where should the unified basket/checkout live — a single `/basket` route used by both surfaces? These affect layout, hence the checkpoint before building.
+- **UX decisions LOCKED (owner, 2026-06-26):**
+  - (a) **One shared basket everywhere** — a logged-in customer has a single basket shared by the public site + portal (one icon, one checkout). The two *catalogues* still stay separate (public = no prices, portal = customer prices); only the basket/checkout unifies.
+  - (b) **One `/basket` route** used by both surfaces; `/quote` and `/portal/basket` redirect to it.
+- **Status:** not started — owner is redeploying to test D1+D3 on the live site first, then D2 builds.
 
 ## Locked decisions (owner, 2026-06-26)
 1. **Unpriced main items are QUOTE-ONLY.** A firm order requires every line priced; any "price on request" line forces "Request Quote".
