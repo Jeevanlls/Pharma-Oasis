@@ -1418,6 +1418,29 @@ export type InsertOrderItem = z.infer<typeof insertOrderItemSchema>;
 export type OrderItem = typeof orderItems.$inferSelect;
 
 // ============================================
+// E5 — DEAL EVENTS (activity timeline / comms log)
+// One row per meaningful action on a quote or order: created, priced,
+// sent, accepted/declined/closed, exported, entered. The message is
+// rendered as-is on the Deal Workspace timeline (no joins needed).
+// ============================================
+export const dealEvents = pgTable("deal_events", {
+  id: serial("id").primaryKey(),
+  dealKind: varchar("deal_kind", { length: 10 }).notNull(), // 'quote' | 'order'
+  dealId: integer("deal_id").notNull(),
+  type: varchar("type", { length: 40 }).notNull(), // created | priced | sent | accepted | declined | closed | exported | entered
+  actorId: integer("actor_id"), // user who triggered it (admin or customer); null for system
+  message: text("message"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertDealEventSchema = createInsertSchema(dealEvents).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertDealEvent = z.infer<typeof insertDealEventSchema>;
+export type DealEvent = typeof dealEvents.$inferSelect;
+
+// ============================================
 // CUSTOMER PRICING v2 — STANDALONE PRICING BRANDS
 // Separate from the public-catalogue `brands` table. The pricing/portal side
 // owns its own brand list, managed independently.

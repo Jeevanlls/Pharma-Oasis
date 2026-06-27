@@ -138,9 +138,12 @@ export default function AdminSalesPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold" style={{ fontFamily: "DM Sans, sans-serif" }}>Sales</h1>
-        <p className="mt-2 text-muted-foreground">Quotes and orders in one worklist. Mark an order "entered into inventory" once you've keyed it into your inventory system — it then moves to Archived.</p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold" style={{ fontFamily: "DM Sans, sans-serif" }}>Sales</h1>
+          <p className="mt-2 text-muted-foreground">Quotes and orders in one worklist. Mark an order "entered into inventory" once you've keyed it into your inventory system — it then moves to Archived.</p>
+        </div>
+        <Link href="/admin/sales/new-quote"><Button data-testid="button-new-quote"><FileText className="h-4 w-4 mr-2" /> New quote</Button></Link>
       </div>
 
       {/* KPI tiles */}

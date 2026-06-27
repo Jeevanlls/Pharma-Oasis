@@ -210,3 +210,20 @@ pool.query(`
   CREATE INDEX IF NOT EXISTS idx_trusted_devices_user ON trusted_devices(user_id);
 `).then(() => console.log('Trusted devices table ready'))
   .catch((err: Error) => console.warn('Trusted devices setup:', err.message));
+
+// ============================================================
+// E5 — Deal events (quote/order activity timeline + comms log)
+// ============================================================
+pool.query(`
+  CREATE TABLE IF NOT EXISTS deal_events (
+    id SERIAL PRIMARY KEY,
+    deal_kind VARCHAR(10) NOT NULL,
+    deal_id INTEGER NOT NULL,
+    type VARCHAR(40) NOT NULL,
+    actor_id INTEGER,
+    message TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+  );
+  CREATE INDEX IF NOT EXISTS idx_deal_events_deal ON deal_events (deal_kind, deal_id);
+`).then(() => console.log('Deal events table ready'))
+  .catch((err: Error) => console.warn('Deal events setup:', err.message));

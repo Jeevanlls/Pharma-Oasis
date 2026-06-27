@@ -56,6 +56,7 @@ import AdminStaffPage from "@/pages/admin/staff";
 import AdminSecurityPage from "@/pages/admin/security";
 import AdminSalesPage from "@/pages/admin/sales";
 import DealWorkspacePage from "@/pages/admin/deal-workspace";
+import NewQuotePage from "@/pages/admin/new-quote";
 import AdminAnalyticsPage from "@/pages/admin/analytics";
 import AdminSeoPage from "@/pages/admin/seo";
 import AdminGooglePricingPage from "@/pages/admin/google-pricing";
@@ -173,6 +174,8 @@ function Router() {
       <Route path="/admin/brands">{() => <AdminRoute component={AdminBrandsPage} />}</Route>
       <Route path="/admin/categories">{() => <AdminRoute component={AdminCategoriesPage} />}</Route>
       <Route path="/admin/sales">{() => <AdminRoute component={AdminSalesPage} />}</Route>
+      {/* E4: salesman-initiated quote (before the :kind/:id workspace route). */}
+      <Route path="/admin/sales/new-quote">{() => <AdminRoute component={NewQuotePage} />}</Route>
       {/* E1: new Deal Workspace opened from the Sales worklist. The old /admin/quotes
           & /admin/orders pages stay reachable (unlinked) as a fallback until E2
           moves pricing/respond into the workspace, then they're removed. */}

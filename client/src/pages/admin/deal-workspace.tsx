@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { format } from "date-fns";
-import { ArrowLeft, FileText, ClipboardList, Download, Printer, Building2, Mail, Phone, ListChecks, Plus, Trash2, Save, Send, Check, X, Loader2 } from "lucide-react";
+import { ArrowLeft, FileText, FileSpreadsheet, ClipboardList, Download, Printer, Building2, Mail, Phone, ListChecks, Plus, Trash2, Save, Send, Check, X, Loader2 } from "lucide-react";
 
 // E2 — Deal Workspace. A quote/order opened from Sales. Quotes that are still
 // pending/quoted are editable: the salesman prices the lines, sets validity + a
@@ -107,12 +107,21 @@ export default function DealWorkspacePage() {
   const addLine = () => { setLines((prev) => [...prev, { description: "", ean: "", quantity: 1, unitPrice: "", unitCost: "", productId: null, priceListItemId: null }]); setDirty(true); };
   const removeLine = (i: number) => { setLines((prev) => prev.filter((_, idx) => idx !== i)); setDirty(true); };
 
-  const timeline: { label: string; at: any }[] = [
-    { label: isOrder ? "Order created" : "Quote requested", at: root.createdAt },
-    ...(root.respondedAt ? [{ label: "Responded to customer", at: root.respondedAt }] : []),
-    ...(root.enteredToInventoryAt ? [{ label: "Entered into inventory", at: root.enteredToInventoryAt }] : []),
-    ...(root.archivedAt ? [{ label: "Archived", at: root.archivedAt }] : []),
-  ].filter((e) => e.at);
+  // E5 — prefer the recorded deal_events log; fall back to status fields for
+  // legacy deals created before the events table existed.
+  const events: any[] = data.events || [];
+  const timeline: { label: string; at: any }[] = events.length
+    ? [
+        { label: isOrder ? "Order created" : "Quote requested", at: root.createdAt },
+        ...events.filter((e) => e.type !== "created").map((e) => ({ label: e.message || e.type, at: e.createdAt })),
+      ]
+    : [
+        { label: isOrder ? "Order created" : "Quote requested", at: root.createdAt },
+        ...(root.respondedAt ? [{ label: "Responded to customer", at: root.respondedAt }] : []),
+        ...(root.enteredToInventoryAt ? [{ label: "Entered into inventory", at: root.enteredToInventoryAt }] : []),
+        ...(root.archivedAt ? [{ label: "Archived", at: root.archivedAt }] : []),
+      ];
+  const timelineSorted = timeline.filter((e) => e.at).sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
 
   return (
     <div className="space-y-6">
@@ -133,7 +142,11 @@ export default function DealWorkspacePage() {
         </div>
         <div className="flex flex-wrap gap-2">
           {isOrder ? (
-            <Button variant="outline" onClick={() => window.open(`/api/admin/orders/${root.id}/export`, "_blank")}><Download className="h-4 w-4 mr-2" /> Export CSV</Button>
+            <>
+              <Button variant="outline" onClick={() => window.open(`/api/admin/orders/${root.id}/document.pdf`, "_blank")}><FileText className="h-4 w-4 mr-2" /> PDF</Button>
+              <Button variant="outline" onClick={() => window.open(`/api/admin/orders/${root.id}/document.xlsx`, "_blank")}><FileSpreadsheet className="h-4 w-4 mr-2" /> Excel</Button>
+              <Button variant="outline" onClick={() => window.open(`/api/admin/orders/${root.id}/export`, "_blank")}><Download className="h-4 w-4 mr-2" /> CSV</Button>
+            </>
           ) : (
             <Link href={`/quotes/${root.id}/print`}><Button variant="outline"><Printer className="h-4 w-4 mr-2" /> Print / PDF</Button></Link>
           )}
@@ -249,7 +262,7 @@ export default function DealWorkspacePage() {
           <Card>
             <CardHeader><CardTitle className="text-lg">Activity</CardTitle></CardHeader>
             <CardContent className="space-y-3">
-              {timeline.map((e, i) => (<div key={i} className="flex items-start gap-3 text-sm"><div className="mt-1 h-2 w-2 rounded-full bg-primary shrink-0" /><div><div>{e.label}</div><div className="text-xs text-muted-foreground">{fmt(e.at)}</div></div></div>))}
+              {timelineSorted.map((e, i) => (<div key={i} className="flex items-start gap-3 text-sm"><div className="mt-1 h-2 w-2 rounded-full bg-primary shrink-0" /><div><div>{e.label}</div><div className="text-xs text-muted-foreground">{fmt(e.at)}</div></div></div>))}
             </CardContent>
           </Card>
         </div>

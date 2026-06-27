@@ -58,6 +58,8 @@ import * as pricingStore from "./pricing-store";
 import * as pricingV2 from "./pricing-v2";
 import { resolveForList, toCustomerPrice } from "./pricing";
 import { buildPriceListData, buildCustomerPriceListData, buildPriceListXlsx, buildPriceListPdf } from "./price-export";
+import { buildOrderXlsx, buildOrderPdf } from "./order-document";
+import { logDealEvent, listDealEvents } from "./deal-events";
 import {
   createImportJob, 
   getImportJob, 
@@ -964,6 +966,8 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
         });
       }
 
+      await logDealEvent({ dealKind: "quote", dealId: quote.id, type: "created", actorId: req.user.id, message: "Quote requested by customer" });
+
       const totalValueFormatted = `£${total.toFixed(2)}`;
       const name = req.user.primaryContactName || req.user.companyName || req.user.email;
 
@@ -1055,6 +1059,7 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
       customerNotes: `Order from accepted quote #${quoteId}.` + (quote.customerNotes ? ` ${quote.customerNotes}` : ""),
       lines,
     });
+    await logDealEvent({ dealKind: "order", dealId: order.id, type: "created", message: `Created from accepted quote Q-${quoteId}` });
     return order.id;
   }
 
@@ -1086,6 +1091,7 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
 
       const updatedQuote = await storage.updateQuote(quoteId, { status });
       const createdOrderId = status === "accepted" ? await createOrderFromAcceptedQuote(quoteId) : null;
+      await logDealEvent({ dealKind: "quote", dealId: quoteId, type: status, actorId: req.user.id, message: status === "accepted" ? `Customer accepted — order O-${createdOrderId} created` : "Customer declined" });
       res.json({ ...updatedQuote, orderId: createdOrderId });
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -2407,13 +2413,63 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     }
   });
 
+  // E4 — salesman-initiated quote: create a pending quote for a chosen customer
+  // with starter lines. The salesman then prices/sends it in the Deal Workspace.
+  app.post("/api/admin/quotes", requireAdmin, async (req: any, res) => {
+    try {
+      const userId = Number(req.body?.userId);
+      if (!Number.isFinite(userId)) return res.status(400).json({ message: "Select a customer." });
+      const customer = await storage.getUser(userId);
+      if (!customer) return res.status(404).json({ message: "Customer not found." });
+      const incoming: any[] = Array.isArray(req.body?.items) ? req.body.items : [];
+      if (incoming.length === 0) return res.status(400).json({ message: "Add at least one line." });
+
+      const lines = incoming.map((it) => {
+        const quantity = Math.max(1, Number(it.quantity) || 1);
+        const unitPrice = it.unitPrice === null || it.unitPrice === undefined || it.unitPrice === "" ? null : Number(it.unitPrice);
+        const unitCost = it.unitCost === null || it.unitCost === undefined || it.unitCost === "" ? null : Number(it.unitCost);
+        const marginApplied = unitPrice != null && unitCost != null && unitCost > 0 ? ((unitPrice - unitCost) / unitCost) * 100 : null;
+        const lineTotal = unitPrice != null ? unitPrice * quantity : 0;
+        return { ean: it.ean ?? null, description: it.description ?? null, quantity, unitPrice, unitCost, marginApplied, lineTotal };
+      });
+      const total = lines.reduce((s, l) => s + (l.lineTotal || 0), 0);
+
+      const quote = await storage.createQuote({
+        userId,
+        status: "pending",
+        customerNotes: typeof req.body?.customerNotes === "string" && req.body.customerNotes ? req.body.customerNotes : null,
+        totalEstimate: total.toFixed(2),
+      } as any);
+      for (const l of lines) {
+        await storage.createQuoteItem({
+          quoteId: quote.id,
+          productId: null,
+          priceListItemId: null,
+          ean: l.ean,
+          description: l.description,
+          quantity: l.quantity,
+          unitPrice: l.unitPrice != null ? String(l.unitPrice) : null,
+          unitCost: l.unitCost != null ? String(l.unitCost) : null,
+          marginApplied: l.marginApplied != null ? String(l.marginApplied) : null,
+          lineTotal: l.lineTotal.toFixed(2),
+        } as any);
+      }
+      await logDealEvent({ dealKind: "quote", dealId: quote.id, type: "created", actorId: req.user?.id ?? null, message: "Quote created by salesman" });
+      res.status(201).json(quote);
+    } catch (error: any) {
+      console.error("Admin quote create error:", error);
+      res.status(500).json({ message: error.message || "Failed to create quote" });
+    }
+  });
+
   // Single quote with items + customer (for the printable quotation document).
   app.get("/api/admin/quotes/:id", requireAdmin, async (req, res) => {
     try {
       const full = await storage.getQuoteWithItems(Number(req.params.id));
       if (!full) return res.status(404).json({ message: "Quote not found" });
       const customer = await storage.getUser(full.userId);
-      res.json({ ...full, customer: customer ? publicUser(customer) : null });
+      const events = await listDealEvents("quote", full.id);
+      res.json({ ...full, customer: customer ? publicUser(customer) : null, events });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch quote" });
     }
@@ -2473,6 +2529,12 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
       // Admin recording acceptance must create the linked confirmed order too,
       // exactly like a customer accepting in the portal.
       const orderId = updates.status === "accepted" ? await createOrderFromAcceptedQuote(id) : null;
+      if (updates.status) {
+        const msg = updates.status === "accepted" ? `Marked accepted — order O-${orderId} created`
+          : updates.status === "declined" ? "Marked declined"
+          : updates.status === "closed" ? "Quote closed" : `Status set to ${updates.status}`;
+        await logDealEvent({ dealKind: "quote", dealId: id, type: updates.status, actorId: (req as any).user?.id ?? null, message: msg });
+      }
       res.json({ ...quote, orderId });
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -2531,6 +2593,7 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
         } as any);
       }
       const updated = await storage.updateQuote(id, { totalEstimate: total.toFixed(2) } as any);
+      await logDealEvent({ dealKind: "quote", dealId: id, type: "priced", actorId: (req as any).user?.id ?? null, message: `Prices saved (${lines.length} line${lines.length === 1 ? "" : "s"}, total £${total.toFixed(2)})` });
       res.json({ ...updated, itemCount: lines.length });
     } catch (error: any) {
       if (error instanceof z.ZodError) return res.status(400).json({ message: "Invalid input", errors: error.errors });
@@ -2574,6 +2637,7 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
           documentUrl: `${SITE_URL}/quotes/${id}/print`,
         });
       }
+      await logDealEvent({ dealKind: "quote", dealId: id, type: "sent", actorId: (req as any).user?.id ?? null, message: quote.status === "quoted" ? "Quote re-sent to customer" : "Quote sent to customer" });
       res.json({ ...updated, sent: true });
     } catch (error: any) {
       console.error("Quote send error:", error);
@@ -4961,7 +5025,8 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
     const found = await pricingStore.getOrderWithItems(Number(req.params.id));
     if (!found) return res.status(404).json({ message: "Order not found" });
     const customer = await storage.getUser(found.order.userId);
-    res.json({ ...found, customer: customer ? publicUser(customer) : null });
+    const events = await listDealEvents("order", found.order.id);
+    res.json({ ...found, customer: customer ? publicUser(customer) : null, events });
   });
 
   // Export an order's lines as CSV (for manual entry / Excel upload into the inventory system).
@@ -4982,10 +5047,42 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
     res.send(csv);
   });
 
+  // E3 — sales-order documents (PDF + Excel) for manual processing in the SaaS.
+  app.get("/api/admin/orders/:id/document.xlsx", requireAdmin, async (req: any, res) => {
+    try {
+      const found = await pricingStore.getOrderWithItems(Number(req.params.id));
+      if (!found) return res.status(404).json({ message: "Order not found" });
+      const customer = await storage.getUser(found.order.userId);
+      const buf = buildOrderXlsx({ order: found.order, items: found.items, customer: customer ? (publicUser(customer) as any) : null });
+      logDealEvent({ dealKind: "order", dealId: found.order.id, type: "exported", actorId: req.user?.id ?? null, message: "Order exported as Excel" });
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", `attachment; filename="order-${found.order.id}.xlsx"`);
+      res.send(buf);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to build Excel document" });
+    }
+  });
+
+  app.get("/api/admin/orders/:id/document.pdf", requireAdmin, async (req: any, res) => {
+    try {
+      const found = await pricingStore.getOrderWithItems(Number(req.params.id));
+      if (!found) return res.status(404).json({ message: "Order not found" });
+      const customer = await storage.getUser(found.order.userId);
+      const buf = await buildOrderPdf({ order: found.order, items: found.items, customer: customer ? (publicUser(customer) as any) : null });
+      logDealEvent({ dealKind: "order", dealId: found.order.id, type: "exported", actorId: req.user?.id ?? null, message: "Order exported as PDF" });
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="order-${found.order.id}.pdf"`);
+      res.send(buf);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to build PDF document" });
+    }
+  });
+
   // Mark an order as entered into the external inventory system → archives it off the active worklist.
   app.post("/api/admin/orders/:id/enter", requireAdmin, async (req: any, res) => {
     try {
       const order = await pricingStore.enterOrderToInventory(Number(req.params.id), req.user.id);
+      await logDealEvent({ dealKind: "order", dealId: order.id, type: "entered", actorId: req.user.id, message: "Marked entered into inventory" });
       res.json(order);
     } catch (error: any) {
       res.status(500).json({ message: error.message || "Failed to mark entered" });
