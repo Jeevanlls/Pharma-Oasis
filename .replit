@@ -54,3 +54,6 @@ integrations = [
 
 [userenv.shared]
 NOTIFICATION_EMAIL = "jeevan@pharmaoasis.com"
+
+[objectStorage]
+defaultBucketID = "replit-objstore-89855f97-e676-41d6-b519-61e3bc0dd488"
