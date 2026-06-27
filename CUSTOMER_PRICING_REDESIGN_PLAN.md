@@ -78,7 +78,7 @@ For each: **Keep identical** = the logic that must not change. **Restyle** = the
 - [x] 2. Categories — pricing-categories.tsx — same row-card treatment. **Awaiting owner verify.**
 - [x] 6. Who Sees What — assignments.tsx — airy spacing pass: rounded-lg banners/list-cards, bigger emerald brand-card titles, roomier customer-chip clusters, dashed empty state, hover on list rows. All logic/testids/links unchanged. **Type-checked + `npm run build` green (agent ran it — tooling restored). Awaiting owner verify.**
 - [x] 4. Current Costs — current-costs.tsx — converted to master-detail: left brand rail (selectable row-cards + filter, drives same `setBrandId`), Select kept as `lg:hidden` mobile fallback. Freshness badge moved into Live-costs header; added loading + dashed "select a brand" empty states. All edit logic (`edits`/`editPayload`/`setCost`/`setNote`/`openConfirm`/`applyChanges`), the product table inputs and preview Dialog unchanged. One presentation-only `brandSearch` state added for the rail filter. **Type-checked + build green. Awaiting owner verify.**
-- [ ] 3. Cost Uploads — cost-uploads.tsx
+- [x] 3. Cost Uploads — cost-uploads.tsx — chrome freshen only (densest page, logic untouched): page header gets an Upload icon + full-width (dropped max-w-6xl so the dense 9-col review table breathes), Review card title gets a ClipboardCheck icon, table/removed-panel wrappers → rounded-lg, history table wrapped in overflow-x-auto. ALL upload/preview/review/publish logic, the live status re-derivation, every editable input and mutation unchanged. **Type-checked + build green. Awaiting owner verify.**
 - [ ] 5. Price Builder — price-builder.tsx (light)
 
 ## Status / handoff

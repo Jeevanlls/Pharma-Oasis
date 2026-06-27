@@ -15,7 +15,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
-  Upload, Download, AlertTriangle, CheckCircle2, Trash2, Loader2, FileUp, Clock, Save, Filter,
+  Upload, Download, AlertTriangle, CheckCircle2, Trash2, Loader2, FileUp, Clock, Save, Filter, ClipboardCheck,
 } from "lucide-react";
 
 interface Brand { id: number; name: string; }
@@ -204,9 +204,11 @@ export default function AdminCostUploadsPage() {
   };
 
   return (
-    <div className="space-y-6 max-w-6xl">
+    <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Cost Uploads</h1>
+        <h1 className="text-2xl font-bold flex items-center gap-2">
+          <Upload className="h-6 w-6" /> Cost Uploads
+        </h1>
         <p className="text-muted-foreground"><b>Step 3.</b> Upload a supplier cost file for a brand. Review the preview, then <b>Publish</b> to make those costs live.</p>
       </div>
 
@@ -331,7 +333,7 @@ export default function AdminCostUploadsPage() {
         return (
         <Card>
           <CardHeader>
-            <CardTitle>Review before publishing</CardTitle>
+            <CardTitle className="flex items-center gap-2"><ClipboardCheck className="h-5 w-5" /> Review before publishing</CardTitle>
             <CardDescription className="flex flex-wrap gap-2 pt-1">
               <Badge variant="outline">{total} rows</Badge>
               {counts.changed > 0 && <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">{counts.changed} cost changed</Badge>}
@@ -374,7 +376,7 @@ export default function AdminCostUploadsPage() {
               <span className="text-xs text-muted-foreground">Showing {visible.length} of {total}. Cost, EAN, QTY &amp; Notes are editable.</span>
             </div>
 
-            <div className="max-h-[460px] overflow-auto border rounded">
+            <div className="max-h-[460px] overflow-auto border rounded-lg">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -446,7 +448,7 @@ export default function AdminCostUploadsPage() {
             </div>
 
             {s.removed.length > 0 && (
-              <div className="border border-amber-200 dark:border-amber-900/50 rounded bg-amber-50 dark:bg-amber-950/20 p-3">
+              <div className="border border-amber-200 dark:border-amber-900/50 rounded-lg bg-amber-50 dark:bg-amber-950/20 p-3.5">
                 <div className="flex items-center justify-between gap-2 mb-2">
                   <div className="flex items-center gap-1 text-amber-800 dark:text-amber-300 text-sm font-medium">
                     <AlertTriangle className="h-4 w-4" /> {s.removed.length} product(s) in the brand's last costs are NOT in this file
@@ -527,6 +529,7 @@ export default function AdminCostUploadsPage() {
       <Card>
         <CardHeader><CardTitle className="flex items-center gap-2"><Clock className="h-5 w-5" /> Upload history</CardTitle></CardHeader>
         <CardContent>
+          <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -561,6 +564,7 @@ export default function AdminCostUploadsPage() {
               ))}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
     </div>
