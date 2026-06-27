@@ -88,6 +88,7 @@ export default function PricingCategoriesPage() {
             ) : cats.length === 0 ? (
               <p className="text-muted-foreground">No categories yet.</p>
             ) : (
+              <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -121,6 +122,7 @@ export default function PricingCategoriesPage() {
                   ))}
                 </TableBody>
               </Table>
+              </div>
             )}
           </CardContent>
         </Card>

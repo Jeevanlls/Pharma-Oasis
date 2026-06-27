@@ -197,10 +197,10 @@ export default function AdminCostUploadsPage() {
   }
 
   const statusColor: Record<string, string> = {
-    draft: "bg-amber-100 text-amber-800",
-    published: "bg-green-100 text-green-800",
-    superseded: "bg-gray-100 text-gray-600",
-    archived: "bg-gray-100 text-gray-600",
+    draft: "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300",
+    published: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300",
+    superseded: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
+    archived: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
   };
 
   return (
@@ -281,11 +281,11 @@ export default function AdminCostUploadsPage() {
         const s = preview.summary;
         const busy = saveDraftMut.isPending;
         const statusMeta: Record<RowStatus, { label: string; cls: string }> = {
-          duplicate: { label: "duplicate", cls: "text-red-600" },
-          missing_info: { label: "missing info", cls: "text-red-600" },
-          changed: { label: "cost changed", cls: "text-amber-700" },
-          new: { label: "new", cls: "text-blue-600" },
-          ok: { label: "ok", cls: "text-green-700" },
+          duplicate: { label: "duplicate", cls: "bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-300" },
+          missing_info: { label: "missing info", cls: "bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-300" },
+          changed: { label: "cost changed", cls: "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300" },
+          new: { label: "new", cls: "bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-300" },
+          ok: { label: "unchanged", cls: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300" },
         };
 
         // Re-derive each row's status LIVE from the current edits (duplicate EANs,
@@ -334,12 +334,12 @@ export default function AdminCostUploadsPage() {
             <CardTitle>Review before publishing</CardTitle>
             <CardDescription className="flex flex-wrap gap-2 pt-1">
               <Badge variant="outline">{total} rows</Badge>
-              {counts.changed > 0 && <Badge className="bg-amber-100 text-amber-800">{counts.changed} cost changed</Badge>}
-              {counts.new > 0 && <Badge className="bg-blue-100 text-blue-800">{counts.new} new</Badge>}
-              {s.removedCount > 0 && <Badge className="bg-amber-100 text-amber-800">{s.removedCount} missing</Badge>}
-              {counts.duplicate > 0 && <Badge className="bg-red-100 text-red-800">{counts.duplicate} duplicate</Badge>}
-              {counts.missing_info > 0 && <Badge className="bg-red-100 text-red-800">{counts.missing_info} missing info</Badge>}
-              {counts.ok > 0 && <Badge className="bg-green-100 text-green-800">{counts.ok} unchanged</Badge>}
+              {counts.changed > 0 && <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">{counts.changed} cost changed</Badge>}
+              {counts.new > 0 && <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-300">{counts.new} new</Badge>}
+              {s.removedCount > 0 && <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">{s.removedCount} missing</Badge>}
+              {counts.duplicate > 0 && <Badge className="bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-300">{counts.duplicate} duplicate</Badge>}
+              {counts.missing_info > 0 && <Badge className="bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-300">{counts.missing_info} missing info</Badge>}
+              {counts.ok > 0 && <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">{counts.ok} unchanged</Badge>}
               {s.brandNameInFile && <Badge variant="outline">File brand: {s.brandNameInFile}</Badge>}
             </CardDescription>
           </CardHeader>
@@ -355,7 +355,7 @@ export default function AdminCostUploadsPage() {
               </Alert>
             )}
             {dirty && (
-              <p className="text-xs text-amber-700">Statuses update live as you edit. Click <strong>Save changes</strong> to store them (Publish also saves automatically).</p>
+              <p className="text-xs text-amber-700 dark:text-amber-400">Statuses update live as you edit. Click <strong>Save changes</strong> to store them (Publish also saves automatically).</p>
             )}
 
             <div className="flex items-center gap-2">
@@ -394,7 +394,7 @@ export default function AdminCostUploadsPage() {
                     <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground text-sm">No rows for this filter</TableCell></TableRow>
                   )}
                   {visible.map(({ r, i }) => (
-                    <TableRow key={i} className={r.rowStatus === "duplicate" || r.rowStatus === "missing_info" ? "bg-red-50" : ""}>
+                    <TableRow key={i} className={r.rowStatus === "duplicate" || r.rowStatus === "missing_info" ? "bg-red-50 dark:bg-red-950/30" : ""}>
                       <TableCell>
                         <Input value={r.ean} onChange={(e) => patchRow(i, { ean: e.target.value })}
                           className="h-8 font-mono text-xs" placeholder="EAN" />
@@ -409,7 +409,7 @@ export default function AdminCostUploadsPage() {
                           onChange={(e) => patchRow(i, { costPrice: e.target.value === "" ? null : Number(e.target.value) })}
                           className="h-8 text-xs text-right" placeholder="0.00" />
                       </TableCell>
-                      <TableCell className={`text-right text-xs ${r.changePercent && Math.abs(r.changePercent) > s.threshold ? "text-red-600 font-semibold" : ""}`}>
+                      <TableCell className={`text-right text-xs ${r.changePercent && Math.abs(r.changePercent) > s.threshold ? "text-red-600 dark:text-red-400 font-semibold" : ""}`}>
                         {r.changePercent === null ? "—" : `${r.changePercent > 0 ? "+" : ""}${r.changePercent}%`}
                       </TableCell>
                       <TableCell>
@@ -422,11 +422,11 @@ export default function AdminCostUploadsPage() {
                           className="h-8 text-xs" placeholder="Internal note" />
                       </TableCell>
                       <TableCell>
-                        <span className={`text-xs ${statusMeta[r.rowStatus].cls}`} title={r.flagReason}>
+                        <Badge className={`font-normal ${statusMeta[r.rowStatus].cls}`} title={r.flagReason}>
                           {statusMeta[r.rowStatus].label}
-                        </span>
+                        </Badge>
                         {needsConfirm(r) && (
-                          <label className="flex items-center gap-1 mt-1 text-xs text-red-600 cursor-pointer">
+                          <label className="flex items-center gap-1 mt-1 text-xs text-red-600 dark:text-red-400 cursor-pointer">
                             <Checkbox checked={!!confirmedChanges[changeKey(r)]}
                               onCheckedChange={(v) => setConfirmedChanges((p) => ({ ...p, [changeKey(r)]: !!v }))} />
                             confirm {r.changePercent! > 0 ? "+" : ""}{r.changePercent}%
@@ -446,9 +446,9 @@ export default function AdminCostUploadsPage() {
             </div>
 
             {s.removed.length > 0 && (
-              <div className="border border-amber-200 rounded bg-amber-50 p-3">
+              <div className="border border-amber-200 dark:border-amber-900/50 rounded bg-amber-50 dark:bg-amber-950/20 p-3">
                 <div className="flex items-center justify-between gap-2 mb-2">
-                  <div className="flex items-center gap-1 text-amber-800 text-sm font-medium">
+                  <div className="flex items-center gap-1 text-amber-800 dark:text-amber-300 text-sm font-medium">
                     <AlertTriangle className="h-4 w-4" /> {s.removed.length} product(s) in the brand's last costs are NOT in this file
                   </div>
                   <div className="flex gap-1">
@@ -456,7 +456,7 @@ export default function AdminCostUploadsPage() {
                     <Button size="sm" variant="outline" onClick={() => { setKeepRemoved(Object.fromEntries(s.removed.map((r) => [r.ean, false]))); setDirty(true); }}>Remove all</Button>
                   </div>
                 </div>
-                <p className="text-xs text-amber-700 mb-2">
+                <p className="text-xs text-amber-700 dark:text-amber-400 mb-2">
                   For each, choose <strong>Keep</strong> (carried into this upload at its old cost) or <strong>Remove</strong> (dropped). Then <strong>Save changes</strong>.
                 </p>
                 <div className="max-h-[200px] overflow-auto">
@@ -512,11 +512,11 @@ export default function AdminCostUploadsPage() {
                 <Trash2 className="h-4 w-4 mr-2" /> Discard draft
               </Button>
               {liveHasDuplicates
-                ? <span className="text-xs text-red-600">Resolve duplicate EANs to enable publishing.</span>
+                ? <span className="text-xs text-red-600 dark:text-red-400">Resolve duplicate EANs to enable publishing.</span>
                 : unconfirmed > 0
-                  ? <span className="text-xs text-red-600">{unconfirmed} large cost change(s) need confirming (tick the box) before publishing.</span>
+                  ? <span className="text-xs text-red-600 dark:text-red-400">{unconfirmed} large cost change(s) need confirming (tick the box) before publishing.</span>
                   : counts.missing_info > 0
-                    ? <span className="text-xs text-amber-700">{counts.missing_info} incomplete line(s) will be skipped on publish.</span>
+                    ? <span className="text-xs text-amber-700 dark:text-amber-400">{counts.missing_info} incomplete line(s) will be skipped on publish.</span>
                     : null}
             </div>
           </CardContent>

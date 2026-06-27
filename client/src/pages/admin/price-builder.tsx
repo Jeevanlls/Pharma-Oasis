@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -15,7 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Coins, Users, RefreshCw, Trash2, Save, CheckCircle2, Search, Eye, AlertTriangle, SlidersHorizontal, PanelLeftClose, PanelLeftOpen, Archive } from "lucide-react";
+import { Plus, Minus, Coins, Users, RefreshCw, Trash2, Save, CheckCircle2, Search, Eye, AlertTriangle, SlidersHorizontal, PanelLeftClose, PanelLeftOpen, Archive, MoreHorizontal } from "lucide-react";
 
 interface PricingBrand { id: number; name: string; }
 interface PriceListSummary {
@@ -187,18 +188,25 @@ export default function PriceBuilderPage() {
   };
 
   // Apply a margin to ALL margin-method rows locally so every price updates live (save persists).
-  const previewMarginAll = () => {
-    if (bulkMargin === "") return;
+  const previewMarginAll = (value?: string) => {
+    const v = value ?? bulkMargin;
+    if (v === "") return;
+    setBulkMargin(v);
     setEdits((prev) => {
       const next = { ...prev };
       for (const it of items) {
         const m = next[it.id] ?? {};
         const method = (m.method ?? it.method);
-        if (method === "margin") next[it.id] = { ...m, method: "margin", marginPercent: bulkMargin };
+        if (method === "margin") next[it.id] = { ...m, method: "margin", marginPercent: v };
       }
       return next;
     });
-    toast({ title: "Preview updated", description: `All margin lines set to ${bulkMargin}% — review, then Save to publish-ready.` });
+    toast({ title: "Preview updated", description: `All margin lines set to ${v}% — review, then Save to publish-ready.` });
+  };
+  const stepMargin = (delta: number) => {
+    const base = Number(bulkMargin === "" ? 20 : bulkMargin);
+    const v = String(Math.max(0, Math.round((base + delta) * 10) / 10));
+    setBulkMargin(v);
   };
 
   const create = useMutation({
@@ -409,21 +417,33 @@ export default function PriceBuilderPage() {
                           <Users className="h-4 w-4 mr-1" /> Assigned ({selected.customerCount})
                         </Button>
                       )}
-                      <Button size="sm" variant="outline" onClick={() => setReconcileOpen(true)} title="Compare this list to the brand's latest published costs" data-testid="button-reconcile">
-                        <RefreshCw className="h-4 w-4 mr-1" /> Check for cost changes
-                      </Button>
-                      {selected.status === "published" ? (
-                        <Button size="sm" variant="outline" onClick={() => setStatus.mutate("draft")}>Unpublish</Button>
-                      ) : (
+                      {selected.status !== "published" && (
                         <Button size="sm" onClick={() => setStatus.mutate("published")} data-testid="button-publish" disabled={items.length === 0}>
                           <CheckCircle2 className="h-4 w-4 mr-1" /> Publish
                         </Button>
                       )}
-                      <Button size="sm" variant="ghost" title="Archive this price list"
-                        onClick={() => { if (confirm("Archive this price list? Customers will be unassigned and it moves to Archived. You can restore it later.")) archive.mutate(selected.id); }}
-                        data-testid="button-archive">
-                        <Archive className="h-4 w-4 mr-1 text-destructive" /> Archive
-                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button size="sm" variant="outline" data-testid="button-more-actions">
+                            <MoreHorizontal className="h-4 w-4 mr-1" /> More
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56">
+                          <DropdownMenuItem onClick={() => setReconcileOpen(true)} data-testid="menu-reconcile">
+                            <RefreshCw className="h-4 w-4 mr-2" /> Check for cost changes
+                          </DropdownMenuItem>
+                          {selected.status === "published" && (
+                            <DropdownMenuItem onClick={() => setStatus.mutate("draft")}>
+                              <Eye className="h-4 w-4 mr-2" /> Unpublish (back to draft)
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem className="text-destructive focus:text-destructive" data-testid="menu-archive"
+                            onClick={() => { if (confirm("Archive this price list? Customers will be unassigned and it moves to Archived. You can restore it later.")) archive.mutate(selected.id); }}>
+                            <Archive className="h-4 w-4 mr-2" /> Archive
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </div>
                 </CardHeader>
@@ -452,10 +472,24 @@ export default function PriceBuilderPage() {
                         </div>
                         <div>
                           <Label htmlFor="bulk-margin" className="text-xs">Set one margin % for every line</Label>
-                          <div className="flex gap-1">
-                            <Input id="bulk-margin" className="w-24" type="number" value={bulkMargin}
-                              onChange={(e) => setBulkMargin(e.target.value)} placeholder="e.g. 20" data-testid="input-bulk-margin" />
-                            <Button variant="secondary" onClick={previewMarginAll} disabled={bulkMargin === ""}>Apply to all</Button>
+                          <div className="flex items-center gap-1">
+                            <Button type="button" variant="outline" size="icon" className="h-9 w-9 shrink-0" onClick={() => stepMargin(-1)} title="Lower by 1%">
+                              <Minus className="h-4 w-4" />
+                            </Button>
+                            <Input id="bulk-margin" className="w-16 text-center" type="number" value={bulkMargin}
+                              onChange={(e) => setBulkMargin(e.target.value)} placeholder="20" data-testid="input-bulk-margin" />
+                            <Button type="button" variant="outline" size="icon" className="h-9 w-9 shrink-0" onClick={() => stepMargin(1)} title="Raise by 1%">
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                            <div className="flex gap-1 mx-1">
+                              {["10", "15", "20", "25", "30"].map((p) => (
+                                <Button key={p} type="button" size="sm"
+                                  variant={bulkMargin === p ? "default" : "outline"}
+                                  className={bulkMargin === p ? "bg-emerald-600 hover:bg-emerald-700 h-9 px-2.5" : "h-9 px-2.5"}
+                                  onClick={() => previewMarginAll(p)} data-testid={`chip-margin-${p}`}>{p}%</Button>
+                              ))}
+                            </div>
+                            <Button variant="secondary" onClick={() => previewMarginAll()} disabled={bulkMargin === ""}>Apply to all</Button>
                           </div>
                         </div>
                         <div>
@@ -930,7 +964,7 @@ function ReconcileDialog({ open, onOpenChange, listId, listName }: {
             {changed.length > 0 && (
               <section className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-semibold text-sm">🟡 Price changed — tick to apply (untick to keep old cost)</h3>
+                  <h3 className="font-semibold text-sm flex items-center gap-1.5"><RefreshCw className="h-4 w-4 text-amber-500" /> Price changed — tick to apply (untick to keep old cost)</h3>
                   <div className="flex gap-2">
                     <Button size="sm" variant="ghost" onClick={() => setRejectChanged(new Set())}>Apply all</Button>
                     <Button size="sm" variant="ghost" onClick={() => setRejectChanged(new Set(changed.map((c) => c.itemId)))}>Keep all old</Button>
@@ -976,7 +1010,7 @@ function ReconcileDialog({ open, onOpenChange, listId, listName }: {
             {newProducts.length > 0 && (
               <section className="space-y-2">
                 <div className="flex items-center justify-between flex-wrap gap-2">
-                  <h3 className="font-semibold text-sm">🟢 New products — added at margin</h3>
+                  <h3 className="font-semibold text-sm flex items-center gap-1.5"><Plus className="h-4 w-4 text-emerald-600" /> New products — added at margin</h3>
                   <div className="flex items-center gap-1">
                     <Label htmlFor="recon-new-margin" className="text-xs">margin %</Label>
                     <Input id="recon-new-margin" className="w-20" type="number" value={marginForNew}
@@ -1011,7 +1045,7 @@ function ReconcileDialog({ open, onOpenChange, listId, listName }: {
             {missing.length > 0 && (
               <section className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-semibold text-sm">🔴 Not in this upload — kept at old price unless you delete</h3>
+                  <h3 className="font-semibold text-sm flex items-center gap-1.5"><AlertTriangle className="h-4 w-4 text-red-500" /> Not in this upload — kept at old price unless you delete</h3>
                   <Button size="sm" variant="ghost" className="text-destructive" onClick={() => setDeleteMissing(new Set(missing.map((m) => m.itemId)))}>Delete all</Button>
                 </div>
                 <p className="text-xs text-muted-foreground">{missing.length} product(s) from this list aren't in the new cost file. By default they keep last month's price.</p>

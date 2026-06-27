@@ -44,6 +44,7 @@ import {
   ShoppingCart,
   PoundSterling,
   BookOpen,
+  Layers,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 
@@ -72,6 +73,7 @@ const mainMenuItems = [
 ];
 
 const pricingMenuItems = [
+  { title: "Overview", href: "/admin/pricing", icon: Layers, staffAccess: true },
   { title: "How this works (guide)", href: "/admin/pricing-guide", icon: BookOpen, staffAccess: true },
   { title: "1. Brands", href: "/admin/pricing-brands", icon: Building2, staffAccess: false },
   { title: "2. Categories", href: "/admin/pricing-categories", icon: Tag, staffAccess: false },

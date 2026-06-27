@@ -39,6 +39,9 @@ _Last updated: 2026-06-27 (end of session). This is the master index. Detailed d
 - **Admin UI convention:** pages must NOT self-wrap in `<AdminLayout>` (the `AdminRoute` shell does it); root is a bare `<div className="space-y-6">`, no `p-6`.
 - Commit promptly — this project has lost uncommitted work to workspace resets before.
 
+## Active UI work
+- **[CUSTOMER_PRICING_UI_PLAN.md](CUSTOMER_PRICING_UI_PLAN.md)** — 2026-06-27: visual/layout polish of the admin **Customer Pricing** section (presentation only, no logic). Reference screenshots in `attached_assets/` (08:37–08:38). Step 1 = NEW Customer Pricing Overview page (KPI cards) — mockup in progress.
+
 ## Detailed docs (the source of truth for each area)
 - **[AUTH_HANDOFF.md](AUTH_HANDOFF.md)** — login hardening, 2FA, trusted devices, break-glass SQL.
 - **[SALES_WORKSPACE_PLAN.md](SALES_WORKSPACE_PLAN.md)** — ACTIVE: new quote & order management (Deal Workspace) replacing the old admin pages; phases E1–E6 (E1 done).

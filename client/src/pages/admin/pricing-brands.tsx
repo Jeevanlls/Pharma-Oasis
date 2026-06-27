@@ -92,6 +92,7 @@ export default function PricingBrandsPage() {
             ) : brands.length === 0 ? (
               <p className="text-muted-foreground">No brands yet. Add your first pricing brand.</p>
             ) : (
+              <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -125,6 +126,7 @@ export default function PricingBrandsPage() {
                   ))}
                 </TableBody>
               </Table>
+              </div>
             )}
           </CardContent>
         </Card>

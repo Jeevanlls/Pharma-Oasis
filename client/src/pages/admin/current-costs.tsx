@@ -163,7 +163,7 @@ export default function AdminCurrentCostsPage() {
               </Select>
             </div>
             {brandId && published && (
-              <Badge className={published.stale ? "bg-amber-100 text-amber-800" : "bg-green-100 text-green-800"}>
+              <Badge className={published.stale ? "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300" : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"}>
                 <Clock className="h-3 w-3 mr-1" /> {published.label}
               </Badge>
             )}
@@ -185,7 +185,7 @@ export default function AdminCurrentCostsPage() {
             <CardTitle className="flex flex-wrap items-center gap-2">
               Live costs
               <Badge variant="outline">{rows.length} products</Badge>
-              {changedCount > 0 && <Badge className="bg-amber-100 text-amber-800">{changedCount} edited</Badge>}
+              {changedCount > 0 && <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">{changedCount} edited</Badge>}
             </CardTitle>
             <CardDescription>Search, then edit the cost or note on just the lines you need.</CardDescription>
           </CardHeader>
@@ -222,7 +222,7 @@ export default function AdminCurrentCostsPage() {
                       (e.comment ?? "") !== (r.comment ?? "")
                     );
                     return (
-                      <TableRow key={key || r.description} className={edited ? "bg-amber-50" : ""}>
+                      <TableRow key={key || r.description} className={edited ? "bg-amber-50 dark:bg-amber-950/20" : ""}>
                         <TableCell className="font-mono text-xs">{r.ean || "—"}</TableCell>
                         <TableCell className="text-xs">{r.description || "—"}</TableCell>
                         <TableCell className="text-right text-xs">{money(r.costPrice)}</TableCell>
@@ -282,7 +282,7 @@ export default function AdminCurrentCostsPage() {
                 </TableHeader>
                 <TableBody>
                   {preview.lines.map((l, i) => (
-                    <TableRow key={i} className={l.big ? "bg-red-50" : ""}>
+                    <TableRow key={i} className={l.big ? "bg-red-50 dark:bg-red-950/30" : ""}>
                       <TableCell className="text-xs">
                         <div>{l.description || "—"}</div>
                         <div className="font-mono text-muted-foreground">{l.ean || "—"}</div>
@@ -296,7 +296,7 @@ export default function AdminCurrentCostsPage() {
                       <TableCell className="text-right text-xs">
                         {money(l.oldCost)} → <strong>{money(l.newCost)}</strong>
                         {l.changePercent !== null && (
-                          <div className={l.big ? "text-red-600 font-semibold" : "text-muted-foreground"}>
+                          <div className={l.big ? "text-red-600 dark:text-red-400 font-semibold" : "text-muted-foreground"}>
                             {l.changePercent > 0 ? "+" : ""}{l.changePercent}%{l.big ? " ⚠" : ""}
                           </div>
                         )}
