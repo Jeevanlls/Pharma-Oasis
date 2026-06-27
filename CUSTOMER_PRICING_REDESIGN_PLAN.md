@@ -76,7 +76,7 @@ For each: **Keep identical** = the logic that must not change. **Restyle** = the
 ## Progress tracker
 - [x] 1. Brands — pricing-brands.tsx — airy row-cards (count badge, emerald active, hover, dashed empty state). Table import removed. Dialog + all testids/handlers unchanged. **Awaiting owner verify.**
 - [x] 2. Categories — pricing-categories.tsx — same row-card treatment. **Awaiting owner verify.**
-- [ ] 6. Who Sees What — assignments.tsx
+- [x] 6. Who Sees What — assignments.tsx — airy spacing pass: rounded-lg banners/list-cards, bigger emerald brand-card titles, roomier customer-chip clusters, dashed empty state, hover on list rows. All logic/testids/links unchanged. **Type-checked + `npm run build` green (agent ran it — tooling restored). Awaiting owner verify.**
 - [ ] 4. Current Costs — current-costs.tsx
 - [ ] 3. Cost Uploads — cost-uploads.tsx
 - [ ] 5. Price Builder — price-builder.tsx (light)

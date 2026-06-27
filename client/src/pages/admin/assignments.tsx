@@ -92,13 +92,13 @@ export default function AssignmentsPage() {
       {/* Top summary */}
       {brands.length > 0 && customers.length > 0 && (
         brandsWithGaps === 0 ? (
-          <div className="rounded-md border border-emerald-200 bg-emerald-50/70 dark:border-emerald-900/50 dark:bg-emerald-950/20 p-3 text-sm flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 dark:border-emerald-900/50 dark:bg-emerald-950/20 p-4 text-sm flex items-center gap-2.5">
+            <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
             <span>Every one of your <b>{customers.length}</b> approved customer(s) can see all <b>{brands.length}</b> brand(s). Nothing missing.</span>
           </div>
         ) : (
-          <div className="rounded-md border border-amber-300 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/20 p-3 text-sm flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+          <div className="rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/20 p-4 text-sm flex items-center gap-2.5">
+            <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0" />
             <span><b>{brandsWithGaps}</b> of <b>{brands.length}</b> brand(s) have customers who can't see prices yet. Check each brand below — expand "customers who can't see this" to find them.</span>
           </div>
         )
@@ -111,8 +111,10 @@ export default function AssignmentsPage() {
       </div>
 
       {brands.length === 0 && (
-        <Card><CardContent className="py-12 text-center text-muted-foreground">
-          No brands yet. Add one under <b>Brands</b>, then build a price list.
+        <Card><CardContent className="p-6">
+          <div className="rounded-lg border border-dashed py-12 text-center text-muted-foreground">
+            No brands yet. Add one under <b>Brands</b>, then build a price list.
+          </div>
         </CardContent></Card>
       )}
 
@@ -124,20 +126,20 @@ export default function AssignmentsPage() {
           <Card key={v.brand.id}>
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between gap-2 flex-wrap">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Coins className="h-4 w-4 text-muted-foreground" /> {v.brand.name}
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Coins className="h-5 w-5 text-emerald-600 dark:text-emerald-400" /> {v.brand.name}
                 </CardTitle>
                 <Badge variant={allCovered ? "default" : "outline"} className={allCovered ? "bg-emerald-600" : "border-amber-400 text-amber-800 dark:text-amber-300"}>
                   {coveredN} of {M} customers covered
                 </Badge>
               </div>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-4">
               {/* Coverage status */}
               {M === 0 ? (
                 <p className="text-sm text-muted-foreground">No approved customers yet.</p>
               ) : !v.hasPublishedList ? (
-                <div className="rounded-md border border-amber-300 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/20 p-2.5 text-sm">
+                <div className="rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/20 p-3.5 text-sm">
                   <div className="flex items-center gap-2 font-medium text-amber-800 dark:text-amber-300">
                     <AlertTriangle className="h-4 w-4 shrink-0" /> No published price list for this brand — none of your {M} customer(s) can see its prices.
                   </div>
@@ -152,12 +154,12 @@ export default function AssignmentsPage() {
                   <CheckCircle2 className="h-4 w-4 shrink-0" /> All {M} approved customer(s) can see this brand's prices.
                 </p>
               ) : (
-                <details className="rounded-md border border-amber-300 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/20 p-2.5 text-sm" data-testid={`gap-${v.brand.id}`}>
+                <details className="rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/20 p-3.5 text-sm" data-testid={`gap-${v.brand.id}`}>
                   <summary className="cursor-pointer font-medium text-amber-800 dark:text-amber-300 flex items-center gap-2">
                     <AlertTriangle className="h-4 w-4 shrink-0" /> {v.uncovered.length} customer(s) can't see this brand's prices — click to view
                   </summary>
                   <p className="text-xs text-muted-foreground mt-2">These approved customers have no price list for {v.brand.name}, so they see nothing for it. Assign them a list in the Price List Builder.</p>
-                  <div className="flex flex-wrap gap-1.5 mt-2">
+                  <div className="flex flex-wrap gap-2 mt-2.5">
                     {v.uncovered.map((c) => (
                       <Badge key={c.id} variant="outline" className="font-normal border-amber-400" title={c.email}>{custName(c)}</Badge>
                     ))}
@@ -169,9 +171,9 @@ export default function AssignmentsPage() {
               {v.lists.length > 0 && (
                 <div className="space-y-2">
                   {v.lists.map((l) => (
-                    <div key={l.name} className="rounded-md border p-3">
+                    <div key={l.name} className="rounded-lg border p-3.5 hover:bg-muted/40 transition-colors">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium">{l.name}</span>
+                        <span className="font-semibold">{l.name}</span>
                         <Badge variant={l.status === "published" ? "default" : "secondary"}>{l.status}</Badge>
                         <span className="text-xs text-muted-foreground">{l.customers.length} customer(s)</span>
                       </div>
@@ -180,7 +182,7 @@ export default function AssignmentsPage() {
                           {l.status === "published" ? "Published, but nobody is assigned yet." : "Draft — publish it before you can assign customers."}
                         </p>
                       ) : (
-                        <div className="flex flex-wrap gap-1.5 mt-2">
+                        <div className="flex flex-wrap gap-2 mt-2.5">
                           {l.customers.slice().sort((a, b) => assignName(a).localeCompare(assignName(b))).map((c) => (
                             <Badge key={c.customerId} variant="outline" className="font-normal" title={c.customerEmail}>{assignName(c)}</Badge>
                           ))}
