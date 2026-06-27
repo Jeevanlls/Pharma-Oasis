@@ -90,5 +90,17 @@ For each: **Keep identical** = the logic that must not change. **Restyle** = the
   - Cost Uploads (chrome) — `ccdfe04`
   - Price Builder (light rail) — this commit
   - Pre-existing `npm run check` has 33 errors in **unrelated** files (suppliers/offers/messages/admin-categories/product-detail) — present before this work, untouched by it.
-  - **Remaining:** owner click-through verify of each redesigned screen in the dev viewer, then the Replit **Deploy** button. Optional: clean up those 33 unrelated type errors separately.
+  - **Remaining:** owner click-through verify of each redesigned screen in the dev viewer, then the Replit **Deploy** button.
 - Indexed from `SESSION_HANDOFF.md`. Companion: `CUSTOMER_PRICING_UI_PLAN.md` (phase 1, done).
+
+## Cleanup — 33 pre-existing type errors FIXED (`05c8f2a`, 2026-06-27)
+Not part of the redesign; a separate sweep so `npm run check` is finally clean. **0 errors (was 33), `npm run build` green.** Files: `messages.tsx`, `suppliers.tsx`, `categories.tsx`, `admin/offers.tsx`, `hooks/use-page-tracking.ts`.
+- Two were **real runtime bugs**, not just type noise: `apiRequest(url, {method})` had its args reversed (helper is `apiRequest(method, url)`) in **messages** (mark-read/delete) and **suppliers** (update/delete) → the old code produced an invalid HTTP method + `/[object Object]` URL, so those actions never worked.
+- Also corrected fields that didn't match `shared/schema.ts`: messages `isRead`→`status==="read"`, dropped non-existent `subject`/`company` (title now "Enquiry from {name}"); suppliers `phone`→`phoneNumber`, `message`→`proposalSummary`, `productCategories[]`→split of the `productCategoriesSupply` text field. Plus two nullable-boolean `Switch` coercions and an optional `description` prop on `PageTracker`.
+
+### Verification (2026-06-27, tooling restored — ran the real app)
+Verdict **PASS** on the behavioral fix (the part that was actually broken), at the server surface. The admin GUI itself could not be driven here (no Playwright + admin login is mandatory-2FA-gated with unknown creds), so the field *rendering* was not browser-screenshotted — flagged for owner click-through.
+- Booted the built prod server (`node dist/index.cjs`) on the live DB; `/api/health` 200.
+- The 4 endpoints the fixed client calls (`PATCH/DELETE /api/admin/messages/:id(/read)`, `PATCH/DELETE /api/admin/supplier-leads/:id`) all return **401** (real `requireAdmin` gate) — whereas **non-existent** API routes return **200** (SPA fallback). So 401 is discriminating: the fixed targets are real, correctly method-routed, auth-gated routes.
+- Confirmed the served bundle (`dist/public/assets/index-*.js`) contains the fixed strings (`Enquiry from`, `Proposal Summary`, `productCategoriesSupply`, `phoneNumber`) and the old broken `…/read`,{method` shape is **gone**.
+- **Owner to eyeball in a live admin session** (only place 2FA can be satisfied): one message (mark-read toggles, delete removes) + one supplier lead (phone, proposal summary, category chips render).
