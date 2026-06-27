@@ -1,8 +1,26 @@
 # Session Handoff — START HERE next session
 
-_Last updated: 2026-06-27 (end of session). This is the master index. Detailed docs are linked below._
+_Last updated: 2026-06-27 (pm session). This is the master index. Detailed docs are linked below._
 
-## TL;DR for the next session
+## ⭐ MOST RECENT (2026-06-27 pm) — Customer Pricing redesign COMPLETE + type-check now clean
+Read this first; it supersedes the older "Active UI work" note for the pricing pages.
+
+**What got done this session (all on `feature/price-list-builder`):**
+- ✅ **Customer Pricing tool-page redesign (Option B) — ALL 6 PAGES DONE.** Brands+Categories (`6388ae7`, prior session) · Who Sees What (`419d62e`) · Current Costs → master-detail (`6f99e17`) · Cost Uploads chrome (`ccdfe04`) · Price Builder left rail (`c1d978b`). Presentation-only; no logic/workflow/testid changes. Full per-page detail + "did I break anything?" checklist in **[CUSTOMER_PRICING_REDESIGN_PLAN.md](CUSTOMER_PRICING_REDESIGN_PLAN.md)**.
+- ✅ **Fixed all 33 pre-existing `npm run check` type errors (`05c8f2a`)** — `npm run check` is now **0 errors** for the first time, build green. Two were **real runtime bugs**: reversed `apiRequest(url,{method})` args broke mark-read/delete/update on admin **Messages** and **Supplier Leads**. Also corrected field names that didn't match `shared/schema.ts`. Verification notes appended to the redesign plan (`d56616e`).
+- ✅ **Tooling is back** in the agent sandbox — `npm run check` / `npm run build` / system `git` all work now (the prior sessions' nix-mount outage is over). Every commit this session was type-checked + built green first.
+- ✅ **Server-surface verification done** for the behavioral fixes: built prod server booted on the live DB; the fixed mark-read/delete/update endpoints return 401 (real auth gate) vs 200 SPA-fallback for fake routes → proves the corrected calls hit real, method-correct endpoints.
+
+**⏯ NEXT ACTION (owner decides — do NOT auto-deploy):**
+1. **Visual click-through of the 6 redesigned screens** in the dev viewer — this is presentation work, so a human needs to eyeball it. Biggest change = **Current Costs** (new master-detail brand rail). The rendered fields on **Messages**/**Supplier Leads** could NOT be auto-verified (admin login is 2FA-gated + no browser automation in sandbox) → eyeball those in a live admin session: mark-read toggles, delete works, phone/proposal/category chips render.
+2. **`main` is STALE** — it's at `6388ae7`, **6 commits behind** `feature/price-list-builder` (tip `d56616e`). If Replit Deploy ships `main`, sync first with `git branch -f main feature/price-list-builder && git push gitsafe-backup main` (see "How this project works"). Replit Deploy usually ships the current workspace = the feature branch, but confirm.
+3. **Then deploy** (Replit Deploy button — agent can't click it).
+
+Nothing is known-broken; nothing half-done. Working tree clean except harness-managed `.claude/settings.local.json`.
+
+---
+
+## TL;DR for the next session (Sales work — still pending deploy, separate from the pricing redesign above)
 - All code is **committed on `feature/price-list-builder`, synced to `main`, pushed to `gitsafe-backup`**. Tree clean except the harness-managed `.claude/settings.local.json`.
 - **⏯ NEXT ACTION = REDEPLOY + TEST.** Production was last deployed at commit `b875b44`, but **everything after that — D1–D3 (consolidation) and E1–E5 (new Sales Workspace) — is NOT on production yet.** Click Replit Deploy to push it live and smoke-test (below).
 - **Sales Workspace E3–E5 are now DONE + verified (2026-06-27).** Order PDF/Excel documents, salesman-initiated "New quote", and the deal-events activity timeline are built. **The only remaining workspace phase is E6 (API push), deferred ~2 weeks by the owner.** Full detail in **[SALES_WORKSPACE_PLAN.md](SALES_WORKSPACE_PLAN.md)**.
@@ -40,7 +58,7 @@ _Last updated: 2026-06-27 (end of session). This is the master index. Detailed d
 - Commit promptly — this project has lost uncommitted work to workspace resets before.
 
 ## Active UI work
-- **[CUSTOMER_PRICING_REDESIGN_PLAN.md](CUSTOMER_PRICING_REDESIGN_PLAN.md)** — 2026-06-27 ACTIVE: redesign the 6 Customer Pricing **tool pages** to the reference layout (Option B). **Presentation-only — NO functionality/workflow changes.** Per-page, verify via build/viewer, commit incrementally. Progress tracker inside.
+- **[CUSTOMER_PRICING_REDESIGN_PLAN.md](CUSTOMER_PRICING_REDESIGN_PLAN.md)** — 2026-06-27 ✅ **DONE (all 6 pages) + 33 type errors fixed + verified.** Presentation-only redesign of the Customer Pricing tool pages to the reference layout (Option B). On `feature/price-list-builder`, type-check clean, build green. **Remaining = owner visual click-through + deploy** (see "⭐ MOST RECENT" at top). Progress tracker + verification notes inside.
 - **[CUSTOMER_PRICING_UI_PLAN.md](CUSTOMER_PRICING_UI_PLAN.md)** — 2026-06-27 (phase 1, DONE, committed `3e3c2b5`): Overview page + light polish pass. Reference screenshots in `attached_assets/` (08:37–08:38).
 
 ## Detailed docs (the source of truth for each area)
