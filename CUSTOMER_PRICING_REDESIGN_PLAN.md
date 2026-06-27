@@ -77,7 +77,7 @@ For each: **Keep identical** = the logic that must not change. **Restyle** = the
 - [x] 1. Brands — pricing-brands.tsx — airy row-cards (count badge, emerald active, hover, dashed empty state). Table import removed. Dialog + all testids/handlers unchanged. **Awaiting owner verify.**
 - [x] 2. Categories — pricing-categories.tsx — same row-card treatment. **Awaiting owner verify.**
 - [x] 6. Who Sees What — assignments.tsx — airy spacing pass: rounded-lg banners/list-cards, bigger emerald brand-card titles, roomier customer-chip clusters, dashed empty state, hover on list rows. All logic/testids/links unchanged. **Type-checked + `npm run build` green (agent ran it — tooling restored). Awaiting owner verify.**
-- [ ] 4. Current Costs — current-costs.tsx
+- [x] 4. Current Costs — current-costs.tsx — converted to master-detail: left brand rail (selectable row-cards + filter, drives same `setBrandId`), Select kept as `lg:hidden` mobile fallback. Freshness badge moved into Live-costs header; added loading + dashed "select a brand" empty states. All edit logic (`edits`/`editPayload`/`setCost`/`setNote`/`openConfirm`/`applyChanges`), the product table inputs and preview Dialog unchanged. One presentation-only `brandSearch` state added for the rail filter. **Type-checked + build green. Awaiting owner verify.**
 - [ ] 3. Cost Uploads — cost-uploads.tsx
 - [ ] 5. Price Builder — price-builder.tsx (light)
 

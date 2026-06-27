@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { AlertTriangle, Loader2, Search, Save, CheckCircle2, RotateCcw, Clock } from "lucide-react";
+import { AlertTriangle, Loader2, Search, Save, CheckCircle2, RotateCcw, Clock, Coins } from "lucide-react";
 
 interface Brand { id: number; name: string; }
 interface CurrentCostRow {
@@ -50,6 +50,7 @@ export default function AdminCurrentCostsPage() {
   const { toast } = useToast();
   const [brandId, setBrandId] = useState<string>("");
   const [search, setSearch] = useState("");
+  const [brandSearch, setBrandSearch] = useState(""); // presentation-only: filters the left brand rail
   // EAN -> edited cost (string while typing) and note.
   const [edits, setEdits] = useState<Record<string, { cost: string; comment: string }>>({});
   const [preview, setPreview] = useState<CostEditPreview | null>(null);
@@ -137,37 +138,74 @@ export default function AdminCurrentCostsPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-6xl">
+    <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Current Costs</h1>
+        <h1 className="text-2xl font-bold flex items-center gap-2">
+          <Coins className="h-6 w-6" /> Current Costs
+        </h1>
         <p className="text-muted-foreground">
           <b>Step 4 (optional).</b> Quickly fix a brand's live cost prices without re-uploading a file. Changing a cost updates the
           customer prices built from it — you'll see exactly what changes before confirming.
         </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Pick a brand</CardTitle>
-          <CardDescription>Shows the costs that are live right now, and when they were published.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="min-w-[240px]">
-              <Label>Brand</Label>
-              <Select value={brandId} onValueChange={setBrandId}>
-                <SelectTrigger><SelectValue placeholder="Select brand" /></SelectTrigger>
-                <SelectContent>
-                  {brands.map((b) => <SelectItem key={b.id} value={String(b.id)}>{b.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
+      {/* Mobile brand picker fallback (the left rail replaces this on lg+) */}
+      <Card className="lg:hidden">
+        <CardContent className="pt-6">
+          <Label>Brand</Label>
+          <Select value={brandId} onValueChange={setBrandId}>
+            <SelectTrigger><SelectValue placeholder="Select brand" /></SelectTrigger>
+            <SelectContent>
+              {brands.map((b) => <SelectItem key={b.id} value={String(b.id)}>{b.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
+        {/* Left rail — brand list (desktop). Selection drives the same setBrandId. */}
+        <Card className="hidden lg:block h-fit">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Brands</CardTitle>
+            <CardDescription>Pick one to edit its live costs.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="relative">
+              <Search className="h-4 w-4 absolute left-2 top-2.5 text-muted-foreground" />
+              <Input className="pl-8" placeholder="Filter brands…" value={brandSearch} onChange={(e) => setBrandSearch(e.target.value)} />
             </div>
-            {brandId && published && (
-              <Badge className={published.stale ? "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300" : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"}>
-                <Clock className="h-3 w-3 mr-1" /> {published.label}
-              </Badge>
-            )}
-          </div>
+            <div className="space-y-1.5 max-h-[520px] overflow-auto pr-1">
+              {brands
+                .filter((b) => b.name.toLowerCase().includes(brandSearch.trim().toLowerCase()))
+                .map((b) => {
+                  const selected = brandId === String(b.id);
+                  return (
+                    <button key={b.id} type="button" onClick={() => setBrandId(String(b.id))}
+                      className={`w-full text-left rounded-lg border px-3 py-2.5 text-sm transition-colors ${selected ? "border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30 font-medium" : "hover:bg-muted/40"}`}>
+                      {b.name}
+                    </button>
+                  );
+                })}
+              {brands.length === 0 && <p className="text-xs text-muted-foreground px-1 py-2">No brands yet.</p>}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Right pane — live costs for the selected brand */}
+        <div className="space-y-4 min-w-0">
+          {!brandId && (
+            <Card><CardContent className="p-6">
+              <div className="rounded-lg border border-dashed py-16 text-center text-muted-foreground">
+                Select a brand to see and edit its live costs.
+              </div>
+            </CardContent></Card>
+          )}
+
+          {brandId && !current && (
+            <Card><CardContent className="p-6 flex items-center gap-2 text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" /> Loading live costs…
+            </CardContent></Card>
+          )}
 
           {brandId && current && current.uploadId === null && (
             <Alert>
@@ -176,17 +214,22 @@ export default function AdminCurrentCostsPage() {
               <AlertDescription>Upload and publish a cost file in <strong>Cost Uploads</strong> first.</AlertDescription>
             </Alert>
           )}
-        </CardContent>
-      </Card>
 
       {brandId && current && current.uploadId !== null && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex flex-wrap items-center gap-2">
-              Live costs
-              <Badge variant="outline">{rows.length} products</Badge>
-              {changedCount > 0 && <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">{changedCount} edited</Badge>}
-            </CardTitle>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <CardTitle className="flex flex-wrap items-center gap-2">
+                Live costs
+                <Badge variant="outline">{rows.length} products</Badge>
+                {changedCount > 0 && <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">{changedCount} edited</Badge>}
+              </CardTitle>
+              {published && (
+                <Badge className={published.stale ? "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300" : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"}>
+                  <Clock className="h-3 w-3 mr-1" /> {published.label}
+                </Badge>
+              )}
+            </div>
             <CardDescription>Search, then edit the cost or note on just the lines you need.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -257,6 +300,8 @@ export default function AdminCurrentCostsPage() {
           </CardContent>
         </Card>
       )}
+        </div>
+      </div>
 
       <Dialog open={!!preview} onOpenChange={(o) => { if (!o) setPreview(null); }}>
         <DialogContent className="max-w-3xl">
