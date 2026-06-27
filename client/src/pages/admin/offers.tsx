@@ -721,7 +721,7 @@ export default function AdminOffersPage() {
                   <div className="flex items-center gap-4 flex-1 min-w-0">
                     <div className="shrink-0">
                       <Switch
-                        checked={offer.isActive}
+                        checked={!!offer.isActive}
                         onCheckedChange={(checked) => toggleMutation.mutate({ id: offer.id, isActive: checked })}
                         disabled={toggleMutation.isPending}
                         data-testid={`switch-toggle-offer-${offer.id}`}

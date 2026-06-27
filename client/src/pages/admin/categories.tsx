@@ -362,7 +362,7 @@ export default function AdminCategoriesPage() {
                 render={({ field }) => (
                   <FormItem className="flex items-center gap-2">
                     <FormControl>
-                      <Switch checked={field.value} onCheckedChange={field.onChange} />
+                      <Switch checked={!!field.value} onCheckedChange={field.onChange} />
                     </FormControl>
                     <FormLabel className="!mt-0">Active</FormLabel>
                   </FormItem>

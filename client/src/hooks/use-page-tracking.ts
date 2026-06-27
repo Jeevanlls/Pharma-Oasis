@@ -47,7 +47,7 @@ export function usePageTracking(pageTitle?: string) {
   }, [location, pageTitle]);
 }
 
-export function PageTracker({ title }: { title?: string }) {
+export function PageTracker({ title }: { title?: string; description?: string }) {
   usePageTracking(title);
   return null;
 }

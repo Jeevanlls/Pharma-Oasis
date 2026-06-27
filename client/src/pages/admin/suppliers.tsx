@@ -47,10 +47,7 @@ export default function AdminSuppliersPage() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: number; updates: Partial<SupplierLead> }) => {
-      return apiRequest(`/api/admin/supplier-leads/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify(updates),
-      });
+      return apiRequest("PATCH", `/api/admin/supplier-leads/${id}`, updates);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/supplier-leads"] });
@@ -63,9 +60,7 @@ export default function AdminSuppliersPage() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      return apiRequest(`/api/admin/supplier-leads/${id}`, {
-        method: "DELETE",
-      });
+      return apiRequest("DELETE", `/api/admin/supplier-leads/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/supplier-leads"] });
@@ -221,7 +216,7 @@ export default function AdminSuppliersPage() {
                   <Phone className="h-4 w-4 text-muted-foreground mt-0.5" />
                   <div>
                     <p className="text-sm text-muted-foreground">Phone</p>
-                    <p className="font-medium">{selectedLead.phone || "N/A"}</p>
+                    <p className="font-medium">{selectedLead.phoneNumber || "N/A"}</p>
                   </div>
                 </div>
                 {selectedLead.website && (
@@ -255,17 +250,19 @@ export default function AdminSuppliersPage() {
                   Product Categories
                 </h4>
                 <div className="flex flex-wrap gap-2">
-                  {selectedLead.productCategories?.map((cat, i) => (
-                    <Badge key={i} variant="secondary">{cat}</Badge>
-                  )) || <span className="text-sm text-muted-foreground">Not specified</span>}
+                  {selectedLead.productCategoriesSupply
+                    ? selectedLead.productCategoriesSupply.split(",").map((cat, i) => (
+                        <Badge key={i} variant="secondary">{cat.trim()}</Badge>
+                      ))
+                    : <span className="text-sm text-muted-foreground">Not specified</span>}
                 </div>
               </div>
 
-              {selectedLead.message && (
+              {selectedLead.proposalSummary && (
                 <div className="border-t pt-4">
-                  <h4 className="font-medium mb-2">Message</h4>
+                  <h4 className="font-medium mb-2">Proposal Summary</h4>
                   <p className="text-sm whitespace-pre-wrap bg-muted p-4 rounded-lg">
-                    {selectedLead.message}
+                    {selectedLead.proposalSummary}
                   </p>
                 </div>
               )}
@@ -335,6 +332,10 @@ interface LeadCardProps {
 
 function LeadCard({ lead, onView, onStatusChange, isUpdating }: LeadCardProps) {
   const status = statusConfig[lead.status] || statusConfig.new;
+  const categories = (lead.productCategoriesSupply ?? "")
+    .split(",")
+    .map((c) => c.trim())
+    .filter(Boolean);
 
   return (
     <Card data-testid={`card-lead-${lead.id}`}>
@@ -359,14 +360,14 @@ function LeadCard({ lead, onView, onStatusChange, isUpdating }: LeadCardProps) {
                 {format(new Date(lead.createdAt), "MMM d, yyyy")}
               </span>
             </div>
-            {lead.productCategories && lead.productCategories.length > 0 && (
+            {categories.length > 0 && (
               <div className="flex flex-wrap gap-1 mt-2">
-                {lead.productCategories.slice(0, 3).map((cat, i) => (
+                {categories.slice(0, 3).map((cat, i) => (
                   <Badge key={i} variant="outline" className="text-xs">{cat}</Badge>
                 ))}
-                {lead.productCategories.length > 3 && (
+                {categories.length > 3 && (
                   <Badge variant="outline" className="text-xs">
-                    +{lead.productCategories.length - 3} more
+                    +{categories.length - 3} more
                   </Badge>
                 )}
               </div>

@@ -17,7 +17,6 @@ import {
   Eye,
   Mail,
   User,
-  Building2,
   Phone,
   Calendar,
   CheckCircle,
@@ -39,9 +38,7 @@ export default function AdminMessagesPage() {
 
   const markReadMutation = useMutation({
     mutationFn: async (id: number) => {
-      return apiRequest(`/api/admin/messages/${id}/read`, {
-        method: "PATCH",
-      });
+      return apiRequest("PATCH", `/api/admin/messages/${id}/read`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/messages"] });
@@ -50,9 +47,7 @@ export default function AdminMessagesPage() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      return apiRequest(`/api/admin/messages/${id}`, {
-        method: "DELETE",
-      });
+      return apiRequest("DELETE", `/api/admin/messages/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/messages"] });
@@ -67,23 +62,22 @@ export default function AdminMessagesPage() {
   const filteredMessages = messages?.filter(msg =>
     msg.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     msg.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    msg.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
     msg.message.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const unreadMessages = filteredMessages?.filter(m => !m.isRead) || [];
-  const readMessages = filteredMessages?.filter(m => m.isRead) || [];
+  const unreadMessages = filteredMessages?.filter(m => m.status !== "read") || [];
+  const readMessages = filteredMessages?.filter(m => m.status === "read") || [];
 
   const handleView = (message: ContactMessage) => {
     setSelectedMessage(message);
-    if (!message.isRead) {
+    if (message.status !== "read") {
       markReadMutation.mutate(message.id);
     }
   };
 
   const handleReply = () => {
     if (!selectedMessage?.email || !replyText) return;
-    window.location.href = `mailto:${selectedMessage.email}?subject=Re: ${selectedMessage.subject}&body=${encodeURIComponent(replyText)}`;
+    window.location.href = `mailto:${selectedMessage.email}?subject=${encodeURIComponent(`Re: Your enquiry`)}&body=${encodeURIComponent(replyText)}`;
     toast({ title: "Opening email client..." });
   };
 
@@ -182,7 +176,7 @@ export default function AdminMessagesPage() {
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle style={{ fontFamily: "DM Sans, sans-serif" }}>
-              {selectedMessage?.subject}
+              {selectedMessage ? `Enquiry from ${selectedMessage.name}` : ""}
             </DialogTitle>
             <DialogDescription>
               Contact form submission
@@ -212,15 +206,6 @@ export default function AdminMessagesPage() {
                     <div>
                       <p className="text-sm text-muted-foreground">Phone</p>
                       <p className="font-medium">{selectedMessage.phone}</p>
-                    </div>
-                  </div>
-                )}
-                {selectedMessage.company && (
-                  <div className="flex items-center gap-2">
-                    <Building2 className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <p className="text-sm text-muted-foreground">Company</p>
-                      <p className="font-medium">{selectedMessage.company}</p>
                     </div>
                   </div>
                 )}
@@ -291,26 +276,22 @@ interface MessageCardProps {
 
 function MessageCard({ message, onView, onDelete, isDeleting }: MessageCardProps) {
   return (
-    <Card 
-      className={!message.isRead ? "border-primary/30 bg-primary/5" : ""}
+    <Card
+      className={message.status !== "read" ? "border-primary/30 bg-primary/5" : ""}
       data-testid={`card-message-${message.id}`}
     >
       <CardContent className="p-4">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
-              {message.isRead ? (
+              {message.status === "read" ? (
                 <CheckCircle className="h-4 w-4 text-muted-foreground" />
               ) : (
                 <Circle className="h-4 w-4 text-primary fill-primary" />
               )}
-              <h3 className="font-medium truncate">{message.subject}</h3>
+              <h3 className="font-medium truncate">Enquiry from {message.name}</h3>
             </div>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-              <span className="flex items-center gap-1">
-                <User className="h-3 w-3" />
-                {message.name}
-              </span>
               <span className="flex items-center gap-1">
                 <Mail className="h-3 w-3" />
                 {message.email}
