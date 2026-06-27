@@ -7,9 +7,6 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
-import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
@@ -83,49 +80,47 @@ export default function PricingBrandsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>All pricing brands</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              All pricing brands
+              {brands.length > 0 && <Badge variant="outline">{brands.length}</Badge>}
+            </CardTitle>
             <CardDescription>Each brand holds one base cost upload and any number of price lists.</CardDescription>
           </CardHeader>
           <CardContent>
             {isLoading ? (
               <p className="text-muted-foreground">Loading…</p>
             ) : brands.length === 0 ? (
-              <p className="text-muted-foreground">No brands yet. Add your first pricing brand.</p>
+              <div className="rounded-lg border border-dashed py-12 text-center text-muted-foreground">
+                No brands yet. Add your first pricing brand.
+              </div>
             ) : (
-              <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Order</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {brands.map((b) => (
-                    <TableRow key={b.id} data-testid={`row-brand-${b.id}`}>
-                      <TableCell className="font-medium">{b.name}</TableCell>
-                      <TableCell>{b.sortOrder ?? 0}</TableCell>
-                      <TableCell>
-                        <Badge variant={b.isActive ? "default" : "secondary"}>
+              <div className="space-y-2">
+                {brands.map((b) => (
+                  <div key={b.id} data-testid={`row-brand-${b.id}`}
+                    className="flex items-center justify-between gap-3 rounded-lg border p-3.5 hover:bg-muted/40 transition-colors">
+                    <div className="min-w-0">
+                      <div className="font-semibold truncate flex items-center gap-2">
+                        {b.name}
+                        <Badge variant={b.isActive ? "default" : "secondary"} className={b.isActive ? "bg-emerald-600" : ""}>
                           {b.isActive ? "Active" : "Inactive"}
                         </Badge>
-                      </TableCell>
-                      <TableCell className="text-right space-x-2">
-                        <Button size="sm" variant="ghost" onClick={() => openEdit(b)} data-testid={`button-edit-brand-${b.id}`}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={() => {
-                          if (confirm(`Delete brand "${b.name}"? This does not delete its price lists automatically.`)) del.mutate(b.id);
-                        }} data-testid={`button-delete-brand-${b.id}`}>
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-0.5">
+                        Sort order {b.sortOrder ?? 0}{b.notes ? ` · ${b.notes}` : ""}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button size="sm" variant="ghost" onClick={() => openEdit(b)} data-testid={`button-edit-brand-${b.id}`}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => {
+                        if (confirm(`Delete brand "${b.name}"? This does not delete its price lists automatically.`)) del.mutate(b.id);
+                      }} data-testid={`button-delete-brand-${b.id}`}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </CardContent>

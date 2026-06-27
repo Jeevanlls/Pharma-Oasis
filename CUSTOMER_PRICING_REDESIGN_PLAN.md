@@ -74,8 +74,8 @@ For each: **Keep identical** = the logic that must not change. **Restyle** = the
 5. **Price Builder** (light chrome only, last) → verify → commit.
 
 ## Progress tracker
-- [ ] 1. Brands — pricing-brands.tsx
-- [ ] 2. Categories — pricing-categories.tsx
+- [x] 1. Brands — pricing-brands.tsx — airy row-cards (count badge, emerald active, hover, dashed empty state). Table import removed. Dialog + all testids/handlers unchanged. **Awaiting owner verify.**
+- [x] 2. Categories — pricing-categories.tsx — same row-card treatment. **Awaiting owner verify.**
 - [ ] 6. Who Sees What — assignments.tsx
 - [ ] 4. Current Costs — current-costs.tsx
 - [ ] 3. Cost Uploads — cost-uploads.tsx

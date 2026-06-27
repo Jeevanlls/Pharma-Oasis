@@ -7,9 +7,6 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
-import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
@@ -79,49 +76,45 @@ export default function PricingCategoriesPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>All pricing categories</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              All pricing categories
+              {cats.length > 0 && <Badge variant="outline">{cats.length}</Badge>}
+            </CardTitle>
             <CardDescription>Used to filter the customer portal and scope downloads.</CardDescription>
           </CardHeader>
           <CardContent>
             {isLoading ? (
               <p className="text-muted-foreground">Loading…</p>
             ) : cats.length === 0 ? (
-              <p className="text-muted-foreground">No categories yet.</p>
+              <div className="rounded-lg border border-dashed py-12 text-center text-muted-foreground">
+                No categories yet.
+              </div>
             ) : (
-              <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Order</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {cats.map((c) => (
-                    <TableRow key={c.id} data-testid={`row-category-${c.id}`}>
-                      <TableCell className="font-medium">{c.name}</TableCell>
-                      <TableCell>{c.sortOrder ?? 0}</TableCell>
-                      <TableCell>
-                        <Badge variant={c.isActive ? "default" : "secondary"}>
+              <div className="space-y-2">
+                {cats.map((c) => (
+                  <div key={c.id} data-testid={`row-category-${c.id}`}
+                    className="flex items-center justify-between gap-3 rounded-lg border p-3.5 hover:bg-muted/40 transition-colors">
+                    <div className="min-w-0">
+                      <div className="font-semibold truncate flex items-center gap-2">
+                        {c.name}
+                        <Badge variant={c.isActive ? "default" : "secondary"} className={c.isActive ? "bg-emerald-600" : ""}>
                           {c.isActive ? "Active" : "Inactive"}
                         </Badge>
-                      </TableCell>
-                      <TableCell className="text-right space-x-2">
-                        <Button size="sm" variant="ghost" onClick={() => openEdit(c)} data-testid={`button-edit-category-${c.id}`}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={() => {
-                          if (confirm(`Delete category "${c.name}"?`)) del.mutate(c.id);
-                        }} data-testid={`button-delete-category-${c.id}`}>
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-0.5">Sort order {c.sortOrder ?? 0}</div>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button size="sm" variant="ghost" onClick={() => openEdit(c)} data-testid={`button-edit-category-${c.id}`}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => {
+                        if (confirm(`Delete category "${c.name}"?`)) del.mutate(c.id);
+                      }} data-testid={`button-delete-category-${c.id}`}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </CardContent>
