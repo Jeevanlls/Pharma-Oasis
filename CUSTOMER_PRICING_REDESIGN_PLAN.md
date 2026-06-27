@@ -79,8 +79,16 @@ For each: **Keep identical** = the logic that must not change. **Restyle** = the
 - [x] 6. Who Sees What — assignments.tsx — airy spacing pass: rounded-lg banners/list-cards, bigger emerald brand-card titles, roomier customer-chip clusters, dashed empty state, hover on list rows. All logic/testids/links unchanged. **Type-checked + `npm run build` green (agent ran it — tooling restored). Awaiting owner verify.**
 - [x] 4. Current Costs — current-costs.tsx — converted to master-detail: left brand rail (selectable row-cards + filter, drives same `setBrandId`), Select kept as `lg:hidden` mobile fallback. Freshness badge moved into Live-costs header; added loading + dashed "select a brand" empty states. All edit logic (`edits`/`editPayload`/`setCost`/`setNote`/`openConfirm`/`applyChanges`), the product table inputs and preview Dialog unchanged. One presentation-only `brandSearch` state added for the rail filter. **Type-checked + build green. Awaiting owner verify.**
 - [x] 3. Cost Uploads — cost-uploads.tsx — chrome freshen only (densest page, logic untouched): page header gets an Upload icon + full-width (dropped max-w-6xl so the dense 9-col review table breathes), Review card title gets a ClipboardCheck icon, table/removed-panel wrappers → rounded-lg, history table wrapped in overflow-x-auto. ALL upload/preview/review/publish logic, the live status re-derivation, every editable input and mutation unchanged. **Type-checked + build green. Awaiting owner verify.**
-- [ ] 5. Price Builder — price-builder.tsx (light)
+- [x] 5. Price Builder — price-builder.tsx (light) — left-rail row-cards aligned to the shared design system: rounded-lg + p-3.5, emerald-tint selected state (matches the Current Costs rail), single-source `hover:bg-muted/40` (removed the now-redundant inner `hover-elevate`). Header already had the Coins icon + Step 5 helper. Working sheet density untouched; all queries/mutations/dialogs/testids unchanged. **Type-checked + build green. Awaiting owner verify.**
 
 ## Status / handoff
 - **2026-06-27:** plan written; starting with Brands + Categories. Branch `feature/price-list-builder`. Tooling mount down in agent sandbox → verify via owner's `!npm run build` / dev viewer; commit per page via system git.
+- **2026-06-27 (later session):** ✅ **ALL 6 PAGES DONE.** Agent tooling restored, so every page was `npm run check`-clean (no errors in our files) + `npm run build` green before each commit. Commits on `feature/price-list-builder`:
+  - Brands + Categories — `6388ae7` (prior session)
+  - Who Sees What — `419d62e`
+  - Current Costs (master-detail) — `6f99e17`
+  - Cost Uploads (chrome) — `ccdfe04`
+  - Price Builder (light rail) — this commit
+  - Pre-existing `npm run check` has 33 errors in **unrelated** files (suppliers/offers/messages/admin-categories/product-detail) — present before this work, untouched by it.
+  - **Remaining:** owner click-through verify of each redesigned screen in the dev viewer, then the Replit **Deploy** button. Optional: clean up those 33 unrelated type errors separately.
 - Indexed from `SESSION_HANDOFF.md`. Companion: `CUSTOMER_PRICING_UI_PLAN.md` (phase 1, done).

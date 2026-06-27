@@ -328,11 +328,11 @@ export default function PriceBuilderPage() {
               {panelLists.map((l) => (
                 <div
                   key={l.id}
-                  className={`w-full rounded-md border p-3 ${selectedId === l.id ? "border-primary bg-accent" : ""}`}
+                  className={`w-full rounded-lg border p-3.5 transition-colors ${selectedId === l.id ? "border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30" : "hover:bg-muted/40"}`}
                   data-testid={`list-item-${l.id}`}
                 >
                   <button
-                    className="w-full text-left hover-elevate rounded-sm"
+                    className="w-full text-left rounded-sm"
                     onClick={() => { setSelectedId(l.id); setEdits({}); setSearch(""); setBulkMargin(""); setManualIds(new Set()); }}
                   >
                     <div className="flex items-center justify-between gap-2">
