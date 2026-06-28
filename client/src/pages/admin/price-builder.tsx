@@ -406,7 +406,7 @@ export default function PriceBuilderPage() {
                       <div>
                       <CardTitle>{selected.name}</CardTitle>
                       <CardDescription>
-                        {selected.brandName} · {items.length} products · base margin {selected.defaultMarginPercent ?? "—"}%
+                        {selected.scope === "category" ? `Category: ${selected.categoryName ?? "—"}` : selected.brandName} · {items.length} products · base margin {selected.defaultMarginPercent ?? "—"}%
                         {priceRange && ` · selling £${priceRange.min.toFixed(2)}–£${priceRange.max.toFixed(2)}`}
                         {selected.status === "published" && publishedAgo(selected.publishedAt ?? selected.updatedAt) && ` · ${publishedAgo(selected.publishedAt ?? selected.updatedAt)}`}
                       </CardDescription>
@@ -844,7 +844,7 @@ function AssignDialog({ open, onOpenChange, listId, listName, brandName }: {
 
   const assignAll = useMutation({
     mutationFn: async () => apiRequest("POST", `/api/admin/v2/price-lists/${listId}/assign`, { all: true }),
-    onSuccess: () => { invalidate(); toast({ title: "Assigned to all customers (one list per brand enforced)" }); },
+    onSuccess: () => { invalidate(); toast({ title: "Assigned to all customers (one list per brand / per category enforced)" }); },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
@@ -888,7 +888,7 @@ function AssignDialog({ open, onOpenChange, listId, listName, brandName }: {
                 <Checkbox
                   checked={isAssigned || !!checked[c.id]}
                   disabled={isAssigned}
-                  onCheckedChange={(v) => setChecked((p) => ({ ...p, [c.id]: !!v }))}
+                  onCheckedChange={(v) => { setChecked((p) => ({ ...p, [c.id]: !!v })); setPreview(null); }}
                   data-testid={`check-customer-${c.id}`}
                 />
                 <div className="flex-1">

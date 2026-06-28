@@ -188,12 +188,12 @@ export default function AdminPromotionsPage() {
                 <div className="grid grid-cols-2 gap-3 pt-3">
                   <div>
                     <Label className="text-xs">Starts</Label>
-                    <Input type="datetime-local" defaultValue={toLocalInput(detail.list.startsAt)}
+                    <Input key={`start-${detail.list.id}`} type="datetime-local" defaultValue={toLocalInput(detail.list.startsAt)}
                       onBlur={(e) => metaMut.mutate({ startsAt: e.target.value || null })} data-testid="input-promo-start" />
                   </div>
                   <div>
                     <Label className="text-xs">Ends</Label>
-                    <Input type="datetime-local" defaultValue={toLocalInput(detail.list.endsAt)}
+                    <Input key={`end-${detail.list.id}`} type="datetime-local" defaultValue={toLocalInput(detail.list.endsAt)}
                       onBlur={(e) => metaMut.mutate({ endsAt: e.target.value || null })} data-testid="input-promo-end" />
                   </div>
                 </div>

@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   BookOpen, Building2, Tag, FileUp, PoundSterling, Coins, Users,
-  ArrowRight, Lightbulb, ShieldCheck, CalendarClock,
+  ArrowRight, Lightbulb, ShieldCheck, CalendarClock, Megaphone,
 } from "lucide-react";
 
 interface Step {
@@ -30,13 +30,13 @@ const steps: Step[] = [
   },
   {
     n: 2, title: "Categories", href: "/admin/pricing-categories", icon: Tag, optional: true,
-    what: "Just groups for your products (e.g. “Vitamins”, “Pain relief”).",
+    what: "Groups for your products (e.g. “Vitamins”, “Pain relief”). They also let you build one price list that spans a category across every brand (see step 5).",
     points: [
-      "You usually don't need to touch this.",
-      "Uploading a cost file with Category: headings creates them automatically.",
-      "Come here only to rename or tidy them.",
+      "Uploading a cost file with Category: headings creates them automatically — you usually don't add them by hand.",
+      "Come here to rename or tidy them.",
+      "Tidy names matter more now: a clean category can become a Category price list in step 5.",
     ],
-    when: "When you want to clean up category names. Otherwise skip it.",
+    when: "When you want to clean up category names, or before building a category price list.",
   },
   {
     n: 3, title: "Cost Uploads", href: "/admin/cost-uploads", icon: FileUp,
@@ -63,15 +63,15 @@ const steps: Step[] = [
   },
   {
     n: 5, title: "Price Lists", href: "/admin/price-builder", icon: Coins,
-    what: "The heart of it: turn your costs into the selling prices customers see.",
+    what: "The heart of it: turn your costs into the selling prices customers see — for one brand, or for a whole category across brands.",
     points: [
-      "New Price List → pick a brand → it auto-fills every product at your default margin.",
+      "New Price List → choose Brand (one brand's products) or Category (the same category across every brand) → it auto-fills at your default margin.",
       "Set prices by Margin %, Fixed £, or Cost + £ — per line, all at once, or by cost bands.",
       "See live customer price, real margin, and a red “below cost!” warning. Save when happy.",
-      "Assign to customers (one list per customer per brand). Preview as customer shows what they see.",
-      "When new costs are published, click Check for cost changes → review → Apply to list.",
+      "Assign to customers: a customer can hold one brand list AND one category list at once — where they overlap, the brand price wins. Use Preview impact in the Assign box to see exactly which prices change before you commit.",
+      "When new costs are published, click Check for cost changes → review → Apply to list. Cost edits also flow through to any category list that includes those products.",
     ],
-    when: "When setting up prices for a brand, or updating after a cost change.",
+    when: "When setting up prices for a brand or a category, or updating after a cost change.",
   },
   {
     n: 6, title: "Who Sees What", href: "/admin/assignments", icon: Users,
@@ -83,12 +83,25 @@ const steps: Step[] = [
     ],
     when: "When you want to check, at a glance, who's getting which prices.",
   },
+  {
+    n: 7, title: "Promotions", href: "/admin/promotions", icon: Megaphone,
+    what: "Time-limited deals shown to every customer. While a promotion is live, its price overrides brand and category list prices for those products — then reverts automatically.",
+    points: [
+      "New promotion → set a start & end date (or leave open-ended) → it goes live and ends on its own.",
+      "Search the pricing catalogue, add products, and set one promo price each — the same for every customer.",
+      "Publish to go live. Those products then show the promo price everywhere — the customer's Promotions tab and their normal catalogue — and revert when it ends.",
+      "Promotions are global: no assigning. Unpublish or Archive to pull one early.",
+    ],
+    when: "When you're running this month's offers across one or more brands or categories.",
+  },
 ];
 
 const rules = [
   "Customers never see cost or margin — only their final price.",
-  "One price list per customer, per brand. (A different brand can have a different list; the same brand can't have two.) Enforced — it offers to swap.",
-  "Costs must be Published before they reach a price list.",
+  "A customer can hold one brand list and one category list at the same time. The same brand (or the same category) can't have two — it offers to swap.",
+  "When a product sits on both a brand and a category list, the brand price wins. A live promotion beats both.",
+  "Promotions are the same for everyone and switch on/off by their dates — you never assign or un-assign them.",
+  "Costs must be Published before they reach a price list. Cost edits reprice brand and category lists alike.",
   "“Check for cost changes” always compares against the latest published costs, not a draft.",
   "Big cost jumps, customer-price impacts, and deletions all ask before they happen.",
 ];
@@ -99,7 +112,11 @@ const glossary: [string, string][] = [
   ["Selling / customer price", "What the customer pays and sees."],
   ["Publish", "Make an upload's costs live so price lists can use them."],
   ["Price list", "A set of selling prices for one brand, given to chosen customers."],
-  ["Assign", "Attach a price list to a customer so they see those prices."],
+  ["Category list", "Selling prices for a whole category across every brand, given to chosen customers."],
+  ["Promotion", "A time-limited deal shown to all customers; its price overrides brand & category lists while it's live, then reverts."],
+  ["Brand-wins", "When a product is on both a brand and a category list, the brand price is the one used."],
+  ["Assign", "Attach a price list to a customer so they see those prices. (Promotions aren't assigned — they're global.)"],
+  ["Preview impact", "In the Assign box: shows which products change price for the chosen customers before you commit."],
   ["Check for cost changes", "Compare a saved list to the latest published costs and review what moved."],
   ["Cost band", "A cost range with its own margin, for bulk pricing."],
 ];
@@ -113,7 +130,7 @@ export default function PricingGuidePage() {
             <BookOpen className="h-6 w-6" /> Customer Pricing — How this works
           </h1>
           <p className="text-muted-foreground mt-1">
-            Where you set the prices specific customers see, brand by brand — without ever exposing your cost or margin.
+            Where you set the prices specific customers see — by brand, by category, and with limited-time promotions — without ever exposing your cost or margin.
           </p>
           <div className="mt-3 flex items-start gap-2 text-sm rounded-md bg-emerald-100/70 dark:bg-emerald-900/30 p-3">
             <Lightbulb className="h-4 w-4 mt-0.5 text-emerald-600 shrink-0" />
@@ -138,7 +155,7 @@ export default function PricingGuidePage() {
               ))}
             </div>
             <p className="text-xs text-muted-foreground mt-3">
-              Steps 1–4 get your <b>costs</b> in. Step 5 turns costs into <b>selling prices</b>. Step 6 shows <b>who gets them</b>.
+              Steps 1–4 get your <b>costs</b> in. Step 5 turns costs into <b>selling prices</b> (by brand or category). Step 6 shows <b>who gets them</b>. Step 7 runs <b>limited-time promotions</b>.
               You don't redo every step each time — see the monthly routine below.
             </p>
           </CardContent>
@@ -194,7 +211,7 @@ export default function PricingGuidePage() {
               <li><b>Price Lists</b> → open each list for that brand → <b>Check for cost changes</b> → review → <b>Apply to list</b>.</li>
               <li>Done — assigned customers now see the new prices.</li>
             </ol>
-            <p className="text-xs text-muted-foreground mt-2">For a quick one-off fix instead of a full upload, use <b>Current Costs</b>.</p>
+            <p className="text-xs text-muted-foreground mt-2">For a quick one-off fix instead of a full upload, use <b>Current Costs</b>. Running this month's deals? Set them up in <b>Promotions</b> with a start &amp; end date — they go live and expire on their own.</p>
           </CardContent>
         </Card>
 
