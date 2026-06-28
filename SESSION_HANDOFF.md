@@ -2,6 +2,20 @@
 
 _Last updated: 2026-06-28. This is the master index. Detailed docs are linked below._
 
+## ⭐ MOST RECENT (2026-06-28 pm) — Category Price Lists + Monthly Promotions: Phase 1 (CORRECT) shipped
+Full spec + decisions + phasing in **[CATEGORY_PRICE_LISTS_PLAN.md](CATEGORY_PRICE_LISTS_PLAN.md)** (redrafted this session). On `feature/price-list-builder`; `npm run check` 0-errors + `build` green; resolver verified 6/6 on the live DB with temp rows (cleaned up).
+
+**Owner decisions (locked):** precedence = **promotion (live) > brand > category > default**; promotions are **global**, **single price for all**, **time-bound with start+end dates that auto-expire/auto-revert**. Brand-wins between brand vs category.
+
+**What Phase 1 did (makes pricing CORRECT before any new UI exists — zero production behaviour change until a category list/promotion is authored):**
+- **Schema (idempotent ALTERs in `server/db.ts` startup, mirrored in `shared/schema.ts`)** — `price_lists`: `scope` ('brand'|'category'|'promotion', default 'brand'), `category_id`, `starts_at`, `ends_at`. `customer_price_lists`: `scope`+`scope_id` (backfilled from `brand_id`), `brand_id` now nullable; unique guard swapped `uniq_customer_brand` → **`uniq_customer_scope (customer_id, scope, scope_id)`** (new index created before old dropped). **Applied to live DB already** (runs on boot).
+- **Resolver (`server/pricing-v2.ts`)** — `getCustomerItemByEan` rewritten: live global promotion wins, else brand-beats-category, cheapest breaks ties. New `activePromotionItemByEan` (published + now in [starts_at,ends_at]).
+- **Charged-price guarantee (`server/routes.ts` `buildPricedLines`)** — the `itemId` line path now re-resolves by EAN so a live promo overrides whatever specific item was added (only ever upgrades the tier).
+
+**⏯ NEXT = Phase 2 (make it USABLE):** category-list build/refresh + cross-brand cost sourcing; cost-edit propagation must also refresh category lists & promotions; generalize `assignCustomers` to `scope/scopeId`; **Monthly Promotions admin** (multi-brand/category picker, dates, single price, global); portal **Promotions section** + make `getCustomerCatalogue`/`getCustomerItem` promo-aware so displayed price = charged price. Phase 3 = assign/publish-time conflict preview + optional `customer_effective_price` materialization. (No category lists/promos exist yet → nothing to click-test on screen this phase.)
+
+---
+
 ## ⭐ MOST RECENT (2026-06-28) — Pricing visual redesign v2 (emerald) + Who-Sees-What assignment tools
 Read this first; it supersedes the 06-27 note below for the pricing pages. Full detail + verification in **[CUSTOMER_PRICING_REDESIGN_PLAN.md](CUSTOMER_PRICING_REDESIGN_PLAN.md)** → section "2026-06-28".
 
@@ -84,6 +98,7 @@ Nothing is known-broken; nothing half-done. Working tree clean except harness-ma
 - **[CUSTOMER_PRICING_UI_PLAN.md](CUSTOMER_PRICING_UI_PLAN.md)** — 2026-06-27 (phase 1, DONE, committed `3e3c2b5`): Overview page + light polish pass. Reference screenshots in `attached_assets/` (08:37–08:38).
 
 ## Detailed docs (the source of truth for each area)
+- **[CATEGORY_PRICE_LISTS_PLAN.md](CATEGORY_PRICE_LISTS_PLAN.md)** — 2026-06-28 **DESIGN/DISCUSSION ONLY (not building yet).** How to add **category-based** price lists alongside brand lists, and how to resolve the price conflict when a customer is on both a brand list and a category list for the same products. Key finding: the resolver `getCustomerItemByEan` is already silent "first-match" with no precedence — categories make that non-deterministic, so a precedence rule is mandatory. Includes policy options (brand-wins recommended), the 3 concrete code changes, phasing, and open questions for the owner.
 - **[AUTH_HANDOFF.md](AUTH_HANDOFF.md)** — login hardening, 2FA, trusted devices, break-glass SQL.
 - **[SALES_WORKSPACE_PLAN.md](SALES_WORKSPACE_PLAN.md)** — ACTIVE: new quote & order management (Deal Workspace) replacing the old admin pages; phases E1–E6 (E1 done).
 - **[SALES_CONSOLIDATION_PLAN.md](SALES_CONSOLIDATION_PLAN.md)** — single-channel D1–D3 (DONE): unified pricing, one shared basket, single admin nav.

@@ -17,7 +17,7 @@ import {
   costUploadRows,
   users,
 } from "@shared/schema";
-import { eq, and, desc, asc, ne, inArray, sql } from "drizzle-orm";
+import { eq, and, desc, asc, ne, inArray, sql, or, isNull, lte, gte } from "drizzle-orm";
 import type {
   PricingBrand,
   InsertPricingBrand,
@@ -1129,18 +1129,61 @@ export async function getCustomerItem(customerId: number, itemId: number): Promi
   return it ?? null;
 }
 
+/** Precedence rank of a list scope: lower wins. brand=1, category=2, anything else=3. */
+function rankScope(scope: string | null | undefined): number {
+  return scope === "brand" ? 1 : scope === "category" ? 2 : 3;
+}
+
 /**
- * Find a customer's prepared price-list item for a catalogue product by EAN.
- * Used to give main-catalogue products the customer's own price when the same
- * EAN exists in one of their assigned lists. Returns null if not in any list.
+ * The best LIVE promotion item for an EAN, or null. Promotions are GLOBAL (apply
+ * to every customer) and time-bound: published, and now within [startsAt, endsAt]
+ * (null bound = open-ended). Cheapest wins if two promotions overlap an EAN.
+ */
+async function activePromotionItemByEan(ean: string): Promise<PriceListItem | null> {
+  const now = new Date();
+  const rows = await db
+    .select({ item: priceListItems })
+    .from(priceListItems)
+    .innerJoin(priceLists, eq(priceListItems.priceListId, priceLists.id))
+    .where(
+      and(
+        eq(priceListItems.ean, ean),
+        eq(priceListItems.isActive, true),
+        eq(priceLists.scope, "promotion"),
+        eq(priceLists.status, "published"),
+        or(isNull(priceLists.startsAt), lte(priceLists.startsAt, now)),
+        or(isNull(priceLists.endsAt), gte(priceLists.endsAt, now)),
+      ),
+    );
+  if (!rows.length) return null;
+  rows.sort((a, b) => (num(a.item.preparedPrice) ?? Infinity) - (num(b.item.preparedPrice) ?? Infinity));
+  return rows[0].item;
+}
+
+/**
+ * Resolve the single price a customer should get for a catalogue product by EAN.
+ * Precedence (Phase 1): live promotion (global) > brand list > category list.
+ * Cheapest preparedPrice breaks ties within a tier. Returns null if the EAN is in
+ * no live promotion and none of the customer's assigned lists.
  */
 export async function getCustomerItemByEan(customerId: number, ean: string | null | undefined): Promise<PriceListItem | null> {
   if (!ean) return null;
+  // 0) A live promotion always wins, for every customer — even those with no lists.
+  const promo = await activePromotionItemByEan(ean);
+  if (promo) return promo;
+  // 1/2) The customer's own lists: brand beats category, cheapest breaks ties.
   const listIds = await customerListIds(customerId);
   if (!listIds.length) return null;
-  const [it] = await db
-    .select()
+  const rows = await db
+    .select({ item: priceListItems, scope: priceLists.scope })
     .from(priceListItems)
+    .innerJoin(priceLists, eq(priceListItems.priceListId, priceLists.id))
     .where(and(eq(priceListItems.ean, ean), inArray(priceListItems.priceListId, listIds)));
-  return it ?? null;
+  if (!rows.length) return null;
+  rows.sort(
+    (a, b) =>
+      rankScope(a.scope) - rankScope(b.scope) ||
+      (num(a.item.preparedPrice) ?? Infinity) - (num(b.item.preparedPrice) ?? Infinity),
+  );
+  return rows[0].item;
 }

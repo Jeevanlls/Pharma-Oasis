@@ -185,6 +185,21 @@ pool.query(`
   ALTER TABLE price_lists ADD COLUMN IF NOT EXISTS archived_at TIMESTAMP;
   -- Backfill publish date for lists already live (idempotent: only fills nulls)
   UPDATE price_lists SET published_at = updated_at WHERE status = 'published' AND published_at IS NULL;
+  -- Category lists + Monthly Promotions (Phase 1): scope tag + category target + promo window.
+  -- scope: 'brand' (default, every existing list) | 'category' | 'promotion'.
+  ALTER TABLE price_lists ADD COLUMN IF NOT EXISTS scope VARCHAR(20) NOT NULL DEFAULT 'brand';
+  ALTER TABLE price_lists ADD COLUMN IF NOT EXISTS category_id INTEGER; -- when scope='category'
+  ALTER TABLE price_lists ADD COLUMN IF NOT EXISTS starts_at TIMESTAMP; -- when scope='promotion' (live window)
+  ALTER TABLE price_lists ADD COLUMN IF NOT EXISTS ends_at   TIMESTAMP; -- when scope='promotion' (auto-expire)
+  -- Generalize per-customer uniqueness from "one list per brand" to "one list per scope target".
+  -- Promotions are GLOBAL and are NOT written here. Category rows carry no brand_id.
+  ALTER TABLE customer_price_lists ADD COLUMN IF NOT EXISTS scope    VARCHAR(20) NOT NULL DEFAULT 'brand';
+  ALTER TABLE customer_price_lists ADD COLUMN IF NOT EXISTS scope_id INTEGER;
+  UPDATE customer_price_lists SET scope_id = brand_id WHERE scope_id IS NULL;
+  ALTER TABLE customer_price_lists ALTER COLUMN brand_id DROP NOT NULL;
+  -- Create the NEW unique index before dropping the OLD constraint (guarantee never absent).
+  CREATE UNIQUE INDEX IF NOT EXISTS uniq_customer_scope ON customer_price_lists (customer_id, scope, scope_id);
+  ALTER TABLE customer_price_lists DROP CONSTRAINT IF EXISTS uniq_customer_brand;
   -- Orders: quote link + inventory-handoff/archive tracking (Sales pipeline Phase A)
   ALTER TABLE orders ADD COLUMN IF NOT EXISTS quote_id INTEGER;
   ALTER TABLE orders ADD COLUMN IF NOT EXISTS entered_to_inventory_at TIMESTAMP;

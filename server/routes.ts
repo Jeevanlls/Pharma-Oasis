@@ -4833,6 +4833,12 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
       if (it.itemId != null) {
         li = await pricingV2.getCustomerItem(user.id, Number(it.itemId));
         if (!li) throw new Error(`Invalid item: ${it.itemId}`);
+        // Promotions/precedence: re-resolve by EAN so a live promo (or a higher-precedence
+        // list) overrides whatever specific item was added. Only ever upgrades the price tier.
+        if (li.ean) {
+          const eff = await pricingV2.getCustomerItemByEan(user.id, li.ean);
+          if (eff) li = eff;
+        }
       } else if (it.productId != null) {
         product = await storage.getProduct(Number(it.productId));
         if (!product || !product.isActive) throw new Error(`Invalid product: ${it.productId}`);

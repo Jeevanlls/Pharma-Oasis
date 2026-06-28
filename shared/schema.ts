@@ -1315,7 +1315,11 @@ export type CostUploadRow = typeof costUploadRows.$inferSelect;
 export const priceLists = pgTable("price_lists", {
   id: serial("id").primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
-  brandId: integer("brand_id"), // FK -> pricing_brands (every v2 list is scoped to one brand)
+  scope: varchar("scope", { length: 20 }).notNull().default("brand"), // brand | category | promotion
+  brandId: integer("brand_id"), // FK -> pricing_brands (set when scope='brand')
+  categoryId: integer("category_id"), // FK -> pricing_categories (set when scope='category')
+  startsAt: timestamp("starts_at"), // promotion live window start (scope='promotion')
+  endsAt: timestamp("ends_at"), // promotion live window end / auto-expire (scope='promotion')
   baseCostUploadId: integer("base_cost_upload_id"), // which base cost this list was prepared from
   defaultMarginPercent: decimal("default_margin_percent", { precision: 6, scale: 2 }), // list-wide default applied on build
   status: varchar("status", { length: 20 }).notNull().default("draft"), // draft | published | archived
@@ -1532,12 +1536,15 @@ export const customerPriceLists = pgTable(
     id: serial("id").primaryKey(),
     customerId: integer("customer_id").notNull(),
     priceListId: integer("price_list_id").notNull(),
-    brandId: integer("brand_id").notNull(), // denormalised from the list for the uniqueness guard
+    scope: varchar("scope", { length: 20 }).notNull().default("brand"), // brand | category (promotions are global, not stored here)
+    scopeId: integer("scope_id"), // brandId for brand lists, categoryId for category lists
+    brandId: integer("brand_id"), // denormalised; null for category assignments
     assignedBy: integer("assigned_by"),
     assignedAt: timestamp("assigned_at").defaultNow().notNull(),
   },
   (t) => ({
-    uniqCustomerBrand: unique("uniq_customer_brand").on(t.customerId, t.brandId),
+    // "one list per scope target per customer": one brand-list per brand AND one category-list per category.
+    uniqCustomerScope: unique("uniq_customer_scope").on(t.customerId, t.scope, t.scopeId),
   }),
 );
 
