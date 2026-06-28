@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
-import { Users, Search, Coins, ArrowRight, CheckCircle2, AlertTriangle, Plus, Loader2 } from "lucide-react";
+import { Users, Search, Coins, ArrowRight, CheckCircle2, AlertTriangle, Plus, Loader2, X } from "lucide-react";
 
 interface Assignment {
   brandId: number | null;
@@ -56,10 +56,10 @@ export default function AssignmentsPage() {
       const uncovered = customers.filter((c) => !coveredIds.has(c.id));
 
       // Lists with their assigned customers (seed from real lists; add assignment-only lists too).
-      const listMap = new Map<number, { name: string; status: string; customers: Assignment[] }>();
-      for (const l of brandLists) listMap.set(l.id, { name: l.name, status: l.status, customers: [] });
+      const listMap = new Map<number, { id: number; name: string; status: string; customers: Assignment[] }>();
+      for (const l of brandLists) listMap.set(l.id, { id: l.id, name: l.name, status: l.status, customers: [] });
       for (const a of brandAssign) {
-        if (!listMap.has(a.priceListId)) listMap.set(a.priceListId, { name: a.listName ?? `List #${a.priceListId}`, status: a.listStatus ?? "draft", customers: [] });
+        if (!listMap.has(a.priceListId)) listMap.set(a.priceListId, { id: a.priceListId, name: a.listName ?? `List #${a.priceListId}`, status: a.listStatus ?? "draft", customers: [] });
         listMap.get(a.priceListId)!.customers.push(a);
       }
       const hasPublishedList = brandLists.some((l) => l.status === "published");
@@ -177,24 +177,7 @@ export default function AssignmentsPage() {
               {v.lists.length > 0 && (
                 <div className="space-y-2">
                   {v.lists.map((l) => (
-                    <div key={l.name} className="rounded-lg border p-3.5 hover:bg-muted/40 transition-colors">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-semibold">{l.name}</span>
-                        <Badge variant={l.status === "published" ? "default" : "secondary"}>{l.status}</Badge>
-                        <span className="text-xs text-muted-foreground">{l.customers.length} customer(s)</span>
-                      </div>
-                      {l.customers.length === 0 ? (
-                        <p className="text-xs text-muted-foreground mt-2">
-                          {l.status === "published" ? "Published, but nobody is assigned yet." : "Draft — publish it before you can assign customers."}
-                        </p>
-                      ) : (
-                        <div className="flex flex-wrap gap-2 mt-2.5">
-                          {l.customers.slice().sort((a, b) => assignName(a).localeCompare(assignName(b))).map((c) => (
-                            <Badge key={c.customerId} variant="outline" className="font-normal" title={c.customerEmail}>{assignName(c)}</Badge>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                    <ListRow key={l.id} list={l} brandName={v.brand.name} allCustomers={customers} />
                   ))}
                 </div>
               )}
@@ -214,6 +197,19 @@ export default function AssignmentsPage() {
   );
 }
 
+// Shared POST to the assign endpoint. Returns the parsed body; on a 409
+// (customer already has a different list for the brand) returns { conflict }.
+async function assignRequest(listId: number, customerIds: number[], replace: boolean) {
+  const res = await fetch(`/api/admin/v2/price-lists/${listId}/assign`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    credentials: "include", body: JSON.stringify({ customerIds, replace }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (res.status === 409) return { conflict: true as const, ...body };
+  if (!res.ok) throw new Error(body.message || "Failed to assign");
+  return body;
+}
+
 // Inline assignment for a brand's uncovered customers — assigns them to one of
 // the brand's PUBLISHED lists without leaving this page. Uses the same
 // /assign endpoint the Price List Builder uses (one list per brand enforced).
@@ -230,25 +226,14 @@ function GapAssign({ brandName, uncovered, publishedLists }: {
     queryClient.invalidateQueries({ queryKey: ["/api/admin/v2/price-lists"] });
   };
 
-  const post = async (listId: number, customerIds: number[], replace: boolean) => {
-    const res = await fetch(`/api/admin/v2/price-lists/${listId}/assign`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      credentials: "include", body: JSON.stringify({ customerIds, replace }),
-    });
-    const body = await res.json().catch(() => ({}));
-    if (res.status === 409) return { conflict: true as const, ...body };
-    if (!res.ok) throw new Error(body.message || "Failed to assign");
-    return body;
-  };
-
   const assign = useMutation({
     mutationFn: async ({ listId, customerIds }: { listId: number; customerIds: number[] }) =>
-      ({ listId, customerIds, ...(await post(listId, customerIds, false)) }),
+      ({ listId, customerIds, ...(await assignRequest(listId, customerIds, false)) }),
     onSuccess: async (res: any) => {
       if (res?.conflict) {
         const n = res.conflicts?.length ?? "Some";
         if (confirm(`${n} customer(s) already have a different ${brandName} list. Replace it with this one?`)) {
-          await post(res.listId, res.customerIds, true);
+          await assignRequest(res.listId, res.customerIds, true);
           invalidate();
           toast({ title: "Assigned (replaced existing list)" });
         }
@@ -298,6 +283,108 @@ function GapAssign({ brandName, uncovered, publishedLists }: {
           </span>
         ))}
       </div>
+    </div>
+  );
+}
+
+// One price list inside a brand card: shows its assigned customers (each with a
+// Remove action) and, for published lists, an "add a customer" picker. Remove
+// uses /unassign; add uses the shared /assign (one list per brand enforced).
+function ListRow({ list, brandName, allCustomers }: {
+  list: { id: number; name: string; status: string; customers: Assignment[] };
+  brandName: string;
+  allCustomers: AppUser[];
+}) {
+  const { toast } = useToast();
+  const [addId, setAddId] = useState<string>("");
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/admin/v2/assignments"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/admin/v2/price-lists"] });
+  };
+
+  const assignedIds = new Set(list.customers.map((c) => c.customerId));
+  const addable = allCustomers.filter((c) => !assignedIds.has(c.id));
+
+  const assign = useMutation({
+    mutationFn: async (customerId: number) => ({ customerId, ...(await assignRequest(list.id, [customerId], false)) }),
+    onSuccess: async (res: any) => {
+      if (res?.conflict) {
+        if (confirm(`That customer already has a different ${brandName} list. Replace it with “${list.name}”?`)) {
+          await assignRequest(list.id, [res.customerId], true);
+          invalidate();
+          toast({ title: "Assigned (replaced existing list)" });
+        }
+        return;
+      }
+      setAddId(""); invalidate();
+      toast({ title: `Assigned to “${list.name}”` });
+    },
+    onError: (e: any) => toast({ title: "Could not assign", description: e.message, variant: "destructive" }),
+  });
+
+  const unassign = useMutation({
+    mutationFn: async (customerId: number) => {
+      const res = await fetch(`/api/admin/v2/price-lists/${list.id}/unassign`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        credentials: "include", body: JSON.stringify({ customerId }),
+      });
+      if (!res.ok) throw new Error("Failed to remove");
+    },
+    onSuccess: () => { invalidate(); toast({ title: "Removed from list" }); },
+    onError: (e: any) => toast({ title: "Could not remove", description: e.message, variant: "destructive" }),
+  });
+
+  const busy = assign.isPending || unassign.isPending;
+
+  return (
+    <div className="rounded-lg border p-3.5 hover:bg-muted/40 transition-colors">
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="font-semibold">{list.name}</span>
+        <Badge variant={list.status === "published" ? "default" : "secondary"}>{list.status}</Badge>
+        <span className="text-xs text-muted-foreground">{list.customers.length} customer(s)</span>
+      </div>
+
+      {list.customers.length === 0 ? (
+        <p className="text-xs text-muted-foreground mt-2">
+          {list.status === "published" ? "Published, but nobody is assigned yet." : "Draft — publish it before you can assign customers."}
+        </p>
+      ) : (
+        <div className="flex flex-wrap gap-1.5 mt-2.5">
+          {list.customers.slice().sort((a, b) => assignName(a).localeCompare(assignName(b))).map((c) => (
+            <span key={c.customerId} className="inline-flex items-center gap-1 rounded-md border bg-background pl-2.5 pr-1 py-0.5" title={c.customerEmail}>
+              <span className="text-xs">{assignName(c)}</span>
+              <Button size="sm" variant="ghost"
+                className="h-6 w-6 p-0 text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
+                disabled={busy} title="Remove from this list"
+                onClick={() => unassign.mutate(c.customerId)}
+                data-testid={`unassign-${list.id}-${c.customerId}`}>
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {list.status === "published" && addable.length > 0 && (
+        <div className="flex items-center gap-2 mt-2.5">
+          <Select value={addId} onValueChange={setAddId}>
+            <SelectTrigger className="h-8 w-56 text-xs" data-testid={`add-select-${list.id}`}>
+              <SelectValue placeholder="Add a customer…" />
+            </SelectTrigger>
+            <SelectContent>
+              {addable.map((c) => <SelectItem key={c.id} value={String(c.id)}>{custName(c)}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Button size="sm" className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
+            disabled={!addId || busy}
+            onClick={() => assign.mutate(Number(addId))}
+            data-testid={`add-assign-${list.id}`}>
+            {assign.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Plus className="h-3.5 w-3.5 mr-1" />}
+            Assign
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
