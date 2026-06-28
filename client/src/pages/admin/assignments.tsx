@@ -1,11 +1,14 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Users, Search, Coins, ArrowRight, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient } from "@/lib/queryClient";
+import { Users, Search, Coins, ArrowRight, CheckCircle2, AlertTriangle, Plus, Loader2 } from "lucide-react";
 
 interface Assignment {
   brandId: number | null;
@@ -60,10 +63,14 @@ export default function AssignmentsPage() {
         listMap.get(a.priceListId)!.customers.push(a);
       }
       const hasPublishedList = brandLists.some((l) => l.status === "published");
+      const publishedLists = brandLists
+        .filter((l) => l.status === "published")
+        .map((l) => ({ id: l.id, name: l.name }))
+        .sort((x, y) => x.name.localeCompare(y.name));
       return {
         brand,
         lists: Array.from(listMap.values()).sort((x, y) => x.name.localeCompare(y.name)),
-        covered, uncovered, hasPublishedList,
+        covered, uncovered, hasPublishedList, publishedLists,
       };
     });
   }, [brands, lists, assignments, customers]);
@@ -161,12 +168,8 @@ export default function AssignmentsPage() {
                   <summary className="cursor-pointer font-medium text-amber-800 dark:text-amber-300 flex items-center gap-2">
                     <AlertTriangle className="h-4 w-4 shrink-0" /> {v.uncovered.length} customer(s) can't see this brand's prices — click to view
                   </summary>
-                  <p className="text-xs text-muted-foreground mt-2">These approved customers have no price list for {v.brand.name}, so they see nothing for it. Assign them a list in the Price List Builder.</p>
-                  <div className="flex flex-wrap gap-2 mt-2.5">
-                    {v.uncovered.map((c) => (
-                      <Badge key={c.id} variant="outline" className="font-normal border-amber-400" title={c.email}>{custName(c)}</Badge>
-                    ))}
-                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">These approved customers have no price list for {v.brand.name}. Pick a published list and assign them right here.</p>
+                  <GapAssign brandName={v.brand.name} uncovered={v.uncovered} publishedLists={v.publishedLists} />
                 </details>
               )}
 
@@ -206,6 +209,94 @@ export default function AssignmentsPage() {
             Manage assignments in Price List Builder <ArrowRight className="h-4 w-4 ml-1" />
           </Button>
         </Link>
+      </div>
+    </div>
+  );
+}
+
+// Inline assignment for a brand's uncovered customers — assigns them to one of
+// the brand's PUBLISHED lists without leaving this page. Uses the same
+// /assign endpoint the Price List Builder uses (one list per brand enforced).
+function GapAssign({ brandName, uncovered, publishedLists }: {
+  brandName: string;
+  uncovered: AppUser[];
+  publishedLists: { id: number; name: string }[];
+}) {
+  const { toast } = useToast();
+  const [targetId, setTargetId] = useState<number>(publishedLists[0]?.id ?? 0);
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/admin/v2/assignments"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/admin/v2/price-lists"] });
+  };
+
+  const post = async (listId: number, customerIds: number[], replace: boolean) => {
+    const res = await fetch(`/api/admin/v2/price-lists/${listId}/assign`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      credentials: "include", body: JSON.stringify({ customerIds, replace }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (res.status === 409) return { conflict: true as const, ...body };
+    if (!res.ok) throw new Error(body.message || "Failed to assign");
+    return body;
+  };
+
+  const assign = useMutation({
+    mutationFn: async ({ listId, customerIds }: { listId: number; customerIds: number[] }) =>
+      ({ listId, customerIds, ...(await post(listId, customerIds, false)) }),
+    onSuccess: async (res: any) => {
+      if (res?.conflict) {
+        const n = res.conflicts?.length ?? "Some";
+        if (confirm(`${n} customer(s) already have a different ${brandName} list. Replace it with this one?`)) {
+          await post(res.listId, res.customerIds, true);
+          invalidate();
+          toast({ title: "Assigned (replaced existing list)" });
+        }
+        return;
+      }
+      invalidate();
+      toast({ title: `Assigned ${res.assigned ?? res.customerIds.length} customer(s) to ${brandName}` });
+    },
+    onError: (e: any) => toast({ title: "Could not assign", description: e.message, variant: "destructive" }),
+  });
+
+  if (publishedLists.length === 0) return null;
+  const target = publishedLists.find((l) => l.id === targetId) ?? publishedLists[0];
+
+  return (
+    <div className="mt-3 space-y-2.5">
+      <div className="flex flex-wrap items-center gap-2">
+        {publishedLists.length > 1 && (
+          <Select value={String(target.id)} onValueChange={(v) => setTargetId(Number(v))}>
+            <SelectTrigger className="h-8 w-52 text-xs" data-testid={`gap-target-${brandName}`}>
+              <SelectValue placeholder="Choose a list" />
+            </SelectTrigger>
+            <SelectContent>
+              {publishedLists.map((l) => <SelectItem key={l.id} value={String(l.id)}>{l.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        )}
+        <Button size="sm" className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
+          disabled={assign.isPending}
+          onClick={() => assign.mutate({ listId: target.id, customerIds: uncovered.map((c) => c.id) })}
+          data-testid={`gap-assign-all-${brandName}`}>
+          {assign.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Plus className="h-3.5 w-3.5 mr-1" />}
+          Assign all {uncovered.length} to “{target.name}”
+        </Button>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {uncovered.map((c) => (
+          <span key={c.id} className="inline-flex items-center gap-1 rounded-md border border-amber-300 bg-background pl-2.5 pr-1 py-0.5" title={c.email}>
+            <span className="text-xs">{custName(c)}</span>
+            <Button size="sm" variant="ghost"
+              className="h-6 px-1.5 text-xs text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+              disabled={assign.isPending}
+              onClick={() => assign.mutate({ listId: target.id, customerIds: [c.id] })}
+              data-testid={`gap-assign-${c.id}`}>
+              <Plus className="h-3 w-3 mr-0.5" /> Assign
+            </Button>
+          </span>
+        ))}
       </div>
     </div>
   );
