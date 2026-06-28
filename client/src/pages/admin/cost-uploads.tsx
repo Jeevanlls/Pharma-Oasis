@@ -205,11 +205,14 @@ export default function AdminCostUploadsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Upload className="h-6 w-6" /> Cost Uploads
-        </h1>
-        <p className="text-muted-foreground"><b>Step 3.</b> Upload a supplier cost file for a brand. Review the preview, then <b>Publish</b> to make those costs live.</p>
+      <div className="flex items-start gap-3">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400">
+          <Upload className="h-6 w-6" />
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Cost Uploads</h1>
+          <p className="text-muted-foreground"><b>Step 3.</b> Upload a supplier cost file for a brand. Review the preview, then <b>Publish</b> to make those costs live.</p>
+        </div>
       </div>
 
       {alerts.length > 0 && (
@@ -271,7 +274,7 @@ export default function AdminCostUploadsPage() {
           </div>
           <div className="flex items-center gap-3">
             <Input type="file" accept=".xlsx,.xls,.csv" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-            <Button onClick={handleUpload} disabled={uploading}>
+            <Button onClick={handleUpload} disabled={uploading} className="bg-emerald-600 hover:bg-emerald-700 text-white">
               {uploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
               Upload &amp; preview
             </Button>
@@ -378,8 +381,8 @@ export default function AdminCostUploadsPage() {
 
             <div className="max-h-[460px] overflow-auto border rounded-lg">
               <Table>
-                <TableHeader>
-                  <TableRow>
+                <TableHeader className="sticky top-0 z-10">
+                  <TableRow className="bg-muted/60 hover:bg-muted/60 border-b [&>th]:text-[11px] [&>th]:uppercase [&>th]:tracking-wider [&>th]:font-semibold [&>th]:text-muted-foreground">
                     <TableHead className="w-[140px]">EAN</TableHead>
                     <TableHead>Description</TableHead>
                     <TableHead className="text-right w-[80px]">Prev</TableHead>
@@ -405,11 +408,14 @@ export default function AdminCostUploadsPage() {
                         <Input value={r.description} onChange={(e) => patchRow(i, { description: e.target.value })}
                           className="h-8 text-xs" placeholder="Description" />
                       </TableCell>
-                      <TableCell className="text-right text-xs">{money(r.previousCost)}</TableCell>
+                      <TableCell className="text-right text-xs tabular-nums text-muted-foreground">{money(r.previousCost)}</TableCell>
                       <TableCell>
-                        <Input type="number" step="0.01" value={r.costPrice ?? ""}
-                          onChange={(e) => patchRow(i, { costPrice: e.target.value === "" ? null : Number(e.target.value) })}
-                          className="h-8 text-xs text-right" placeholder="0.00" />
+                        <div className="relative">
+                          <span className="pointer-events-none absolute left-1.5 top-1/2 -translate-y-1/2 text-[11px] text-muted-foreground">£</span>
+                          <Input type="number" step="0.01" value={r.costPrice ?? ""}
+                            onChange={(e) => patchRow(i, { costPrice: e.target.value === "" ? null : Number(e.target.value) })}
+                            className="h-8 text-xs text-right tabular-nums pl-4" placeholder="0.00" />
+                        </div>
                       </TableCell>
                       <TableCell className={`text-right text-xs ${r.changePercent && Math.abs(r.changePercent) > s.threshold ? "text-red-600 dark:text-red-400 font-semibold" : ""}`}>
                         {r.changePercent === null ? "—" : `${r.changePercent > 0 ? "+" : ""}${r.changePercent}%`}
@@ -464,7 +470,7 @@ export default function AdminCostUploadsPage() {
                 <div className="max-h-[200px] overflow-auto">
                   <Table>
                     <TableHeader>
-                      <TableRow>
+                      <TableRow className="bg-muted/40 hover:bg-muted/40 [&>th]:text-[11px] [&>th]:uppercase [&>th]:tracking-wider [&>th]:font-semibold [&>th]:text-muted-foreground">
                         <TableHead>EAN</TableHead>
                         <TableHead>Description</TableHead>
                         <TableHead className="text-right">Old cost</TableHead>
@@ -506,7 +512,8 @@ export default function AdminCostUploadsPage() {
                 {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
                 Save changes
               </Button>
-              <Button onClick={() => handlePublish(preview.uploadId)} disabled={busy || !canPublish}>
+              <Button onClick={() => handlePublish(preview.uploadId)} disabled={busy || !canPublish}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white">
                 <CheckCircle2 className="h-4 w-4 mr-2" />
                 Publish — make these costs live
               </Button>
@@ -532,7 +539,7 @@ export default function AdminCostUploadsPage() {
           <div className="overflow-x-auto">
           <Table>
             <TableHeader>
-              <TableRow>
+              <TableRow className="bg-muted/40 hover:bg-muted/40 [&>th]:text-[11px] [&>th]:uppercase [&>th]:tracking-wider [&>th]:font-semibold [&>th]:text-muted-foreground">
                 <TableHead>Date</TableHead>
                 <TableHead>Brand</TableHead>
                 <TableHead>Supplier</TableHead>

@@ -79,14 +79,17 @@ export default function AssignmentsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Users className="h-6 w-6" /> Customer Assignments
-        </h1>
-        <p className="text-muted-foreground">
-          <b>Step 6.</b> Which customers can see which prices, for each brand. A customer sees a brand's prices only if
-          they're on a price list for it — so below, each brand shows who's covered and <b>who isn't</b>.
-        </p>
+      <div className="flex items-start gap-3">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400">
+          <Users className="h-6 w-6" />
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Customer Assignments</h1>
+          <p className="text-muted-foreground">
+            <b>Step 6.</b> Which customers can see which prices, for each brand. A customer sees a brand's prices only if
+            they're on a price list for it — so below, each brand shows who's covered and <b>who isn't</b>.
+          </p>
+        </div>
       </div>
 
       {/* Top summary */}

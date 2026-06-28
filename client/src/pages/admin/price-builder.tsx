@@ -288,15 +288,18 @@ export default function PriceBuilderPage() {
     <>
       <div className="space-y-4">
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <Coins className="h-6 w-6" /> Price List Builder
-            </h1>
-            <p className="text-muted-foreground">
-              <b>Step 5.</b> Set your selling prices for one brand. Pick a list on the left, set a margin, tweak any lines, then <b>Save</b> and choose who gets it.
-            </p>
+          <div className="flex items-start gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400">
+              <Coins className="h-6 w-6" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight">Price List Builder</h1>
+              <p className="text-muted-foreground">
+                <b>Step 5.</b> Set your selling prices for one brand. Pick a list on the left, set a margin, tweak any lines, then <b>Save</b> and choose who gets it.
+              </p>
+            </div>
           </div>
-          <Button onClick={() => setCreateOpen(true)} data-testid="button-new-list">
+          <Button onClick={() => setCreateOpen(true)} data-testid="button-new-list" className="bg-emerald-600 hover:bg-emerald-700 text-white">
             <Plus className="h-4 w-4 mr-2" /> New Price List
           </Button>
         </div>
@@ -328,7 +331,7 @@ export default function PriceBuilderPage() {
               {panelLists.map((l) => (
                 <div
                   key={l.id}
-                  className={`w-full rounded-lg border p-3.5 transition-colors ${selectedId === l.id ? "border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30" : "hover:bg-muted/40"}`}
+                  className={`w-full rounded-lg border p-3.5 transition-colors ${selectedId === l.id ? "border-emerald-300 border-l-4 border-l-emerald-500 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30" : "hover:bg-muted/40"}`}
                   data-testid={`list-item-${l.id}`}
                 >
                   <button
@@ -517,8 +520,8 @@ export default function PriceBuilderPage() {
 
                       <div className="overflow-x-auto max-h-[72vh] overflow-y-auto border rounded-md">
                         <Table>
-                          <TableHeader className="sticky top-0 bg-background z-10">
-                            <TableRow>
+                          <TableHeader className="sticky top-0 z-10">
+                            <TableRow className="bg-muted/60 hover:bg-muted/60 border-b [&>th]:text-[11px] [&>th]:uppercase [&>th]:tracking-wider [&>th]:font-semibold [&>th]:text-muted-foreground">
                               <TableHead>Product</TableHead>
                               <TableHead className="text-right">Cost</TableHead>
                               <TableHead>Pricing method</TableHead>

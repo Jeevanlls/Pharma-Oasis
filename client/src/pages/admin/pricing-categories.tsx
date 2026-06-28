@@ -61,15 +61,18 @@ export default function PricingCategoriesPage() {
   return (
     <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <Tag className="h-6 w-6" /> Pricing Categories
-            </h1>
-            <p className="text-muted-foreground">
-              <b>Step 2 (optional).</b> Groups for your products. Cost uploads create these automatically from the file's Category: blocks — add or tidy them here.
-            </p>
+          <div className="flex items-start gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400">
+              <Tag className="h-6 w-6" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight">Pricing Categories</h1>
+              <p className="text-muted-foreground">
+                <b>Step 2 (optional).</b> Groups for your products. Cost uploads create these automatically from the file's Category: blocks — add or tidy them here.
+              </p>
+            </div>
           </div>
-          <Button onClick={() => { reset(); setOpen(true); }} data-testid="button-add-category">
+          <Button onClick={() => { reset(); setOpen(true); }} data-testid="button-add-category" className="bg-emerald-600 hover:bg-emerald-700 text-white">
             <Plus className="h-4 w-4 mr-2" /> Add Category
           </Button>
         </div>
