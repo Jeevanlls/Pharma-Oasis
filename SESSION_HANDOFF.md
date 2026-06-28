@@ -1,6 +1,28 @@
 # Session Handoff — START HERE next session
 
-_Last updated: 2026-06-27 (pm session). This is the master index. Detailed docs are linked below._
+_Last updated: 2026-06-28. This is the master index. Detailed docs are linked below._
+
+## ⭐ MOST RECENT (2026-06-28) — Pricing visual redesign v2 (emerald) + Who-Sees-What assignment tools
+Read this first; it supersedes the 06-27 note below for the pricing pages. Full detail + verification in **[CUSTOMER_PRICING_REDESIGN_PLAN.md](CUSTOMER_PRICING_REDESIGN_PLAN.md)** → section "2026-06-28".
+
+**Why:** the 06-27 facelift still didn't satisfy the owner. Owner pointed at the six "Pricing Manager v3.3" reference screenshots (in `/screenshots/` + `attached_assets/`) and clarified: **screenshots are for the VISUAL style only — menus/functions are fine; just make the visuals proper.** Owner chose to **KEEP EMERALD** (not the screenshots' navy/teal/pink).
+
+**What got done this session (all on `feature/price-list-builder`; `npm run check` 0-errors + `build` green at every commit):**
+- ✅ **Shared emerald visual system across all 6 pricing pages** (presentation-only, every `data-testid` preserved — counts verified vs HEAD). Emerald icon-chip headers; spreadsheet table chrome (tinted uppercase sticky headers, roomier `text-sm` rows, mono EANs, `tabular-nums`, `£`-prefixed cost inputs); a consistent status-colour language (green/amber/blue/red/grey); amber edited-row affordance; emerald CTAs + selected-row accents. Pilot on **Current Costs** (`7cfca19`, owner-approved), rolled to the other five (`d030c8d`).
+- ✅ **Who Sees What (`assignments.tsx`) — NEW functionality** (real changes, reuses existing v2 assign/unassign endpoints):
+  1. **Inline assign** of uncovered customers from the gap section (`dbe785a`).
+  2. **Remove (×)** on each assigned customer + per-published-list **"Add a customer"** picker (`488faba`).
+  3. **Master-detail brand rail** that scales to 80–100 brands (`54c9114`): searchable rail with per-brand **status dots** (🟢 covered / 🟡 gaps+count / 🟡 no-list / ⚪ none) + a **"Needs attention"** filter; right pane shows one brand's detail; mobile = brand dropdown.
+
+**⏯ NEXT ACTION (owner):**
+1. **Visual + functional click-through in a live admin session** (2FA-gated, can't be automated here): the 6 redesigned pages, and on **Who Sees What** — rail status dots, "Needs attention" toggle, gap-assign, per-list Add, Remove ×, and that coverage updates after each action. Server-surface was verified (assign/unassign return 401 real-auth-gate vs 200 SPA-fallback for fake routes); on-screen rendering was NOT browser-verified.
+2. **Deploy (unchanged process):** `main` is stale → `git branch -f main feature/price-list-builder && git push gitsafe-backup main`, then Replit **Deploy** (agent can't click it).
+
+Nothing known-broken; nothing half-done. Tree clean except harness-managed `.claude/settings.local.json` (and `/screenshots`, owner's reference images).
+
+**Commits (after `7e0b538`):** `7cfca19` · `d030c8d` · `dbe785a` · `488faba` · `54c9114`.
+
+---
 
 ## ⭐ MOST RECENT (2026-06-27 pm) — Customer Pricing redesign COMPLETE + type-check now clean
 Read this first; it supersedes the older "Active UI work" note for the pricing pages.
@@ -58,7 +80,7 @@ Nothing is known-broken; nothing half-done. Working tree clean except harness-ma
 - Commit promptly — this project has lost uncommitted work to workspace resets before.
 
 ## Active UI work
-- **[CUSTOMER_PRICING_REDESIGN_PLAN.md](CUSTOMER_PRICING_REDESIGN_PLAN.md)** — 2026-06-27 ✅ **DONE (all 6 pages) + 33 type errors fixed + verified.** Presentation-only redesign of the Customer Pricing tool pages to the reference layout (Option B). On `feature/price-list-builder`, type-check clean, build green. **Remaining = owner visual click-through + deploy** (see "⭐ MOST RECENT" at top). Progress tracker + verification notes inside.
+- **[CUSTOMER_PRICING_REDESIGN_PLAN.md](CUSTOMER_PRICING_REDESIGN_PLAN.md)** — see the **2026-06-28** section first: emerald visual-system v2 across all 6 pages **+ new Who-Sees-What assignment tools** (inline assign, per-list add/remove, master-detail brand rail for 80–100 brands). Earlier 06-27 Option-B facelift + 33 type-error fixes also documented. On `feature/price-list-builder`, check clean, build green. **Remaining = owner click-through + deploy** (see "⭐ MOST RECENT" at top).
 - **[CUSTOMER_PRICING_UI_PLAN.md](CUSTOMER_PRICING_UI_PLAN.md)** — 2026-06-27 (phase 1, DONE, committed `3e3c2b5`): Overview page + light polish pass. Reference screenshots in `attached_assets/` (08:37–08:38).
 
 ## Detailed docs (the source of truth for each area)

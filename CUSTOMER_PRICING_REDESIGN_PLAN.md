@@ -104,3 +104,64 @@ Verdict **PASS** on the behavioral fix (the part that was actually broken), at t
 - The 4 endpoints the fixed client calls (`PATCH/DELETE /api/admin/messages/:id(/read)`, `PATCH/DELETE /api/admin/supplier-leads/:id`) all return **401** (real `requireAdmin` gate) — whereas **non-existent** API routes return **200** (SPA fallback). So 401 is discriminating: the fixed targets are real, correctly method-routed, auth-gated routes.
 - Confirmed the served bundle (`dist/public/assets/index-*.js`) contains the fixed strings (`Enquiry from`, `Proposal Summary`, `productCategoriesSupply`, `phoneNumber`) and the old broken `…/read`,{method` shape is **gone**.
 - **Owner to eyeball in a live admin session** (only place 2FA can be satisfied): one message (mark-read toggles, delete removes) + one supplier lead (phone, proposal summary, category chips render).
+
+---
+
+# 2026-06-28 — Visual redesign v2 (emerald system) + Who-Sees-What assignment tools
+
+_Owner said the 06-27 facelift still didn't look right. Reviewed the six "Pharma Oasis Pricing Manager v3.3" reference screenshots (now also in `/screenshots/`, originals in `attached_assets/` dated 06-27 08:37–08:38). Owner clarified: **screenshots are for the VISUAL style only — menus & functions are fine; just make the visuals proper (distinguish with colour, clearer changes, proper inline-edit tables).** Owner chose to **KEEP EMERALD** as the accent (NOT the screenshots' navy/teal/pink). All work on `feature/price-list-builder`; `npm run check` exit 0 + `npm run build` green at every commit._
+
+## A. Shared emerald visual system (applied to all 6 pricing pages)
+Presentation-only — no logic/workflow/`data-testid` changes (testid counts verified identical to HEAD on every page). The conventions:
+- **Emerald icon-chip page header:** a `h-11 w-11 rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400` square holding the lucide icon, beside `text-2xl font-bold tracking-tight` title + the existing "Step N" subtitle.
+- **Spreadsheet table chrome:** tinted **sticky** header row (`bg-muted/60`) with **uppercase, letter-spaced** labels (`text-[11px] uppercase tracking-wider font-semibold text-muted-foreground`); roomier body rows (`text-sm`, `h-9` inputs where it was `text-xs`/`h-8`); `font-mono` EANs; right-aligned `tabular-nums` numbers.
+- **`£`-prefixed cost inputs:** a `pointer-events-none absolute` "£" inside the input (`pl-5`/`pl-4`), so cost fields read as money.
+- **Status-colour language (consistent everywhere):** 🟢 emerald = live/published/active/unchanged · 🟡 amber = draft/unsaved/changed · 🔵 blue = new · 🔴 red = error/duplicate/below-cost/large-change · ⚪ grey = inactive/superseded.
+- **Edited-row affordance:** amber row tint + amber dot next to the EAN + amber input border/focus-ring.
+- **Emerald primary CTAs:** `bg-emerald-600 hover:bg-emerald-700 text-white`. **Emerald left-accent** (`border-l-4 border-l-emerald-500`) on selected rows in master-detail rails.
+
+### Per-page (commits `7cfca19` pilot, `d030c8d` the other five)
+| Page | File | What changed |
+|---|---|---|
+| **Current Costs** (pilot) | `current-costs.tsx` | Icon-chip header · spreadsheet table chrome · £-prefixed New-cost input · amber edited dot+border · emerald Review/Confirm CTAs · emerald left-accent on selected brand rail. Owner approved this look → became the template. |
+| **Brands** | `pricing-brands.tsx` | Emerald icon-chip header · emerald "Add Brand" CTA. (Rows were already airy row-cards.) |
+| **Categories** | `pricing-categories.tsx` | Emerald icon-chip header · emerald "Add Category" CTA. |
+| **Who Sees What** | `assignments.tsx` | Emerald icon-chip header (then heavily extended — see section B). |
+| **Cost Uploads** | `cost-uploads.tsx` | Icon-chip header · tinted uppercase headers on **all 3** tables (review/removed/history) · £-prefixed + `tabular-nums` New-cost input · emerald "Upload & preview" + "Publish" CTAs. Dense 9-col review table kept dense (per constraint). |
+| **Price Builder** | `price-builder.tsx` | Light touch: icon-chip header · tinted uppercase working-sheet header · emerald "New Price List" CTA · emerald left-accent on selected list. Dense working sheet untouched. |
+
+## B. Who Sees What (`assignments.tsx`) — NEW functionality (owner-requested)
+This page went from a read-only report to a full assignment console. **These are real functional changes** (not presentation-only). Reuses the existing **v2 endpoints** the Price List Builder uses — no new server code.
+
+**Endpoints used** (`server/routes.ts`):
+- `POST /api/admin/v2/price-lists/:id/assign` body `{ customerIds:number[], replace:boolean }` (or `{ all:true }`). Returns `{ assigned, conflicts }`; **409** `{ message, assigned, conflicts }` when a customer already has a *different* list for that brand and `replace` is false. (route ~`routes.ts:4654`)
+- `POST /api/admin/v2/price-lists/:id/unassign` body `{ customerId }`. (route ~`routes.ts:4677`)
+- One-list-per-brand is enforced server-side → the 409 path drives a "Replace it?" `confirm()`.
+- On success both `["/api/admin/v2/assignments"]` and `["/api/admin/v2/price-lists"]` queries are invalidated so coverage/counts update live.
+- Shared client helper `assignRequest(listId, customerIds, replace)` (module-scope in `assignments.tsx`) does the fetch + 409 detection.
+
+1. **Inline assign for uncovered customers** (commit `dbe785a`) — in each brand's "customers who can't see this brand" gap `<details>`, the `GapAssign` component: a per-customer **Assign** button, an **Assign all N to "List"** button, and a **list picker** that appears only when the brand has >1 published list. (Only shows when the brand HAS a published list; otherwise the "create one in Price Builder" note stays.)
+2. **Remove + per-list Add-customer** (commit `488faba`) — `ListRow` component: every assigned customer chip gets a **×** (Remove → `/unassign`); every **published** list gets an **"Add a customer…"** Select (approved customers not already on it) + emerald **Assign** button. Doubles as a move-between-lists tool (409 → replace prompt). Threaded the list **id** into the per-brand view's `listMap` so both actions can target the right list.
+3. **Master-detail brand rail — scales to 80–100 brands** (commit `54c9114`) — replaced the vertical stack of every brand card with a `lg:grid-cols-[300px_minmax(0,1fr)]` layout:
+   - **Left rail** (`hidden lg:block`): search (brand/list/customer) + a **"Needs attention"** toggle (filters to brands with gaps OR no published list; shows the count) + a scrollable list of brand buttons, each with a **status dot** — 🟢 covered · 🟡 gaps (shows count badge) · 🟡 "no list" · ⚪ no customers. Selected = emerald left-accent.
+   - **Right pane** = `BrandPanel` (extracted from the old inline card) renders the selected brand's full coverage + gap-assign + per-list add/remove.
+   - **Mobile fallback** (`lg:hidden`): a brand `Select` above the detail pane.
+   - Selection state `selectedBrandId` defaults to the first brand in the (filtered) rail via `?? railList[0]`.
+   - New testids: `rail-brand-{id}`, `toggle-needs-attention`, `select-brand-mobile`, `add-select-{listId}`, `add-assign-{listId}`, `unassign-{listId}-{customerId}`, `gap-assign-{id}`, `gap-assign-all-{brand}`.
+
+## Verification (2026-06-28)
+- `npm run check` exit 0 and `npm run build` complete after **every** commit.
+- The `/assign` and `/unassign` routes confirmed **real + admin-gated (401)** on the running dev server (port 5000), vs **200** SPA-fallback for a fake sibling route — proving the new client calls hit real, method-correct, auth-gated endpoints.
+- **NOT browser-verified** (admin login is 2FA-gated, no Playwright in sandbox): the actual on-screen rendering + the assign/remove click-throughs. **Owner to eyeball in a live admin session** — especially Who-Sees-What: rail status dots, "Needs attention" filter, gap-assign, per-list Add, Remove ×, and that coverage updates after each action.
+
+## Commits this session (on `feature/price-list-builder`, all after `7e0b538`)
+- `7cfca19` Current Costs visual system (pilot)
+- `d030c8d` roll emerald visual system to remaining 5 pages
+- `dbe785a` Who Sees What: assign uncovered customers inline
+- `488faba` Who Sees What: Remove + per-list Add-customer actions
+- `54c9114` Who Sees What: master-detail brand rail (scales to 80–100 brands)
+
+## Still open / next
+- **Owner visual click-through** of all 6 pages + the Who-Sees-What assignment actions (above).
+- **Deploy** unchanged from the 06-27 process: `main` is stale → sync `git branch -f main feature/price-list-builder && git push gitsafe-backup main`, then Replit **Deploy** (agent can't click it).
+- **Optional / not done:** KPI stat-strip on Brands/Categories (needs a count the page doesn't fetch yet); rounded-pill filter chips on Price Builder's brand/active-archived filters; same brand-rail treatment could be applied elsewhere if wanted.
