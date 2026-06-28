@@ -29,12 +29,22 @@ interface AppUser {
   id: number; email: string; role: string; status: string;
   companyName: string | null; primaryContactName: string | null;
 }
+interface BrandView {
+  brand: PricingBrand;
+  lists: { id: number; name: string; status: string; customers: Assignment[] }[];
+  covered: AppUser[];
+  uncovered: AppUser[];
+  hasPublishedList: boolean;
+  publishedLists: { id: number; name: string }[];
+}
 
 const custName = (c: AppUser) => c.companyName?.trim() || c.primaryContactName?.trim() || c.email;
 const assignName = (a: Assignment) => a.customerCompany?.trim() || a.customerEmail;
 
 export default function AssignmentsPage() {
   const [search, setSearch] = useState("");
+  const [selectedBrandId, setSelectedBrandId] = useState<number | null>(null);
+  const [onlyGaps, setOnlyGaps] = useState(false);
   const { data: assignments = [] } = useQuery<Assignment[]>({ queryKey: ["/api/admin/v2/assignments"] });
   const { data: lists = [] } = useQuery<PriceListSummary[]>({ queryKey: ["/api/admin/v2/price-lists"] });
   const { data: brands = [] } = useQuery<PricingBrand[]>({ queryKey: ["/api/admin/pricing-brands"] });
@@ -84,6 +94,18 @@ export default function AssignmentsPage() {
 
   const brandsWithGaps = brandViews.filter((v) => v.uncovered.length > 0).length;
 
+  // Rail: a brand "needs attention" if it has uncovered customers or no published list.
+  const needsAttention = (v: BrandView) => customers.length > 0 && (v.uncovered.length > 0 || !v.hasPublishedList);
+  const attentionCount = brandViews.filter(needsAttention).length;
+  const railList = brandViews.filter(brandMatches).filter((v) => !onlyGaps || needsAttention(v));
+  const selected = brandViews.find((v) => v.brand.id === selectedBrandId) ?? railList[0] ?? null;
+  const statusDot = (v: BrandView): { dot: string; label: string | null } => {
+    if (customers.length === 0) return { dot: "bg-muted-foreground/40", label: null };
+    if (!v.hasPublishedList) return { dot: "bg-amber-500", label: "no list" };
+    if (v.uncovered.length === 0) return { dot: "bg-emerald-500", label: null };
+    return { dot: "bg-amber-500", label: String(v.uncovered.length) };
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-start gap-3">
@@ -109,82 +131,78 @@ export default function AssignmentsPage() {
         ) : (
           <div className="rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/20 p-4 text-sm flex items-center gap-2.5">
             <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0" />
-            <span><b>{brandsWithGaps}</b> of <b>{brands.length}</b> brand(s) have customers who can't see prices yet. Check each brand below — expand "customers who can't see this" to find them.</span>
+            <span><b>{brandsWithGaps}</b> of <b>{brands.length}</b> brand(s) have customers who can't see prices yet. Use the brand list on the left — switch on <b>Needs attention</b> to jump straight to them.</span>
           </div>
         )
       )}
 
-      <div className="relative max-w-md">
-        <Search className="h-4 w-4 absolute left-2 top-2.5 text-muted-foreground" />
-        <Input className="pl-8" value={search} onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by customer, price list, or brand…" data-testid="input-assignments-search" />
-      </div>
-
-      {brands.length === 0 && (
+      {brands.length === 0 ? (
         <Card><CardContent className="p-6">
           <div className="rounded-lg border border-dashed py-12 text-center text-muted-foreground">
             No brands yet. Add one under <b>Brands</b>, then build a price list.
           </div>
         </CardContent></Card>
-      )}
-
-      {brandViews.filter(brandMatches).map((v) => {
-        const M = customers.length;
-        const coveredN = v.covered.length;
-        const allCovered = M > 0 && v.uncovered.length === 0;
-        return (
-          <Card key={v.brand.id}>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between gap-2 flex-wrap">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Coins className="h-5 w-5 text-emerald-600 dark:text-emerald-400" /> {v.brand.name}
-                </CardTitle>
-                <Badge variant={allCovered ? "default" : "outline"} className={allCovered ? "bg-emerald-600" : "border-amber-400 text-amber-800 dark:text-amber-300"}>
-                  {coveredN} of {M} customers covered
-                </Badge>
+      ) : (
+        <div className="grid gap-6 lg:grid-cols-[300px_minmax(0,1fr)]">
+          {/* Brand rail — search, triage filter, status dots */}
+          <Card className="hidden lg:block h-fit">
+            <CardHeader className="pb-3 space-y-3">
+              <div className="relative">
+                <Search className="h-4 w-4 absolute left-2 top-2.5 text-muted-foreground" />
+                <Input className="pl-8" value={search} onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search brand, list, or customer…" data-testid="input-assignments-search" />
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs text-muted-foreground">{railList.length} of {brandViews.length}</span>
+                <Button size="sm" variant="outline"
+                  className={`h-7 text-xs ${onlyGaps ? "border-amber-400 bg-amber-50 text-amber-800 dark:bg-amber-950/30 dark:text-amber-300" : ""}`}
+                  onClick={() => setOnlyGaps((p) => !p)} data-testid="toggle-needs-attention">
+                  <AlertTriangle className="h-3 w-3 mr-1" /> Needs attention{attentionCount > 0 ? ` (${attentionCount})` : ""}
+                </Button>
               </div>
             </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Coverage status */}
-              {M === 0 ? (
-                <p className="text-sm text-muted-foreground">No approved customers yet.</p>
-              ) : !v.hasPublishedList ? (
-                <div className="rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/20 p-3.5 text-sm">
-                  <div className="flex items-center gap-2 font-medium text-amber-800 dark:text-amber-300">
-                    <AlertTriangle className="h-4 w-4 shrink-0" /> No published price list for this brand — none of your {M} customer(s) can see its prices.
-                  </div>
-                  <Link href="/admin/price-builder">
-                    <span className="text-xs text-emerald-700 dark:text-emerald-400 hover:underline cursor-pointer inline-flex items-center gap-1 mt-1">
-                      Create &amp; publish one in Price List Builder <ArrowRight className="h-3 w-3" />
-                    </span>
-                  </Link>
-                </div>
-              ) : allCovered ? (
-                <p className="text-sm text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 shrink-0" /> All {M} approved customer(s) can see this brand's prices.
-                </p>
-              ) : (
-                <details className="rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/20 p-3.5 text-sm" data-testid={`gap-${v.brand.id}`}>
-                  <summary className="cursor-pointer font-medium text-amber-800 dark:text-amber-300 flex items-center gap-2">
-                    <AlertTriangle className="h-4 w-4 shrink-0" /> {v.uncovered.length} customer(s) can't see this brand's prices — click to view
-                  </summary>
-                  <p className="text-xs text-muted-foreground mt-2">These approved customers have no price list for {v.brand.name}. Pick a published list and assign them right here.</p>
-                  <GapAssign brandName={v.brand.name} uncovered={v.uncovered} publishedLists={v.publishedLists} />
-                </details>
-              )}
-
-              {/* Lists and who's on them */}
-              {v.lists.length > 0 && (
-                <div className="space-y-2">
-                  {v.lists.map((l) => (
-                    <ListRow key={l.id} list={l} brandName={v.brand.name} allCustomers={customers} />
-                  ))}
-                </div>
-              )}
+            <CardContent className="pt-0">
+              <div className="space-y-1 max-h-[68vh] overflow-auto pr-1">
+                {railList.map((v) => {
+                  const st = statusDot(v);
+                  const isSel = selected?.brand.id === v.brand.id;
+                  return (
+                    <button key={v.brand.id} type="button" onClick={() => setSelectedBrandId(v.brand.id)}
+                      className={`w-full flex items-center gap-2 rounded-lg border px-3 py-2 text-left transition-colors ${isSel ? "border-emerald-300 border-l-4 border-l-emerald-500 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30 font-medium" : "hover:bg-muted/40"}`}
+                      data-testid={`rail-brand-${v.brand.id}`}>
+                      <span className={`h-2 w-2 shrink-0 rounded-full ${st.dot}`} aria-hidden />
+                      <span className="flex-1 truncate text-sm">{v.brand.name}</span>
+                      {st.label && <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 font-normal text-[11px] px-1.5">{st.label}</Badge>}
+                    </button>
+                  );
+                })}
+                {railList.length === 0 && (
+                  <p className="text-xs text-muted-foreground px-1 py-3">{onlyGaps ? "No brands need attention 🎉" : "No brands match."}</p>
+                )}
+              </div>
             </CardContent>
           </Card>
-        );
-      })}
+
+          {/* Detail pane for the selected brand */}
+          <div className="space-y-4 min-w-0">
+            <div className="lg:hidden">
+              <Select value={selected ? String(selected.brand.id) : ""} onValueChange={(val) => setSelectedBrandId(Number(val))}>
+                <SelectTrigger data-testid="select-brand-mobile"><SelectValue placeholder="Select a brand" /></SelectTrigger>
+                <SelectContent>
+                  {railList.map((v) => <SelectItem key={v.brand.id} value={String(v.brand.id)}>{v.brand.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            {selected ? (
+              <BrandPanel v={selected} customers={customers} />
+            ) : (
+              <Card><CardContent className="p-6">
+                <div className="rounded-lg border border-dashed py-16 text-center text-muted-foreground">Select a brand to see its coverage and assignments.</div>
+              </CardContent></Card>
+            )}
+          </div>
+        </div>
+      )}
 
       <div>
         <Link href="/admin/price-builder">
@@ -194,6 +212,65 @@ export default function AssignmentsPage() {
         </Link>
       </div>
     </div>
+  );
+}
+
+// The full coverage + assignment detail for one selected brand (right pane).
+function BrandPanel({ v, customers }: { v: BrandView; customers: AppUser[] }) {
+  const M = customers.length;
+  const coveredN = v.covered.length;
+  const allCovered = M > 0 && v.uncovered.length === 0;
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Coins className="h-5 w-5 text-emerald-600 dark:text-emerald-400" /> {v.brand.name}
+          </CardTitle>
+          <Badge variant={allCovered ? "default" : "outline"} className={allCovered ? "bg-emerald-600" : "border-amber-400 text-amber-800 dark:text-amber-300"}>
+            {coveredN} of {M} customers covered
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Coverage status */}
+        {M === 0 ? (
+          <p className="text-sm text-muted-foreground">No approved customers yet.</p>
+        ) : !v.hasPublishedList ? (
+          <div className="rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/20 p-3.5 text-sm">
+            <div className="flex items-center gap-2 font-medium text-amber-800 dark:text-amber-300">
+              <AlertTriangle className="h-4 w-4 shrink-0" /> No published price list for this brand — none of your {M} customer(s) can see its prices.
+            </div>
+            <Link href="/admin/price-builder">
+              <span className="text-xs text-emerald-700 dark:text-emerald-400 hover:underline cursor-pointer inline-flex items-center gap-1 mt-1">
+                Create &amp; publish one in Price List Builder <ArrowRight className="h-3 w-3" />
+              </span>
+            </Link>
+          </div>
+        ) : allCovered ? (
+          <p className="text-sm text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 shrink-0" /> All {M} approved customer(s) can see this brand's prices.
+          </p>
+        ) : (
+          <details className="rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/20 p-3.5 text-sm" data-testid={`gap-${v.brand.id}`}>
+            <summary className="cursor-pointer font-medium text-amber-800 dark:text-amber-300 flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 shrink-0" /> {v.uncovered.length} customer(s) can't see this brand's prices — click to view
+            </summary>
+            <p className="text-xs text-muted-foreground mt-2">These approved customers have no price list for {v.brand.name}. Pick a published list and assign them right here.</p>
+            <GapAssign brandName={v.brand.name} uncovered={v.uncovered} publishedLists={v.publishedLists} />
+          </details>
+        )}
+
+        {/* Lists and who's on them */}
+        {v.lists.length > 0 && (
+          <div className="space-y-2">
+            {v.lists.map((l) => (
+              <ListRow key={l.id} list={l} brandName={v.brand.name} allCustomers={customers} />
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
