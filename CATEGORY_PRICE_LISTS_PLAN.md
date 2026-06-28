@@ -105,11 +105,17 @@ if (li?.ean) { const eff = await pricingV2.getCustomerItemByEan(user.id, li.ean)
 ---
 
 ## PHASE 2 — make it USABLE
+### ✅ Monthly Promotions slice — DONE (2026-06-28 pm), verified 15/15 on live DB
+- **Backend (`server/pricing-v2.ts`)**: `listPromotions` / `createPromotion` / `updatePromotionMeta` (name + window + publish) / `addPromotionItems` (by EAN, flat `fixed` price, dedupes) / `setPromotionItemPrice` / `removePromotionItem` / `searchPromotableProducts` (one row per distinct EAN from **published brand/category list items** — NOT the `products` table, which has no EANs) / `activePromotionsCatalogue`. Reuse `archivePriceListV2`.
+- **Resolver/display correctness**: `getCustomerCatalogue` now overlays live-promo prices by EAN (`onPromotion` flag) so displayed = charged; `getCustomerItem` resolves live-promo items **by id** too (promotions are global, not in `customerListIds`) so a promo item adds to basket + checks out.
+- **API (`server/routes.ts`)**: admin `GET/POST/PUT /api/admin/promotions[...]`, `…/items` add/edit/remove, `…/archive`, `GET /api/admin/promotions-product-search`; portal `GET /api/portal/promotions` (live, global). All behind `requireAdmin`/`requireActiveCustomer` (verified 401 vs SPA-fallback).
+- **UI**: admin `client/src/pages/admin/promotions.tsx` (nav "7. Promotions") — create, schedule, product picker, per-item price, publish/unpublish, archive. Portal `client/src/pages/portal/promotions.tsx` (nav "Promotions") — live offers + add to basket.
+- **Note/limitation**: if a promo expires while a promo item sits in a basket, checkout throws "Invalid item" rather than falling back to the list price (acceptable edge case; revisit if it bites).
+
+### Remaining Phase 2 — category lists (not built yet)
 - **Category list authoring**: build/refresh a list whose product set is a category across member brands; generalize `getBaseCostForBrand` → gather latest **published** cost rows per product in the category (union across brands). `priceListItems` already carries per-row `ean`+`pricingCategoryId`+`costPrice`, so cross-brand items store fine.
-- **Cost-edit propagation**: the Current Costs "apply" flow walks lists **by brand** — it must **also** refresh category lists and promotions containing a changed product, or their `preparedPrice` goes stale.
+- **Cost-edit propagation**: the Current Costs "apply" flow walks lists **by brand** — it must **also** refresh category lists (and any margin-based promotions) containing a changed product, or their `preparedPrice` goes stale. (Promotions use flat `fixed` prices today, so they don't drift on cost edits.)
 - **Category assignment**: generalize `assignCustomers` (today it throws if `!brandId` and checks conflict at brand level) to set `scope`/`scopeId` and conflict on `(customerId, scope, scopeId)`.
-- **Monthly Promotions admin**: author a promotion (multi-brand/category product picker), set `startsAt`/`endsAt`, single price per EAN, publish. Global — no assignment step.
-- **Portal**: a **Monthly Promotions** section; make `getCustomerItem`/`getCustomerCatalogue` promo-aware so the **displayed** price matches the **charged** price (promo EANs show the promo price / are flagged, and are visually "obsolete" on their brand/category rows).
 
 ## PHASE 3 — make it SAFE & CLEAR
 - **Assign-time / publish-time conflict preview** (reuse Price Builder assign dialog + Who-Sees-What console):

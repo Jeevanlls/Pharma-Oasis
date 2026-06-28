@@ -45,6 +45,7 @@ import {
   PoundSterling,
   BookOpen,
   Layers,
+  Megaphone,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 
@@ -81,6 +82,7 @@ const pricingMenuItems = [
   { title: "4. Current Costs", href: "/admin/current-costs", icon: PoundSterling, staffAccess: false },
   { title: "5. Price Lists", href: "/admin/price-builder", icon: Coins, staffAccess: false },
   { title: "6. Who Sees What", href: "/admin/assignments", icon: Users, staffAccess: false },
+  { title: "7. Promotions", href: "/admin/promotions", icon: Megaphone, staffAccess: false },
   // Legacy "Price Lists" page hidden from the sidebar — superseded by the Price List Builder.
   // Route still registered in App.tsx (/admin/price-lists) so it's reversible; no data removed.
   // { title: "Price Lists (legacy)", href: "/admin/price-lists", icon: Coins, staffAccess: false },

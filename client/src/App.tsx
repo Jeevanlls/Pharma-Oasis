@@ -72,10 +72,12 @@ import AdminPricingBrandsPage from "@/pages/admin/pricing-brands";
 import AdminPricingCategoriesPage from "@/pages/admin/pricing-categories";
 import AdminPriceBuilderPage from "@/pages/admin/price-builder";
 import AdminAssignmentsPage from "@/pages/admin/assignments";
+import AdminPromotionsPage from "@/pages/admin/promotions";
 import AdminPricingGuidePage from "@/pages/admin/pricing-guide";
 import AdminPricingOverviewPage from "@/pages/admin/pricing-overview";
 
 import PortalCataloguePage from "@/pages/portal/catalogue";
+import PortalPromotionsPage from "@/pages/portal/promotions";
 import PortalOrdersPage from "@/pages/portal/orders";
 import PortalDownloadsPage from "@/pages/portal/downloads";
 
@@ -211,8 +213,10 @@ function Router() {
       <Route path="/admin/pricing-brands">{() => <AdminRoute component={AdminPricingBrandsPage} />}</Route>
       <Route path="/admin/pricing-categories">{() => <AdminRoute component={AdminPricingCategoriesPage} />}</Route>
       <Route path="/admin/price-builder">{() => <AdminRoute component={AdminPriceBuilderPage} />}</Route>
+      <Route path="/admin/promotions">{() => <AdminRoute component={AdminPromotionsPage} />}</Route>
 
       <Route path="/portal">{() => <PortalRoute component={PortalCataloguePage} />}</Route>
+      <Route path="/portal/promotions">{() => <PortalRoute component={PortalPromotionsPage} />}</Route>
       {/* D2: portal basket + the duplicate portal quotes list fold into the shared basket / my-quotes. */}
       <Route path="/portal/basket">{() => <Redirect to="/basket" />}</Route>
       <Route path="/portal/quotes">{() => <Redirect to="/my-quotes" />}</Route>

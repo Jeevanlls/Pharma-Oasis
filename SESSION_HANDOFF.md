@@ -2,6 +2,18 @@
 
 _Last updated: 2026-06-28. This is the master index. Detailed docs are linked below._
 
+## ⭐ MOST RECENT (2026-06-28 pm) — Monthly Promotions (Phase 2 slice) BUILT
+On `feature/price-list-builder`; `npm run check` 0-errors + `build` green; backend verified **15/15** on the live DB (temp rows cleaned up); routes verified auth-gated (401 vs SPA-fallback). Spec/decisions in **[CATEGORY_PRICE_LISTS_PLAN.md](CATEGORY_PRICE_LISTS_PLAN.md)** → Phase 2.
+
+**What it is:** a global, time-bound **Monthly Promotions** feature on top of the Phase-1 precedence engine. A live promo price overrides every customer's brand/category price for those EANs, and auto-reverts when the window ends.
+- **Admin** — new page **/admin/promotions** (sidebar "7. Promotions"): create, set start/end dates, pick products from the pricing catalogue (search by name/EAN — sourced from published list items, since the `products` table has **no EANs**), set a flat price per item, publish/unpublish, archive.
+- **Customer portal** — new **/portal/promotions** page (header "Promotions" tab): live offers, add-to-basket. Catalogue prices also overlay the promo price (`onPromotion`) so displayed = charged.
+- **Files:** `server/pricing-v2.ts` (promotion fns + catalogue overlay + `getCustomerItem` promo-by-id fallback), `server/routes.ts` (admin+portal endpoints), `client/src/pages/admin/promotions.tsx`, `client/src/pages/portal/promotions.tsx`, `App.tsx`, `admin-layout.tsx`, `portal-layout.tsx`.
+
+**⏯ NEXT:** owner click-through (admin create→publish a promo, see it on the portal + price override) — can't be browser-automated here. Then the **remaining Phase 2 = category lists** (authoring + cross-brand cost sourcing + cost-edit propagation + generalize `assignCustomers`). Deploy: code isn't live yet (schema already is) → `git branch -f main feature/price-list-builder && git push gitsafe-backup main`, then Replit **Deploy**.
+
+---
+
 ## ⭐ MOST RECENT (2026-06-28 pm) — Category Price Lists + Monthly Promotions: Phase 1 (CORRECT) shipped
 Full spec + decisions + phasing in **[CATEGORY_PRICE_LISTS_PLAN.md](CATEGORY_PRICE_LISTS_PLAN.md)** (redrafted this session). On `feature/price-list-builder`; `npm run check` 0-errors + `build` green; resolver verified 6/6 on the live DB with temp rows (cleaned up).
 

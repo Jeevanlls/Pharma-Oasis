@@ -17,7 +17,7 @@ import {
   costUploadRows,
   users,
 } from "@shared/schema";
-import { eq, and, desc, asc, ne, inArray, sql, or, isNull, lte, gte } from "drizzle-orm";
+import { eq, and, desc, asc, ne, inArray, sql, or, isNull, lte, gte, ilike } from "drizzle-orm";
 import type {
   PricingBrand,
   InsertPricingBrand,
@@ -1053,6 +1053,7 @@ export interface PortalItem {
   price: number | null;
   availability: Availability;
   availableQty: number | null;
+  onPromotion?: boolean; // price reflects a live promotion overriding the customer's list price
 }
 
 export interface PortalFilter {
@@ -1090,6 +1091,19 @@ export async function getCustomerCatalogue(customerId: number, filter: PortalFil
     availableQty: r.item.supplierQty ?? null,
   }));
 
+  // Overlay live promotions: a promo price overrides the customer's list price for that
+  // EAN, so the DISPLAYED price matches what buildPricedLines will CHARGE (Phase 1).
+  const promos = await activePromotionItemsByEan();
+  if (promos.size) {
+    for (const i of items) {
+      const p = i.ean ? promos.get(i.ean) : undefined;
+      if (p) {
+        i.price = num(p.preparedPrice);
+        i.onPromotion = true;
+      }
+    }
+  }
+
   const s = (filter.search ?? "").trim().toLowerCase();
   if (s)
     items = items.filter(
@@ -1118,15 +1132,24 @@ export async function getCustomerCatalogue(customerId: number, filter: PortalFil
   return items;
 }
 
-/** A single prepared item a customer is allowed to see (for basket pricing). */
+/** A single prepared item a customer is allowed to see (for basket pricing): one of their
+ *  own assigned-list items, OR any item on a LIVE promotion (promotions are global). */
 export async function getCustomerItem(customerId: number, itemId: number): Promise<PriceListItem | null> {
   const listIds = await customerListIds(customerId);
-  if (!listIds.length) return null;
-  const [it] = await db
-    .select()
+  if (listIds.length) {
+    const [it] = await db
+      .select()
+      .from(priceListItems)
+      .where(and(eq(priceListItems.id, itemId), inArray(priceListItems.priceListId, listIds)));
+    if (it) return it;
+  }
+  // Fallback: the item belongs to a live promotion (e.g. added from the Promotions page).
+  const [promo] = await db
+    .select({ item: priceListItems })
     .from(priceListItems)
-    .where(and(eq(priceListItems.id, itemId), inArray(priceListItems.priceListId, listIds)));
-  return it ?? null;
+    .innerJoin(priceLists, eq(priceListItems.priceListId, priceLists.id))
+    .where(and(eq(priceListItems.id, itemId), ...livePromotionConds(new Date())));
+  return promo?.item ?? null;
 }
 
 /** Precedence rank of a list scope: lower wins. brand=1, category=2, anything else=3. */
@@ -1139,25 +1162,48 @@ function rankScope(scope: string | null | undefined): number {
  * to every customer) and time-bound: published, and now within [startsAt, endsAt]
  * (null bound = open-ended). Cheapest wins if two promotions overlap an EAN.
  */
+/** Conditions for a price_list_items row that belongs to a LIVE promotion right now
+ *  (published, isActive, and `now` within [startsAt, endsAt]). Join priceLists first. */
+function livePromotionConds(now: Date) {
+  return [
+    eq(priceListItems.isActive, true),
+    eq(priceLists.scope, "promotion"),
+    eq(priceLists.status, "published"),
+    or(isNull(priceLists.startsAt), lte(priceLists.startsAt, now)),
+    or(isNull(priceLists.endsAt), gte(priceLists.endsAt, now)),
+  ];
+}
+
 async function activePromotionItemByEan(ean: string): Promise<PriceListItem | null> {
   const now = new Date();
   const rows = await db
     .select({ item: priceListItems })
     .from(priceListItems)
     .innerJoin(priceLists, eq(priceListItems.priceListId, priceLists.id))
-    .where(
-      and(
-        eq(priceListItems.ean, ean),
-        eq(priceListItems.isActive, true),
-        eq(priceLists.scope, "promotion"),
-        eq(priceLists.status, "published"),
-        or(isNull(priceLists.startsAt), lte(priceLists.startsAt, now)),
-        or(isNull(priceLists.endsAt), gte(priceLists.endsAt, now)),
-      ),
-    );
+    .where(and(eq(priceListItems.ean, ean), ...livePromotionConds(now)));
   if (!rows.length) return null;
   rows.sort((a, b) => (num(a.item.preparedPrice) ?? Infinity) - (num(b.item.preparedPrice) ?? Infinity));
   return rows[0].item;
+}
+
+/** Map of EAN -> cheapest live-promotion item, across ALL promotions (global). Used to
+ *  overlay promo prices onto the portal catalogue and to render the Promotions section. */
+async function activePromotionItemsByEan(): Promise<Map<string, PriceListItem>> {
+  const now = new Date();
+  const rows = await db
+    .select({ item: priceListItems })
+    .from(priceListItems)
+    .innerJoin(priceLists, eq(priceListItems.priceListId, priceLists.id))
+    .where(and(...livePromotionConds(now)));
+  const map = new Map<string, PriceListItem>();
+  for (const { item } of rows) {
+    if (!item.ean) continue;
+    const prev = map.get(item.ean);
+    if (!prev || (num(item.preparedPrice) ?? Infinity) < (num(prev.preparedPrice) ?? Infinity)) {
+      map.set(item.ean, item);
+    }
+  }
+  return map;
 }
 
 /**
@@ -1186,4 +1232,222 @@ export async function getCustomerItemByEan(customerId: number, ean: string | nul
       (num(a.item.preparedPrice) ?? Infinity) - (num(b.item.preparedPrice) ?? Infinity),
   );
   return rows[0].item;
+}
+
+// ===============================================================
+// MONTHLY PROMOTIONS (scope='promotion') — global, time-bound, single price.
+// A promotion is a price_lists row with scope='promotion' + startsAt/endsAt and
+// price_list_items priced at a flat fixedPrice. It is NOT assigned per customer:
+// it applies to everyone while live, overriding brand/category prices by EAN.
+// ===============================================================
+export interface PromotionSummary extends PriceList {
+  itemCount: number;
+  /** Live right now (published + within window). */
+  isLive: boolean;
+}
+
+/** Is this promotion live at `now`? (published + within [startsAt, endsAt]). */
+function promoIsLive(list: { status: string; startsAt: Date | null; endsAt: Date | null }, now: Date): boolean {
+  if (list.status !== "published") return false;
+  if (list.startsAt && list.startsAt > now) return false;
+  if (list.endsAt && list.endsAt < now) return false;
+  return true;
+}
+
+export async function listPromotions(archived: "exclude" | "only" | "include" = "exclude"): Promise<PromotionSummary[]> {
+  const conds = [eq(priceLists.scope, "promotion")] as any[];
+  if (archived === "exclude") conds.push(ne(priceLists.status, "archived"));
+  if (archived === "only") conds.push(eq(priceLists.status, "archived"));
+  const lists = await db
+    .select()
+    .from(priceLists)
+    .where(and(...conds))
+    .orderBy(desc(priceLists.startsAt), asc(priceLists.name));
+  const now = new Date();
+  const out: PromotionSummary[] = [];
+  for (const list of lists) {
+    const [{ count: itemCount }] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(priceListItems)
+      .where(eq(priceListItems.priceListId, list.id));
+    out.push({ ...list, itemCount, isLive: promoIsLive(list, now) });
+  }
+  return out;
+}
+
+export async function createPromotion(input: {
+  name: string;
+  startsAt?: Date | null;
+  endsAt?: Date | null;
+}): Promise<PriceList> {
+  const [list] = await db
+    .insert(priceLists)
+    .values({
+      name: input.name.trim(),
+      scope: "promotion",
+      brandId: null,
+      categoryId: null,
+      startsAt: input.startsAt ?? null,
+      endsAt: input.endsAt ?? null,
+      status: "draft",
+      type: "customer",
+      isActive: true,
+    })
+    .returning();
+  return list;
+}
+
+export async function updatePromotionMeta(
+  id: number,
+  data: { name?: string; startsAt?: Date | null; endsAt?: Date | null; status?: string },
+): Promise<PriceList> {
+  const patch: any = { updatedAt: new Date() };
+  if (data.name !== undefined) patch.name = data.name.trim();
+  if (data.startsAt !== undefined) patch.startsAt = data.startsAt;
+  if (data.endsAt !== undefined) patch.endsAt = data.endsAt;
+  if (data.status !== undefined) {
+    patch.status = data.status;
+    if (data.status === "published") patch.publishedAt = new Date();
+  }
+  const [list] = await db
+    .update(priceLists)
+    .set(patch)
+    .where(and(eq(priceLists.id, id), eq(priceLists.scope, "promotion")))
+    .returning();
+  return list;
+}
+
+/** A product the admin can promote: a distinct EAN that exists in the pricing catalogue
+ *  (a published brand/category list item), so a promo on it actually overrides a list price. */
+export interface PromotableProduct {
+  ean: string;
+  description: string | null;
+  caseSize: string | null;
+  pricingCategoryId: number | null;
+  costPrice: string | null; // admin reference (their current cost) — not shown to customers
+  brandName: string | null;
+}
+
+/** Search the pricing catalogue (published brand/category list items) for promotable products,
+ *  one row per distinct EAN. Used by the promotion product picker. */
+export async function searchPromotableProducts(query: string, limit = 50): Promise<PromotableProduct[]> {
+  const q = (query ?? "").trim();
+  const conds = [
+    inArray(priceLists.scope, ["brand", "category"]),
+    eq(priceLists.status, "published"),
+    eq(priceListItems.isActive, true),
+    sql`${priceListItems.ean} IS NOT NULL AND ${priceListItems.ean} <> ''`,
+  ] as any[];
+  if (q) conds.push(or(ilike(priceListItems.description, `%${q}%`), ilike(priceListItems.ean, `%${q}%`)));
+  const rows = await db
+    .select({ item: priceListItems, brandName: pricingBrands.name })
+    .from(priceListItems)
+    .innerJoin(priceLists, eq(priceListItems.priceListId, priceLists.id))
+    .leftJoin(pricingBrands, eq(priceLists.brandId, pricingBrands.id))
+    .where(and(...conds))
+    .orderBy(asc(priceListItems.description))
+    .limit(limit * 6);
+  const seen = new Set<string>();
+  const out: PromotableProduct[] = [];
+  for (const r of rows) {
+    const ean = r.item.ean!;
+    if (seen.has(ean)) continue;
+    seen.add(ean);
+    out.push({
+      ean,
+      description: r.item.description,
+      caseSize: r.item.caseSize,
+      pricingCategoryId: r.item.pricingCategoryId ?? null,
+      costPrice: r.item.costPrice,
+      brandName: r.brandName ?? null,
+    });
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
+/** Add products (by EAN) to a promotion at a flat price each (skips EANs already on it). */
+export async function addPromotionItems(
+  listId: number,
+  items: {
+    ean: string;
+    description?: string | null;
+    caseSize?: string | null;
+    costPrice?: string | number | null;
+    pricingCategoryId?: number | null;
+    price: number;
+  }[],
+): Promise<{ added: number; skipped: number }> {
+  if (!items.length) return { added: 0, skipped: 0 };
+  const existing = await db
+    .select({ ean: priceListItems.ean })
+    .from(priceListItems)
+    .where(eq(priceListItems.priceListId, listId));
+  const have = new Set(existing.map((r) => r.ean).filter(Boolean) as string[]);
+
+  const values: any[] = [];
+  let skipped = 0;
+  for (const it of items) {
+    const ean = (it.ean ?? "").trim();
+    if (!ean || have.has(ean)) { skipped++; continue; }
+    have.add(ean);
+    const price = round2(Number(it.price) || 0);
+    values.push({
+      priceListId: listId,
+      costRowId: null,
+      ean,
+      description: it.description ?? null,
+      pricingCategoryId: it.pricingCategoryId ?? null,
+      caseSize: it.caseSize ?? null,
+      costPrice: it.costPrice != null ? toStr(Number(it.costPrice)) : null, // snapshot for admin margin visibility
+      method: "fixed" as const,
+      marginPercent: null,
+      fixedPrice: toStr(price),
+      plusAmount: null,
+      preparedPrice: toStr(price),
+      supplierQty: null,
+      isActive: true,
+    });
+  }
+  if (values.length) await db.insert(priceListItems).values(values);
+  return { added: values.length, skipped };
+}
+
+export async function removePromotionItem(listId: number, itemId: number): Promise<void> {
+  await db
+    .delete(priceListItems)
+    .where(and(eq(priceListItems.id, itemId), eq(priceListItems.priceListId, listId)));
+}
+
+export async function setPromotionItemPrice(listId: number, itemId: number, price: number): Promise<void> {
+  const p = toStr(round2(Number(price) || 0));
+  await db
+    .update(priceListItems)
+    .set({ fixedPrice: p, preparedPrice: p, method: "fixed", updatedAt: new Date() })
+    .where(and(eq(priceListItems.id, itemId), eq(priceListItems.priceListId, listId)));
+}
+
+/** Every product on a LIVE promotion right now, priced for the portal "Promotions" section
+ *  (global — same for all customers). Cost/margin never included. */
+export async function activePromotionsCatalogue(): Promise<PortalItem[]> {
+  const map = await activePromotionItemsByEan();
+  const out: PortalItem[] = [];
+  for (const item of Array.from(map.values())) {
+    out.push({
+      itemId: item.id,
+      priceListId: item.priceListId,
+      brandId: null,
+      brandName: null,
+      pricingCategoryId: item.pricingCategoryId ?? null,
+      ean: item.ean,
+      description: item.description,
+      caseSize: item.caseSize,
+      price: num(item.preparedPrice),
+      availability: availabilityOf(item.supplierQty),
+      availableQty: item.supplierQty ?? null,
+      onPromotion: true,
+    });
+  }
+  out.sort((a, b) => (a.description ?? "").localeCompare(b.description ?? ""));
+  return out;
 }

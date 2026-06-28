@@ -4689,6 +4689,58 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
     res.json(await pricingV2.allAssignments());
   });
 
+  // ==================== MONTHLY PROMOTIONS (global, time-bound) ====================
+  // (parseDate is defined above and reused here.)
+  app.get("/api/admin/promotions", requireAdmin, async (req, res) => {
+    const archived = req.query.archived === "only" ? "only" : req.query.archived === "include" ? "include" : "exclude";
+    res.json(await pricingV2.listPromotions(archived));
+  });
+
+  app.get("/api/admin/promotions/:id", requireAdmin, async (req, res) => {
+    const found = await pricingV2.getPriceListFull(parseInt(req.params.id, 10));
+    if (!found || found.list.scope !== "promotion") return res.status(404).json({ message: "Promotion not found" });
+    res.json(found);
+  });
+
+  app.post("/api/admin/promotions", requireAdmin, async (req, res) => {
+    const name = (req.body.name || "").trim();
+    if (!name) return res.status(400).json({ message: "name is required" });
+    res.json(await pricingV2.createPromotion({ name, startsAt: parseDate(req.body.startsAt), endsAt: parseDate(req.body.endsAt) }));
+  });
+
+  app.put("/api/admin/promotions/:id", requireAdmin, async (req, res) => {
+    const patch: any = {};
+    if (req.body.name !== undefined) patch.name = req.body.name;
+    if (req.body.startsAt !== undefined) patch.startsAt = parseDate(req.body.startsAt);
+    if (req.body.endsAt !== undefined) patch.endsAt = parseDate(req.body.endsAt);
+    if (req.body.status !== undefined) patch.status = req.body.status;
+    res.json(await pricingV2.updatePromotionMeta(parseInt(req.params.id, 10), patch));
+  });
+
+  // Search the pricing catalogue for products to promote (one row per distinct EAN).
+  app.get("/api/admin/promotions-product-search", requireAdmin, async (req, res) => {
+    res.json(await pricingV2.searchPromotableProducts((req.query.q as string) || "", 50));
+  });
+
+  app.post("/api/admin/promotions/:id/items", requireAdmin, async (req, res) => {
+    const items = Array.isArray(req.body.items) ? req.body.items : [];
+    res.json(await pricingV2.addPromotionItems(parseInt(req.params.id, 10), items));
+  });
+
+  app.put("/api/admin/promotions/:id/items/:itemId", requireAdmin, async (req, res) => {
+    await pricingV2.setPromotionItemPrice(parseInt(req.params.id, 10), parseInt(req.params.itemId, 10), Number(req.body.price));
+    res.json({ ok: true });
+  });
+
+  app.delete("/api/admin/promotions/:id/items/:itemId", requireAdmin, async (req, res) => {
+    await pricingV2.removePromotionItem(parseInt(req.params.id, 10), parseInt(req.params.itemId, 10));
+    res.json({ ok: true });
+  });
+
+  app.post("/api/admin/promotions/:id/archive", requireAdmin, async (req, res) => {
+    res.json(await pricingV2.archivePriceListV2(parseInt(req.params.id, 10)));
+  });
+
   // ==================== CUSTOMER PRICING — PRICE LISTS (legacy v1) ====================
   app.get("/api/admin/price-lists", requireAdmin, async (req, res) => {
     res.json(await pricingStore.listPriceLists());
@@ -4793,6 +4845,16 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
     } catch (error: any) {
       console.error("Portal products error:", error);
       res.status(500).json({ message: "Failed to load products" });
+    }
+  });
+
+  // Live Monthly Promotions — global, same for every logged-in customer.
+  app.get("/api/portal/promotions", requireActiveCustomer, async (_req: any, res) => {
+    try {
+      res.json({ products: await pricingV2.activePromotionsCatalogue() });
+    } catch (error: any) {
+      console.error("Portal promotions error:", error);
+      res.status(500).json({ message: "Failed to load promotions" });
     }
   });
 
