@@ -2,6 +2,18 @@
 
 _Last updated: 2026-06-28. This is the master index. Detailed docs are linked below._
 
+## ⭐ MOST RECENT (2026-06-28 pm) — Category Price Lists + conflict preview (Phase 2 + Phase 3) BUILT
+On `feature/price-list-builder`; `check` 0-errors + `build` green; verified on the live DB — category suite **9/9**, plus Phase-1 **6/6** and promotions **15/15** re-run with no regressions; new routes auth-gated (401). Full detail in **[CATEGORY_PRICE_LISTS_PLAN.md](CATEGORY_PRICE_LISTS_PLAN.md)** (all phases now marked DONE).
+
+**This completes the category-pricing programme** (precedence engine → promotions → category lists → safety preview):
+- **Category lists** — create a list scoped to a pricing category, auto-filled from **every brand's** latest published costs in that category (`getBaseCostForCategory`/`buildCategoryPriceList`). Refresh/reconcile generalized; **cost edits now propagate to category lists too** (`applyCostEdits` scans `brandId OR scope='category'`). Assignment generalized to `(scope, scopeId)` so a brand list + a category list **coexist** per customer (brand price wins on overlap). UI: Price Builder create dialog gained a **Brand/Category toggle** + category picker + a "Category lists" filter.
+- **Phase 3 conflict preview** — `assignPreview` + **"Preview impact"** button in the assign dialog shows, per customer, which EANs change price (old→new + source) before committing. `effectivePriceForCustomer(customerId, ean)` gives "this £X came from list N" auditability. The optional materialized `customer_effective_price` table was **deliberately deferred** (speed-only; risk on shared prod DB > benefit) — see the doc.
+- **Files:** `server/pricing-v2.ts` (category cost sourcing/build, generalized refresh/reconcile/assign/propagation, `bestListItemForEan` refactor, `effectivePriceForCustomer`, `assignPreview`, `listPriceListsV2` scope filter excl. promotions), `server/routes.ts` (category-create, assign-preview, scope query), `client/src/pages/admin/price-builder.tsx`.
+
+**⏯ NEXT:** owner click-through (create a category list, assign it alongside a brand list, hit Preview impact, confirm brand-wins) — not browser-automatable here. Deploy: schema already live → `git branch -f main feature/price-list-builder && git push gitsafe-backup main`, then Replit **Deploy**. Minor follow-up: the "Who Sees What" page still groups by brand only (category assignments show but aren't category-grouped there yet).
+
+---
+
 ## ⭐ MOST RECENT (2026-06-28 pm) — Monthly Promotions (Phase 2 slice) BUILT
 On `feature/price-list-builder`; `npm run check` 0-errors + `build` green; backend verified **15/15** on the live DB (temp rows cleaned up); routes verified auth-gated (401 vs SPA-fallback). Spec/decisions in **[CATEGORY_PRICE_LISTS_PLAN.md](CATEGORY_PRICE_LISTS_PLAN.md)** → Phase 2.
 

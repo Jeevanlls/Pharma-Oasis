@@ -163,11 +163,47 @@ export async function getBaseCostForBrand(
   return { uploadId: upload.id, rows };
 }
 
+type CostRow = typeof costUploadRows.$inferSelect;
+
+/** Gather base-cost rows for a CATEGORY across ALL brands: the latest published cost
+ *  upload per brand, filtered to rows in this pricing category. uploadId is null
+ *  because the rows come from many uploads (no single source to lock). */
+export async function getBaseCostForCategory(
+  categoryId: number,
+): Promise<{ uploadId: number | null; rows: CostRow[] }> {
+  const uploads = await db
+    .select({ id: costUploads.id, brandId: costUploads.brandId })
+    .from(costUploads)
+    .where(eq(costUploads.status, "published"))
+    .orderBy(desc(costUploads.publishedAt));
+  const latestByBrand = new Map<number, number>(); // brandId -> latest published uploadId
+  for (const u of uploads) if (u.brandId != null && !latestByBrand.has(u.brandId)) latestByBrand.set(u.brandId, u.id);
+  const uploadIds = Array.from(latestByBrand.values());
+  if (!uploadIds.length) return { uploadId: null, rows: [] };
+  const rows = await db
+    .select()
+    .from(costUploadRows)
+    .where(and(inArray(costUploadRows.uploadId, uploadIds), eq(costUploadRows.pricingCategoryId, categoryId)));
+  return { uploadId: null, rows };
+}
+
+/** Base-cost rows for any list, by its scope: brand list → its brand's costs;
+ *  category list → cross-brand costs in its category. Returns null if unsourceable. */
+async function getBaseCostForList(
+  list: { scope: string; brandId: number | null; categoryId: number | null },
+): Promise<{ uploadId: number | null; rows: CostRow[] } | null> {
+  if (list.scope === "category") {
+    return list.categoryId != null ? getBaseCostForCategory(list.categoryId) : null;
+  }
+  return list.brandId != null ? getBaseCostForBrand(list.brandId) : null;
+}
+
 // ---------------------------------------------------------------
 // PRICE LIST BUILDER
 // ---------------------------------------------------------------
 export interface PriceListSummary extends PriceList {
   brandName: string | null;
+  categoryName: string | null;
   itemCount: number;
   customerCount: number;
 }
@@ -175,16 +211,20 @@ export interface PriceListSummary extends PriceList {
 export async function listPriceListsV2(
   brandId?: number,
   archived: "exclude" | "only" | "include" = "exclude",
+  scope?: "brand" | "category",
 ): Promise<PriceListSummary[]> {
-  const conds = [] as any[];
+  // Promotions are managed on their own page — never list them here.
+  const conds = [ne(priceLists.scope, "promotion")] as any[];
   if (brandId) conds.push(eq(priceLists.brandId, brandId));
+  if (scope) conds.push(eq(priceLists.scope, scope));
   if (archived === "exclude") conds.push(ne(priceLists.status, "archived"));
   if (archived === "only") conds.push(eq(priceLists.status, "archived"));
   const rows = await db
-    .select({ list: priceLists, brandName: pricingBrands.name })
+    .select({ list: priceLists, brandName: pricingBrands.name, categoryName: pricingCategories.name })
     .from(priceLists)
     .leftJoin(pricingBrands, eq(priceLists.brandId, pricingBrands.id))
-    .where(conds.length ? and(...conds) : sql`true`)
+    .leftJoin(pricingCategories, eq(priceLists.categoryId, pricingCategories.id))
+    .where(and(...conds))
     .orderBy(asc(pricingBrands.name), asc(priceLists.name));
 
   const out: PriceListSummary[] = [];
@@ -197,7 +237,7 @@ export async function listPriceListsV2(
       .select({ count: sql<number>`count(*)::int` })
       .from(customerPriceLists)
       .where(eq(customerPriceLists.priceListId, r.list.id));
-    out.push({ ...r.list, brandName: r.brandName, itemCount, customerCount });
+    out.push({ ...r.list, brandName: r.brandName, categoryName: r.categoryName, itemCount, customerCount });
   }
   return out;
 }
@@ -251,6 +291,58 @@ export async function buildPriceList(input: {
         ean: row.ean,
         description: row.description,
         pricingCategoryId: row.pricingCategoryId ?? null,
+        caseSize: row.caseSize,
+        costPrice: row.costPrice,
+        method: "margin" as const,
+        marginPercent: toStr(margin),
+        fixedPrice: null,
+        plusAmount: null,
+        preparedPrice: toStr(computePrepared("margin", cost, margin, null, null)),
+        supplierQty: row.supplierQty ?? null,
+        isActive: true,
+      };
+    });
+    await db.insert(priceListItems).values(values);
+    itemCount = values.length;
+  }
+  return { list, itemCount };
+}
+
+/** Create a CATEGORY-scoped list and auto-fill one item per product in the category
+ *  (across all brands' latest published costs), at the given default margin %. */
+export async function buildCategoryPriceList(input: {
+  categoryId: number;
+  name: string;
+  defaultMarginPercent: number;
+}): Promise<{ list: PriceList; itemCount: number }> {
+  const base = await getBaseCostForCategory(input.categoryId);
+  const margin = input.defaultMarginPercent;
+
+  const [list] = await db
+    .insert(priceLists)
+    .values({
+      name: input.name.trim(),
+      scope: "category",
+      brandId: null,
+      categoryId: input.categoryId,
+      baseCostUploadId: null, // category lists draw from many uploads
+      defaultMarginPercent: toStr(margin),
+      status: "draft",
+      type: "customer",
+      isActive: true,
+    })
+    .returning();
+
+  let itemCount = 0;
+  if (base.rows.length) {
+    const values = base.rows.map((row) => {
+      const cost = num(row.costPrice);
+      return {
+        priceListId: list.id,
+        costRowId: row.id,
+        ean: row.ean,
+        description: row.description,
+        pricingCategoryId: row.pricingCategoryId ?? input.categoryId,
         caseSize: row.caseSize,
         costPrice: row.costPrice,
         method: "margin" as const,
@@ -371,8 +463,8 @@ export async function deletePriceListV2(id: number): Promise<void> {
  *  fixed-price items keep their price but are returned as "needs review". */
 export async function refreshFromBaseCost(id: number): Promise<{ updated: number; fixedToReview: number }> {
   const [list] = await db.select().from(priceLists).where(eq(priceLists.id, id));
-  if (!list || !list.brandId) return { updated: 0, fixedToReview: 0 };
-  const base = await getBaseCostForBrand(list.brandId);
+  if (!list) return { updated: 0, fixedToReview: 0 };
+  const base = await getBaseCostForList(list);
   if (!base) return { updated: 0, fixedToReview: 0 };
   const costByEan = new Map<string, number | null>();
   for (const r of base.rows) if (r.ean) costByEan.set(r.ean, num(r.costPrice));
@@ -459,8 +551,8 @@ export async function reconcilePreview(listId: number): Promise<ReconcilePreview
     newProducts: [],
     missing: [],
   };
-  if (!list || !list.brandId) return empty;
-  const base = await getBaseCostForBrand(list.brandId);
+  if (!list) return empty;
+  const base = await getBaseCostForList(list);
   if (!base) return empty;
 
   const items = await db.select().from(priceListItems).where(eq(priceListItems.priceListId, listId));
@@ -542,9 +634,9 @@ export interface ReconcileResult {
 /** Apply the admin's reviewed decisions from reconcilePreview. */
 export async function reconcileApply(listId: number, d: ReconcileDecisions): Promise<ReconcileResult> {
   const [list] = await db.select().from(priceLists).where(eq(priceLists.id, listId));
-  if (!list || !list.brandId) throw new Error("Price list has no brand");
-  const base = await getBaseCostForBrand(list.brandId);
-  if (!base) throw new Error("No published base cost for this brand");
+  if (!list) throw new Error("Price list not found");
+  const base = await getBaseCostForList(list);
+  if (!base) throw new Error("No published base cost for this list");
 
   const baseByEan = new Map<string, typeof base.rows[number]>();
   for (const r of base.rows) if (r.ean) baseByEan.set(r.ean, r);
@@ -744,7 +836,12 @@ export async function previewCostEdits(brandId: number, edits: CostEdit[]): Prom
     if (old === null || round2(old) !== round2(e.newCost)) costsChanged++;
   }
 
-  const lists = await db.select().from(priceLists).where(eq(priceLists.brandId, brandId));
+  // The brand's own lists PLUS every category list (a category spans brands, so an edited
+  // EAN may live on a category list too). Promotions use flat prices, so they're excluded.
+  const lists = await db
+    .select()
+    .from(priceLists)
+    .where(or(eq(priceLists.brandId, brandId), eq(priceLists.scope, "category")));
   const lines: CostEditImpactLine[] = [];
   const listIds = new Set<number>();
   for (const list of lists) {
@@ -864,7 +961,12 @@ export async function applyCostEdits(
     .where(and(eq(costUploads.brandId, brandId), eq(costUploads.status, "published"), ne(costUploads.id, newUpload.id)));
 
   // Reprice affected customer price-list lines across the brand.
-  const lists = await db.select().from(priceLists).where(eq(priceLists.brandId, brandId));
+  // The brand's own lists PLUS every category list (a category spans brands, so an edited
+  // EAN may live on a category list too). Promotions use flat prices, so they're excluded.
+  const lists = await db
+    .select()
+    .from(priceLists)
+    .where(or(eq(priceLists.brandId, brandId), eq(priceLists.scope, "category")));
   let itemsRepriced = 0;
   const affectedLists = new Set<number>();
   for (const list of lists) {
@@ -907,20 +1009,32 @@ export class AssignmentConflict extends Error {
   }
 }
 
-async function listBrandId(priceListId: number): Promise<number | null> {
-  const [l] = await db.select({ brandId: priceLists.brandId }).from(priceLists).where(eq(priceLists.id, priceListId));
-  return l?.brandId ?? null;
+/** The (scope, scopeId) a list assigns against: brand list → ('brand', brandId);
+ *  category list → ('category', categoryId). Promotions are never assigned. */
+async function listScopeTarget(
+  priceListId: number,
+): Promise<{ scope: string; scopeId: number; brandId: number | null } | null> {
+  const [l] = await db
+    .select({ scope: priceLists.scope, brandId: priceLists.brandId, categoryId: priceLists.categoryId })
+    .from(priceLists)
+    .where(eq(priceLists.id, priceListId));
+  if (!l) return null;
+  if (l.scope === "category") return l.categoryId != null ? { scope: "category", scopeId: l.categoryId, brandId: null } : null;
+  if (l.scope === "promotion") return null; // promotions are global, not assigned
+  return l.brandId != null ? { scope: "brand", scopeId: l.brandId, brandId: l.brandId } : null;
 }
 
-/** Assign customers to a list. If a customer already has a DIFFERENT list for
- *  the same brand: throw (replace=false) or swap it (replace=true). */
+/** Assign customers to a list. If a customer already has a DIFFERENT list for the
+ *  same scope target (brand-for-brand, category-for-category): throw (replace=false)
+ *  or swap it (replace=true). A brand list and a category list can coexist — the
+ *  resolver decides which price wins (brand beats category). */
 export async function assignCustomers(
   priceListId: number,
   customerIds: number[],
   opts: { replace?: boolean; assignedBy?: number | null } = {},
 ): Promise<{ assigned: number; conflicts: { customerId: number; existingListId: number }[] }> {
-  const brandId = await listBrandId(priceListId);
-  if (!brandId) throw new Error("Price list has no brand");
+  const target = await listScopeTarget(priceListId);
+  if (!target) throw new Error("This list can't be assigned (promotions are global; brand/category not set).");
   // A draft list isn't ready — only published lists can be assigned to customers.
   const [pl] = await db.select({ status: priceLists.status }).from(priceLists).where(eq(priceLists.id, priceListId));
   if (!pl) throw new Error("Price list not found");
@@ -932,7 +1046,11 @@ export async function assignCustomers(
     const [existing] = await db
       .select()
       .from(customerPriceLists)
-      .where(and(eq(customerPriceLists.customerId, customerId), eq(customerPriceLists.brandId, brandId)));
+      .where(and(
+        eq(customerPriceLists.customerId, customerId),
+        eq(customerPriceLists.scope, target.scope),
+        eq(customerPriceLists.scopeId, target.scopeId),
+      ));
 
     if (existing) {
       if (existing.priceListId === priceListId) continue; // already on this list
@@ -949,7 +1067,9 @@ export async function assignCustomers(
       await db.insert(customerPriceLists).values({
         customerId,
         priceListId,
-        brandId,
+        scope: target.scope,
+        scopeId: target.scopeId,
+        brandId: target.brandId,
         assignedBy: opts.assignedBy ?? null,
       });
       assigned++;
@@ -992,13 +1112,16 @@ export async function customersForList(priceListId: number) {
 export async function assignmentsForCustomer(customerId: number) {
   return db
     .select({
+      scope: customerPriceLists.scope,
       brandId: customerPriceLists.brandId,
       brandName: pricingBrands.name,
+      categoryName: pricingCategories.name,
       priceListId: customerPriceLists.priceListId,
       listName: priceLists.name,
     })
     .from(customerPriceLists)
     .leftJoin(pricingBrands, eq(customerPriceLists.brandId, pricingBrands.id))
+    .leftJoin(pricingCategories, and(eq(customerPriceLists.scope, "category"), eq(customerPriceLists.scopeId, pricingCategories.id)))
     .leftJoin(priceLists, eq(customerPriceLists.priceListId, priceLists.id))
     .where(eq(customerPriceLists.customerId, customerId));
 }
@@ -1007,8 +1130,10 @@ export async function assignmentsForCustomer(customerId: number) {
 export async function allAssignments() {
   return db
     .select({
+      scope: customerPriceLists.scope,
       brandId: customerPriceLists.brandId,
       brandName: pricingBrands.name,
+      categoryName: pricingCategories.name,
       priceListId: customerPriceLists.priceListId,
       listName: priceLists.name,
       listStatus: priceLists.status,
@@ -1019,6 +1144,7 @@ export async function allAssignments() {
     })
     .from(customerPriceLists)
     .leftJoin(pricingBrands, eq(customerPriceLists.brandId, pricingBrands.id))
+    .leftJoin(pricingCategories, and(eq(customerPriceLists.scope, "category"), eq(customerPriceLists.scopeId, pricingCategories.id)))
     .leftJoin(priceLists, eq(customerPriceLists.priceListId, priceLists.id))
     .innerJoin(users, eq(customerPriceLists.customerId, users.id));
 }
@@ -1207,18 +1333,20 @@ async function activePromotionItemsByEan(): Promise<Map<string, PriceListItem>> 
 }
 
 /**
- * Resolve the single price a customer should get for a catalogue product by EAN.
- * Precedence (Phase 1): live promotion (global) > brand list > category list.
- * Cheapest preparedPrice breaks ties within a tier. Returns null if the EAN is in
- * no live promotion and none of the customer's assigned lists.
+ * Best price-list item for an EAN among a given set of lists, by precedence:
+ * (optional) live promotion > brand > category, cheapest preparedPrice breaking
+ * ties within a tier. Returns the item + its scope, or null. This is the shared
+ * core used by the live resolver and the assign-time conflict preview.
  */
-export async function getCustomerItemByEan(customerId: number, ean: string | null | undefined): Promise<PriceListItem | null> {
-  if (!ean) return null;
-  // 0) A live promotion always wins, for every customer — even those with no lists.
-  const promo = await activePromotionItemByEan(ean);
-  if (promo) return promo;
-  // 1/2) The customer's own lists: brand beats category, cheapest breaks ties.
-  const listIds = await customerListIds(customerId);
+async function bestListItemForEan(
+  listIds: number[],
+  ean: string,
+  includePromo: boolean,
+): Promise<{ item: PriceListItem; scope: string } | null> {
+  if (includePromo) {
+    const promo = await activePromotionItemByEan(ean);
+    if (promo) return { item: promo, scope: "promotion" };
+  }
   if (!listIds.length) return null;
   const rows = await db
     .select({ item: priceListItems, scope: priceLists.scope })
@@ -1231,7 +1359,112 @@ export async function getCustomerItemByEan(customerId: number, ean: string | nul
       rankScope(a.scope) - rankScope(b.scope) ||
       (num(a.item.preparedPrice) ?? Infinity) - (num(b.item.preparedPrice) ?? Infinity),
   );
-  return rows[0].item;
+  return { item: rows[0].item, scope: rows[0].scope ?? "" };
+}
+
+/**
+ * Resolve the single price a customer should get for a catalogue product by EAN.
+ * Precedence: live promotion (global) > brand list > category list. Returns null
+ * if the EAN is in no live promotion and none of the customer's assigned lists.
+ */
+export async function getCustomerItemByEan(customerId: number, ean: string | null | undefined): Promise<PriceListItem | null> {
+  if (!ean) return null;
+  const best = await bestListItemForEan(await customerListIds(customerId), ean, true);
+  return best?.item ?? null;
+}
+
+/** The effective price a customer pays for an EAN, plus WHICH list it came from
+ *  (auditability). Same precedence as getCustomerItemByEan. */
+export async function effectivePriceForCustomer(
+  customerId: number,
+  ean: string | null | undefined,
+): Promise<{ price: number | null; scope: string; listId: number } | null> {
+  if (!ean) return null;
+  const best = await bestListItemForEan(await customerListIds(customerId), ean, true);
+  if (!best) return null;
+  return { price: num(best.item.preparedPrice), scope: best.scope, listId: best.item.priceListId };
+}
+
+// ---------------------------------------------------------------
+// ASSIGN-TIME CONFLICT PREVIEW (Phase 3) — show, before assigning a list, which
+// products would change price for each customer (brand-wins precedence applied).
+// ---------------------------------------------------------------
+export interface AssignPreviewChange {
+  ean: string;
+  description: string | null;
+  oldPrice: number | null;
+  newPrice: number | null;
+  oldSource: string; // scope the price came from before (brand/category/none)
+  newSource: string;
+}
+export interface AssignPreviewCustomer {
+  customerId: number;
+  name: string;
+  changeCount: number;
+  changes: AssignPreviewChange[]; // capped for payload size
+}
+export interface AssignPreview {
+  listName: string;
+  scope: string;
+  totalChanges: number;
+  customers: AssignPreviewCustomer[];
+}
+
+async function customerLabel(customerId: number): Promise<string> {
+  const [u] = await db.select({ companyName: users.companyName, email: users.email }).from(users).where(eq(users.id, customerId));
+  return u?.companyName || u?.email || `#${customerId}`;
+}
+
+/** Preview the price impact of assigning `priceListId` to `customerIds`. Compares each
+ *  EAN's effective price (pure list precedence, ignoring transient promos) before vs
+ *  after the assignment — replacing any list the customer already holds for the same
+ *  scope target. With brand-wins, assigning a category list rarely changes prices a
+ *  brand list already covers; this surfaces exactly what (if anything) moves. */
+export async function assignPreview(priceListId: number, customerIds: number[]): Promise<AssignPreview> {
+  const [list] = await db.select().from(priceLists).where(eq(priceLists.id, priceListId));
+  const target = await listScopeTarget(priceListId);
+  if (!list || !target) return { listName: list?.name ?? "", scope: list?.scope ?? "", totalChanges: 0, customers: [] };
+
+  const listItems = await db
+    .select()
+    .from(priceListItems)
+    .where(and(eq(priceListItems.priceListId, priceListId), eq(priceListItems.isActive, true)));
+  const eans = Array.from(new Set(listItems.map((i) => i.ean).filter(Boolean) as string[])).slice(0, 1000);
+
+  const out: AssignPreviewCustomer[] = [];
+  let totalChanges = 0;
+  for (const customerId of customerIds) {
+    const currentListIds = await customerListIds(customerId);
+    // the list (if any) this customer currently holds for the same scope target — it gets replaced
+    const [held] = await db
+      .select({ priceListId: customerPriceLists.priceListId })
+      .from(customerPriceLists)
+      .where(and(
+        eq(customerPriceLists.customerId, customerId),
+        eq(customerPriceLists.scope, target.scope),
+        eq(customerPriceLists.scopeId, target.scopeId),
+      ));
+    const newListIds = currentListIds.filter((id) => id !== held?.priceListId);
+    if (!newListIds.includes(priceListId)) newListIds.push(priceListId);
+
+    const changes: AssignPreviewChange[] = [];
+    for (const ean of eans) {
+      const before = await bestListItemForEan(currentListIds, ean, false);
+      const after = await bestListItemForEan(newListIds, ean, false);
+      const op = before ? num(before.item.preparedPrice) : null;
+      const np = after ? num(after.item.preparedPrice) : null;
+      const os = before?.scope ?? "none";
+      const ns = after?.scope ?? "none";
+      if (op !== np || os !== ns) {
+        changes.push({ ean, description: after?.item.description ?? before?.item.description ?? null, oldPrice: op, newPrice: np, oldSource: os, newSource: ns });
+      }
+    }
+    if (changes.length) {
+      out.push({ customerId, name: await customerLabel(customerId), changeCount: changes.length, changes: changes.slice(0, 50) });
+      totalChanges += changes.length;
+    }
+  }
+  return { listName: list.name, scope: list.scope, totalChanges, customers: out };
 }
 
 // ===============================================================

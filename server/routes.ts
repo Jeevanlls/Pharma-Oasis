@@ -4548,7 +4548,26 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
   app.get("/api/admin/v2/price-lists", requireAdmin, async (req, res) => {
     const brandId = req.query.brandId ? parseInt(req.query.brandId as string, 10) : undefined;
     const archived = req.query.archived === "only" ? "only" : req.query.archived === "include" ? "include" : "exclude";
-    res.json(await pricingV2.listPriceListsV2(brandId, archived));
+    const scope = req.query.scope === "brand" || req.query.scope === "category" ? (req.query.scope as "brand" | "category") : undefined;
+    res.json(await pricingV2.listPriceListsV2(brandId, archived, scope));
+  });
+
+  // Create a CATEGORY-scoped list, auto-filled from cross-brand costs in the category.
+  app.post("/api/admin/v2/category-price-lists", requireAdmin, async (req, res) => {
+    try {
+      const categoryId = parseInt(req.body.categoryId, 10);
+      const name = (req.body.name || "").trim();
+      const defaultMarginPercent = Number(req.body.defaultMarginPercent) || 0;
+      if (!categoryId) return res.status(400).json({ message: "categoryId is required" });
+      if (!name) return res.status(400).json({ message: "name is required" });
+      const result = await pricingV2.buildCategoryPriceList({ categoryId, name, defaultMarginPercent });
+      if (result.itemCount === 0) {
+        return res.json({ ...result, warning: "No published costs found for products in this category yet — the list was created empty." });
+      }
+      res.json(result);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message || "Failed to build category price list" });
+    }
   });
 
   // Full list with its prepared items (ADMIN view — includes cost).
@@ -4672,6 +4691,12 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
     } catch (e: any) {
       res.status(500).json({ message: e.message || "Failed to assign" });
     }
+  });
+
+  // Phase 3 — preview the price impact of an assignment before committing it.
+  app.post("/api/admin/v2/price-lists/:id/assign-preview", requireAdmin, async (req, res) => {
+    const customerIds: number[] = (Array.isArray(req.body.customerIds) ? req.body.customerIds : []).map(Number);
+    res.json(await pricingV2.assignPreview(parseInt(req.params.id, 10), customerIds));
   });
 
   app.post("/api/admin/v2/price-lists/:id/unassign", requireAdmin, async (req, res) => {

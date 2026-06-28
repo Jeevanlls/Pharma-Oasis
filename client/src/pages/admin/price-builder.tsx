@@ -21,6 +21,7 @@ import { Plus, Minus, Coins, Users, RefreshCw, Trash2, Save, CheckCircle2, Searc
 interface PricingBrand { id: number; name: string; }
 interface PriceListSummary {
   id: number; name: string; brandId: number | null; brandName: string | null;
+  scope?: string; categoryId?: number | null; categoryName?: string | null;
   defaultMarginPercent: string | null; status: string; itemCount: number; customerCount: number;
   publishedAt: string | null; updatedAt: string | null;
 }
@@ -32,6 +33,11 @@ interface PriceListItem {
 }
 interface Customer { id: number; email: string; companyName: string | null; role: string; status: string; }
 interface AssignedCustomer { id: number; email: string; companyName: string | null; }
+interface AssignImpactChange { ean: string; description: string | null; oldPrice: number | null; newPrice: number | null; oldSource: string; newSource: string; }
+interface AssignImpact {
+  listName: string; scope: string; totalChanges: number;
+  customers: { customerId: number; name: string; changeCount: number; changes: AssignImpactChange[] }[];
+}
 
 const money = (n: string | number | null) => (n == null || n === "" ? "—" : `£${Number(n).toFixed(2)}`);
 const num = (v: string | null | undefined) => (v == null || v === "" ? null : Number(v));
@@ -70,6 +76,8 @@ export default function PriceBuilderPage() {
   const [showArchived, setShowArchived] = useState(false);
 
   const [newBrandId, setNewBrandId] = useState("");
+  const [newScope, setNewScope] = useState<"brand" | "category">("brand");
+  const [newCategoryId, setNewCategoryId] = useState("");
   const [newName, setNewName] = useState("");
   const [newMargin, setNewMargin] = useState("20");
 
@@ -94,6 +102,7 @@ export default function PriceBuilderPage() {
   ]);
 
   const { data: brands = [] } = useQuery<PricingBrand[]>({ queryKey: ["/api/admin/pricing-brands"] });
+  const { data: categories = [] } = useQuery<{ id: number; name: string }[]>({ queryKey: ["/api/admin/pricing-categories"] });
   // Two-element key so prefix-invalidation of ["/api/admin/v2/price-lists"] still refreshes it.
   const { data: lists = [] } = useQuery<PriceListSummary[]>({
     queryKey: ["/api/admin/v2/price-lists", showArchived ? "only" : "active"],
@@ -211,12 +220,16 @@ export default function PriceBuilderPage() {
 
   const create = useMutation({
     mutationFn: async () =>
-      (await apiRequest("POST", "/api/admin/v2/price-lists", {
-        brandId: Number(newBrandId), name: newName, defaultMarginPercent: Number(newMargin) || 0,
-      })).json(),
+      (await apiRequest(
+        "POST",
+        newScope === "category" ? "/api/admin/v2/category-price-lists" : "/api/admin/v2/price-lists",
+        newScope === "category"
+          ? { categoryId: Number(newCategoryId), name: newName, defaultMarginPercent: Number(newMargin) || 0 }
+          : { brandId: Number(newBrandId), name: newName, defaultMarginPercent: Number(newMargin) || 0 },
+      )).json(),
     onSuccess: (res: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/v2/price-lists"] });
-      setCreateOpen(false); setNewName(""); setNewBrandId(""); setNewMargin("20");
+      setCreateOpen(false); setNewName(""); setNewBrandId(""); setNewCategoryId(""); setNewScope("brand"); setNewMargin("20");
       if (res?.list?.id) { setSelectedId(res.list.id); setEdits({}); }
       toast({ title: "Price list created", description: res?.warning || `${res?.itemCount ?? 0} products auto-filled.` });
     },
@@ -282,7 +295,10 @@ export default function PriceBuilderPage() {
   });
 
   const selected = lists.find((l) => l.id === selectedId);
-  const panelLists = panelBrand === "all" ? lists : lists.filter((l) => String(l.brandId) === panelBrand);
+  const panelLists =
+    panelBrand === "all" ? lists
+    : panelBrand === "category" ? lists.filter((l) => l.scope === "category")
+    : lists.filter((l) => String(l.brandId) === panelBrand);
 
   return (
     <>
@@ -314,7 +330,8 @@ export default function PriceBuilderPage() {
               <Select value={panelBrand} onValueChange={setPanelBrand}>
                 <SelectTrigger className="h-8 text-xs" data-testid="select-panel-brand"><SelectValue placeholder="All brands" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All brands</SelectItem>
+                  <SelectItem value="all">All lists</SelectItem>
+                  <SelectItem value="category">Category lists</SelectItem>
                   {brands.map((b) => <SelectItem key={b.id} value={String(b.id)}>{b.name}</SelectItem>)}
                 </SelectContent>
               </Select>
@@ -343,7 +360,9 @@ export default function PriceBuilderPage() {
                       <Badge variant={l.status === "published" ? "default" : l.status === "archived" ? "outline" : "secondary"}>{l.status}</Badge>
                     </div>
                     <div className="text-xs text-muted-foreground mt-1">
-                      {l.brandName ?? "—"} · {l.itemCount} items ·{" "}
+                      {l.scope === "category"
+                        ? <span className="text-blue-600 font-medium">Category: {l.categoryName ?? "—"}</span>
+                        : (l.brandName ?? "—")} · {l.itemCount} items ·{" "}
                       <span className={l.customerCount === 0 && !showArchived ? "text-amber-600 font-medium" : ""}>
                         {l.customerCount} customers
                       </span>
@@ -601,18 +620,39 @@ export default function PriceBuilderPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>New price list</DialogTitle>
-            <DialogDescription>Auto-fills every product from the brand's base cost at your default margin.</DialogDescription>
+            <DialogDescription>
+              Auto-fills every product at your default margin — a <b>brand</b> list from that brand's base cost, or a <b>category</b> list from every brand's costs in that category.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label>Brand</Label>
-              <Select value={newBrandId} onValueChange={setNewBrandId}>
-                <SelectTrigger data-testid="select-new-brand"><SelectValue placeholder="Choose a brand" /></SelectTrigger>
-                <SelectContent>
-                  {brands.map((b) => <SelectItem key={b.id} value={String(b.id)}>{b.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <Label>List type</Label>
+              <div className="flex gap-2 mt-1">
+                <Button type="button" size="sm" variant={newScope === "brand" ? "default" : "outline"} className="flex-1" onClick={() => setNewScope("brand")} data-testid="button-scope-brand">Brand</Button>
+                <Button type="button" size="sm" variant={newScope === "category" ? "default" : "outline"} className="flex-1" onClick={() => setNewScope("category")} data-testid="button-scope-category">Category</Button>
+              </div>
             </div>
+            {newScope === "brand" ? (
+              <div>
+                <Label>Brand</Label>
+                <Select value={newBrandId} onValueChange={setNewBrandId}>
+                  <SelectTrigger data-testid="select-new-brand"><SelectValue placeholder="Choose a brand" /></SelectTrigger>
+                  <SelectContent>
+                    {brands.map((b) => <SelectItem key={b.id} value={String(b.id)}>{b.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <div>
+                <Label>Category</Label>
+                <Select value={newCategoryId} onValueChange={setNewCategoryId}>
+                  <SelectTrigger data-testid="select-new-category"><SelectValue placeholder="Choose a category" /></SelectTrigger>
+                  <SelectContent>
+                    {categories.map((c) => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div>
               <Label htmlFor="new-name">List name</Label>
               <Input id="new-name" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="e.g. Gold customers" data-testid="input-new-name" />
@@ -624,7 +664,7 @@ export default function PriceBuilderPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
-            <Button onClick={() => create.mutate()} disabled={!newBrandId || !newName.trim() || create.isPending} data-testid="button-create-list">
+            <Button onClick={() => create.mutate()} disabled={(newScope === "brand" ? !newBrandId : !newCategoryId) || !newName.trim() || create.isPending} data-testid="button-create-list">
               {create.isPending ? "Building…" : "Create & auto-fill"}
             </Button>
           </DialogFooter>
@@ -760,6 +800,7 @@ function AssignDialog({ open, onOpenChange, listId, listName, brandName }: {
 }) {
   const { toast } = useToast();
   const [checked, setChecked] = useState<Record<number, boolean>>({});
+  const [preview, setPreview] = useState<AssignImpact | null>(null);
 
   const { data: users = [] } = useQuery<Customer[]>({ queryKey: ["/api/admin/users"] });
   const { data: assigned = [] } = useQuery<AssignedCustomer[]>({
@@ -790,7 +831,7 @@ function AssignDialog({ open, onOpenChange, listId, listName, brandName }: {
     },
     onSuccess: (res: any) => {
       if (res?.conflict) {
-        if (confirm(`${res.conflicts.length} customer(s) already have a different list for ${brandName}. Replace it with "${listName}"?`)) {
+        if (confirm(`${res.conflicts.length} customer(s) already have a different list of this type. Replace it with "${listName}"?`)) {
           assign.mutate({ replace: true });
         }
         return;
@@ -812,13 +853,23 @@ function AssignDialog({ open, onOpenChange, listId, listName, brandName }: {
     onSuccess: () => { invalidate(); toast({ title: "Removed" }); },
   });
 
+  const previewMut = useMutation({
+    mutationFn: async () => {
+      const customerIds = Object.entries(checked).filter(([, v]) => v).map(([k]) => Number(k));
+      return (await apiRequest("POST", `/api/admin/v2/price-lists/${listId}/assign-preview`, { customerIds })).json();
+    },
+    onSuccess: (res: AssignImpact) => setPreview(res),
+    onError: (e: any) => toast({ title: "Preview failed", description: e.message, variant: "destructive" }),
+  });
+  const checkedCount = Object.values(checked).filter(Boolean).length;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Assign “{listName}” to customers</DialogTitle>
           <DialogDescription>
-            One list per customer per brand is enforced. Assigning a customer who already has another {brandName} list will prompt to replace it.
+            One list per customer per brand, and one per category, is enforced — a brand list and a category list can coexist (brand price wins where they overlap). Use <b>Preview impact</b> to see what changes before assigning.
           </DialogDescription>
         </DialogHeader>
 
@@ -853,8 +904,41 @@ function AssignDialog({ open, onOpenChange, listId, listName, brandName }: {
           {customers.length === 0 && <div className="p-3 text-sm text-muted-foreground">No customers found.</div>}
         </div>
 
-        <DialogFooter>
+        {/* Phase 3 — price-impact preview before committing the assignment */}
+        {preview && (
+          <div className="rounded-md border bg-muted/30 p-3 text-sm" data-testid="assign-preview">
+            {preview.totalChanges === 0 ? (
+              <div className="text-emerald-700">No prices change for the selected customer(s) — brand-wins precedence keeps their current prices.</div>
+            ) : (
+              <div className="space-y-2">
+                <div className="font-medium">{preview.totalChanges} price change(s) across {preview.customers.length} customer(s):</div>
+                <div className="max-h-40 overflow-y-auto space-y-2">
+                  {preview.customers.map((c) => (
+                    <div key={c.customerId}>
+                      <div className="text-xs font-semibold">{c.name} — {c.changeCount} change(s)</div>
+                      {c.changes.slice(0, 6).map((ch) => (
+                        <div key={ch.ean} className="text-xs text-muted-foreground flex justify-between gap-2">
+                          <span className="truncate">{ch.description ?? ch.ean}</span>
+                          <span className="tabular-nums whitespace-nowrap">
+                            {ch.oldPrice == null ? "—" : `£${ch.oldPrice.toFixed(2)}`} ({ch.oldSource}) → {ch.newPrice == null ? "—" : `£${ch.newPrice.toFixed(2)}`} ({ch.newSource})
+                          </span>
+                        </div>
+                      ))}
+                      {c.changeCount > 6 && <div className="text-[11px] text-muted-foreground">…and {c.changeCount - 6} more</div>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        <DialogFooter className="gap-2">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
+          <Button variant="secondary" onClick={() => previewMut.mutate()}
+            disabled={checkedCount === 0 || previewMut.isPending} data-testid="button-preview-impact">
+            {previewMut.isPending ? "Checking…" : "Preview impact"}
+          </Button>
           <Button onClick={() => assign.mutate({ replace: false })}
             disabled={Object.values(checked).every((v) => !v) || assign.isPending} data-testid="button-confirm-assign">
             {assign.isPending ? "Assigning…" : "Assign selected"}

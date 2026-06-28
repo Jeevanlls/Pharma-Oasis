@@ -1,6 +1,6 @@
 # Category Price Lists + Monthly Promotions — Plan & Build Log
 
-_Created 2026-06-28. Redrafted 2026-06-28 after owner decisions (below). Status: **Phase 1 being built this session.**_
+_Created 2026-06-28. Redrafted 2026-06-28 after owner decisions (below). Status: **ALL phases (1, 2, 3) built & verified on the live DB this session — pending owner click-through + deploy.**_
 
 This doc now covers **two** related additions to customer pricing:
 1. **Category-based price lists** (alongside today's brand/supplier lists).
@@ -112,15 +112,18 @@ if (li?.ean) { const eff = await pricingV2.getCustomerItemByEan(user.id, li.ean)
 - **UI**: admin `client/src/pages/admin/promotions.tsx` (nav "7. Promotions") — create, schedule, product picker, per-item price, publish/unpublish, archive. Portal `client/src/pages/portal/promotions.tsx` (nav "Promotions") — live offers + add to basket.
 - **Note/limitation**: if a promo expires while a promo item sits in a basket, checkout throws "Invalid item" rather than falling back to the list price (acceptable edge case; revisit if it bites).
 
-### Remaining Phase 2 — category lists (not built yet)
-- **Category list authoring**: build/refresh a list whose product set is a category across member brands; generalize `getBaseCostForBrand` → gather latest **published** cost rows per product in the category (union across brands). `priceListItems` already carries per-row `ean`+`pricingCategoryId`+`costPrice`, so cross-brand items store fine.
-- **Cost-edit propagation**: the Current Costs "apply" flow walks lists **by brand** — it must **also** refresh category lists (and any margin-based promotions) containing a changed product, or their `preparedPrice` goes stale. (Promotions use flat `fixed` prices today, so they don't drift on cost edits.)
-- **Category assignment**: generalize `assignCustomers` (today it throws if `!brandId` and checks conflict at brand level) to set `scope`/`scopeId` and conflict on `(customerId, scope, scopeId)`.
+### ✅ Category lists — DONE (2026-06-28 pm), verified 9/9 on live DB
+- **Cross-brand cost sourcing** (`server/pricing-v2.ts`): `getBaseCostForCategory(categoryId)` = latest published cost upload **per brand**, unioned and filtered to that `pricingCategoryId`; `getBaseCostForList(list)` dispatches by scope. `buildCategoryPriceList({categoryId,name,defaultMargin})` mirrors `buildPriceList` (scope='category', brandId null). `refreshFromBaseCost`/`reconcilePreview`/`reconcileApply` generalized to source via `getBaseCostForList` (no longer bail on null brandId).
+- **Cost-edit propagation**: `previewCostEdits`/`applyCostEdits` now scan the brand's lists **plus every category list** (`brandId = ? OR scope='category'`), repricing matching EANs. Promotions excluded (flat prices). Verified via read-only `previewCostEdits` reaching a category list.
+- **Assignment**: `assignCustomers` generalized — derives `(scope, scopeId)` from the list (brand→brandId, category→categoryId), conflicts on `(customerId, scope, scopeId)`, writes `scope`/`scopeId`/`brandId`. A brand list and a category list **coexist** for one customer (verified). `assignmentsForCustomer`/`allAssignments` now return `scope` + `categoryName`. `listPriceListsV2` gained a `scope` filter + `categoryName`, and now **excludes promotions** (they have their own page).
+- **API**: `POST /api/admin/v2/category-price-lists`; `scope` query on `GET /api/admin/v2/price-lists`. Item-edit/refresh/reconcile/assign/archive routes already work generically by list id.
+- **UI** (`client/src/pages/admin/price-builder.tsx`): create dialog has a **Brand/Category toggle** + category picker; saved-lists panel has a "Category lists" filter and labels category lists; everything else (item pricing, refresh, reconcile, assign) works unchanged for category lists.
+- **Known minor follow-up**: the "Who Sees What" (`assignments.tsx`) page is still brand-rail-organized; category assignments appear but aren't grouped by category there yet. Creating/assigning/previewing category lists is fully done in the Price Builder.
 
-## PHASE 3 — make it SAFE & CLEAR
-- **Assign-time / publish-time conflict preview** (reuse Price Builder assign dialog + Who-Sees-What console):
-  > "Publishing promo **June Deals** changes **34** products that are on customers' brand lists — here's old→new while it's live (until 30 Jun)."
-- Optional **`customer_effective_price (customerId, ean, price, sourceListId)`** materialization, rebuilt on publish / assignment / cost edit / promo start+expiry. Buys speed (one indexed read on the quote hot path), auditability ("this £4.50 came from June Deals"), and a place to store detected conflicts. Note promo expiry must trigger a rebuild.
+## PHASE 3 — make it SAFE & CLEAR — ✅ DONE (2026-06-28 pm), verified on live DB
+- **✅ Assign-time conflict preview** (`server/pricing-v2.ts` `assignPreview` + `POST /api/admin/v2/price-lists/:id/assign-preview`): for the selected customers, compares each EAN's effective price (pure list precedence, ignoring transient promos) **before vs after** the assignment — replacing any list the customer holds for the same scope target. Surfaced in the Price Builder assign dialog as a **"Preview impact"** button → shows total changes + per-customer old→new with source scope. With brand-wins, assigning a category list over a brand-covered EAN correctly shows **no change** (verified both directions).
+- **✅ Auditability**: `effectivePriceForCustomer(customerId, ean)` returns `{ price, scope, listId }` — "this £X came from list N (brand/category/promotion)." The live resolver and the preview share one core (`bestListItemForEan`), so they can't diverge.
+- **Deliberately deferred — the materialized `customer_effective_price` table.** It was marked *optional* (speed only; the resolver is already a single indexed query). A stored table needs rebuild triggers on publish / assignment / cost edit / **promo start+expiry** — write-amplification and staleness risk on the **shared dev+prod DB** that outweighs the marginal speed win today. The auditability + conflict-detection value it was wanted for is already delivered by `effectivePriceForCustomer` + `assignPreview`. Revisit only if the quote hot path shows up as slow at scale.
 
 ---
 
