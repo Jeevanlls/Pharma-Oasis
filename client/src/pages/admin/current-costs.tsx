@@ -139,14 +139,17 @@ export default function AdminCurrentCostsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Coins className="h-6 w-6" /> Current Costs
-        </h1>
-        <p className="text-muted-foreground">
-          <b>Step 4 (optional).</b> Quickly fix a brand's live cost prices without re-uploading a file. Changing a cost updates the
-          customer prices built from it — you'll see exactly what changes before confirming.
-        </p>
+      <div className="flex items-start gap-3">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400">
+          <Coins className="h-6 w-6" />
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Current Costs</h1>
+          <p className="text-muted-foreground">
+            <b>Step 4 (optional).</b> Quickly fix a brand's live cost prices without re-uploading a file. Changing a cost updates the
+            customer prices built from it — you'll see exactly what changes before confirming.
+          </p>
+        </div>
       </div>
 
       {/* Mobile brand picker fallback (the left rail replaces this on lg+) */}
@@ -181,7 +184,7 @@ export default function AdminCurrentCostsPage() {
                   const selected = brandId === String(b.id);
                   return (
                     <button key={b.id} type="button" onClick={() => setBrandId(String(b.id))}
-                      className={`w-full text-left rounded-lg border px-3 py-2.5 text-sm transition-colors ${selected ? "border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30 font-medium" : "hover:bg-muted/40"}`}>
+                      className={`w-full text-left rounded-lg border px-3 py-2.5 text-sm transition-colors ${selected ? "border-emerald-300 border-l-4 border-l-emerald-500 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30 font-medium text-emerald-900 dark:text-emerald-200" : "hover:bg-muted/40"}`}>
                       {b.name}
                     </button>
                   );
@@ -241,20 +244,20 @@ export default function AdminCurrentCostsPage() {
               {isFetching && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
             </div>
 
-            <div className="max-h-[520px] overflow-auto border rounded">
+            <div className="max-h-[520px] overflow-auto border rounded-lg">
               <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[150px]">EAN</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead className="text-right w-[110px]">Live cost</TableHead>
-                    <TableHead className="text-right w-[120px]">New cost</TableHead>
-                    <TableHead className="w-[220px]">Notes</TableHead>
+                <TableHeader className="sticky top-0 z-10">
+                  <TableRow className="bg-muted/60 hover:bg-muted/60 border-b">
+                    <TableHead className="w-[170px] text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">EAN</TableHead>
+                    <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">Description</TableHead>
+                    <TableHead className="text-right w-[110px] text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">Live cost</TableHead>
+                    <TableHead className="text-right w-[150px] text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">New cost</TableHead>
+                    <TableHead className="w-[240px] text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">Notes</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filtered.length === 0 && (
-                    <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground text-sm">No products match</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground text-sm py-8">No products match</TableCell></TableRow>
                   )}
                   {filtered.map((r) => {
                     const key = r.ean ?? "";
@@ -265,18 +268,27 @@ export default function AdminCurrentCostsPage() {
                       (e.comment ?? "") !== (r.comment ?? "")
                     );
                     return (
-                      <TableRow key={key || r.description} className={edited ? "bg-amber-50 dark:bg-amber-950/20" : ""}>
-                        <TableCell className="font-mono text-xs">{r.ean || "—"}</TableCell>
-                        <TableCell className="text-xs">{r.description || "—"}</TableCell>
-                        <TableCell className="text-right text-xs">{money(r.costPrice)}</TableCell>
+                      <TableRow key={key || r.description} className={edited ? "bg-amber-50/70 dark:bg-amber-950/20" : ""}>
+                        <TableCell className="font-mono text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1.5">
+                            <span className={`inline-block h-1.5 w-1.5 rounded-full ${edited ? "bg-amber-500" : "bg-transparent"}`} aria-hidden />
+                            {r.ean || "—"}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-sm">{r.description || "—"}</TableCell>
+                        <TableCell className="text-right text-sm tabular-nums text-muted-foreground">{money(r.costPrice)}</TableCell>
                         <TableCell>
-                          <Input type="number" step="0.01" disabled={!r.ean}
-                            className="h-8 text-xs text-right" placeholder={money(r.costPrice)}
-                            value={costStr}
-                            onChange={(ev) => setCost(key, ev.target.value, r.comment ?? "")} />
+                          <div className="relative">
+                            <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">£</span>
+                            <Input type="number" step="0.01" disabled={!r.ean}
+                              className={`h-9 pl-5 text-right tabular-nums ${edited ? "border-amber-400 focus-visible:ring-amber-400 dark:border-amber-600" : ""}`}
+                              placeholder={r.costPrice !== null ? Number(r.costPrice).toFixed(2) : "0.00"}
+                              value={costStr}
+                              onChange={(ev) => setCost(key, ev.target.value, r.comment ?? "")} />
+                          </div>
                         </TableCell>
                         <TableCell>
-                          <Input className="h-8 text-xs" placeholder="Internal note" disabled={!r.ean}
+                          <Input className="h-9 text-sm" placeholder="Internal note" disabled={!r.ean}
                             value={e?.comment ?? (r.comment ?? "")}
                             onChange={(ev) => setNote(key, ev.target.value, (r.costPrice ?? "").toString())} />
                         </TableCell>
@@ -288,7 +300,8 @@ export default function AdminCurrentCostsPage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <Button onClick={openConfirm} disabled={changedCount === 0 || loadingPreview}>
+              <Button onClick={openConfirm} disabled={changedCount === 0 || loadingPreview}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white">
                 {loadingPreview ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
                 Review &amp; apply {changedCount > 0 ? `(${changedCount})` : ""}
               </Button>
@@ -365,7 +378,8 @@ export default function AdminCurrentCostsPage() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setPreview(null)} disabled={applying}>Cancel</Button>
-            <Button onClick={applyChanges} disabled={applying}>
+            <Button onClick={applyChanges} disabled={applying}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white">
               {applying ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
               Confirm &amp; apply
             </Button>
