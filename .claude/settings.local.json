@@ -123,7 +123,23 @@
       "Bash(echo \"=== exit $? ===\")",
       "Bash(echo \"exit: $?\")",
       "Bash(grep -nA25 \"contactMessages = pgTable\" shared/schema.ts)",
-      "Bash(grep -nA30 \"suppliers = pgTable\" shared/schema.ts)"
+      "Bash(grep -nA30 \"suppliers = pgTable\" shared/schema.ts)",
+      "Bash(PORT=5050 NODE_ENV=production node dist/index.cjs)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5000/api/health)",
+      "Bash(GIT_CONFIG_NOSYSTEM=1 git commit -q -m 'Customer Pricing redesign: Current Costs visual system \\(pilot\\) *)",
+      "Bash(echo \"=== check exit: $? ===\")",
+      "Bash(echo \"=== build exit: $? ===\")",
+      "Bash(GIT_CONFIG_NOSYSTEM=1 git commit -q -m 'Customer Pricing redesign: roll emerald visual system to remaining 5 pages *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" -X POST http://localhost:5000/api/admin/v2/price-lists/1/assign -H \"Content-Type: application/json\" -d '{\"customerIds\":[999999]}')",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" -X POST http://localhost:5000/api/admin/v2/price-lists/1/totally-fake -H \"Content-Type: application/json\" -d '{}')",
+      "Bash(GIT_CONFIG_NOSYSTEM=1 git commit -q -m 'Who Sees What: assign uncovered customers inline \\(new capability\\) *)",
+      "Bash(GIT_CONFIG_NOSYSTEM=1 git commit -q -m 'Who Sees What: add Remove + per-list Add-customer actions *)",
+      "Bash(grep -o 'data-testid={\\\\?`\\\\?\"\\\\?[a-zA-Z-]*' client/src/pages/admin/assignments.tsx)",
+      "Bash(GIT_CONFIG_NOSYSTEM=1 git commit -q -m 'Who Sees What: master-detail brand rail \\(scales to 80-100 brands\\) *)",
+      "Bash(GIT_CONFIG_NOSYSTEM=1 git commit -q -m 'Docs: record 2026-06-28 session — emerald visual v2 + Who-Sees-What assignment tools *)",
+      "Bash(pkill -f \"dist/index.cjs\")",
+      "Bash(grep -E \"\\\\.\\(ts|js\\)$\")",
+      "Bash(pkill -f \"tsx.*test-\")"
     ]
   }
 }
