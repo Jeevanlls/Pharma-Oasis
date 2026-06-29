@@ -74,14 +74,7 @@ const allowedOrigins = [
   "https://www.pharmaoasis.co.uk",
   "https://pharmaoasis.com",
   "https://www.pharmaoasis.com",
-  "https://pharma-oasis--jeevan.replit.app",
 ];
-
-// Replit preview/deploy domains provided by the platform (comma-separated)
-const replitHosts = (process.env.REPLIT_DOMAINS || process.env.REPLIT_DEV_DOMAIN || "")
-  .split(",")
-  .map((s) => s.trim())
-  .filter(Boolean);
 
 // Single source of truth for whether an Origin may access the app.
 function isOriginAllowed(origin?: string): boolean {
@@ -91,9 +84,8 @@ function isOriginAllowed(origin?: string): boolean {
     const host = new URL(origin).hostname;
     // Localhost in development
     if (!IS_PRODUCTION && (host === "localhost" || host === "127.0.0.1")) return true;
-    // Replit preview & deployment domains
-    if (/\.replit\.dev$/.test(host) || /\.replit\.app$/.test(host) || /\.repl\.co$/.test(host)) return true;
-    if (replitHosts.includes(host)) return true;
+    // Render preview/deploy domains (temporary test URL)
+    if (/\.onrender\.com$/.test(host)) return true;
   } catch {
     // malformed Origin — fall through to reject
   }

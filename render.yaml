@@ -1,0 +1,41 @@
+# Render Blueprint for Pharma Oasis
+# Deploys the Express+React app as one always-on web service.
+# Secrets (sync:false) are entered in the Render dashboard, not committed.
+services:
+  - type: web
+    name: pharma-oasis
+    runtime: node
+    plan: starter            # always-on (needed for background jobs + WebSockets)
+    region: frankfurt        # EU region (UK customers + Neon EU); change if Neon is elsewhere
+    branch: feature/price-list-builder
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SITE_URL
+        value: https://pharmaoasis.co.uk
+      - key: NEON_DATABASE_URL   # reuse the SAME Neon URL as Replit production
+        sync: false
+      - key: SESSION_SECRET      # reuse the SAME value so existing logins stay valid
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ZOHO_EMAIL
+        sync: false
+      - key: ZOHO_EMAIL_PASSWORD
+        sync: false
+      - key: NOTIFICATION_EMAIL
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET
+        sync: false

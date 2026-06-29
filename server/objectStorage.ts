@@ -1,26 +1,37 @@
-import { Storage, File } from "@google-cloud/storage";
 import { Response } from "express";
 import { randomUUID } from "crypto";
+import type { Readable } from "stream";
+import {
+  S3Client,
+  GetObjectCommand,
+  PutObjectCommand,
+  HeadObjectCommand,
+  DeleteObjectCommand,
+} from "@aws-sdk/client-s3";
 
-const REPLIT_SIDECAR_ENDPOINT = "http://127.0.0.1:1106";
+// Cloudflare R2 is S3-compatible. Configure via environment:
+//   R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET
+//   (optional) R2_ENDPOINT to override the derived endpoint.
+const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID || "";
+const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID || "";
+const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY || "";
+const R2_BUCKET =
+  process.env.R2_BUCKET || process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID || "";
+const R2_ENDPOINT =
+  process.env.R2_ENDPOINT ||
+  (R2_ACCOUNT_ID ? `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com` : "");
 
-export const objectStorageClient = new Storage({
-  credentials: {
-    audience: "replit",
-    subject_token_type: "access_token",
-    token_url: `${REPLIT_SIDECAR_ENDPOINT}/token`,
-    type: "external_account",
-    credential_source: {
-      url: `${REPLIT_SIDECAR_ENDPOINT}/credential`,
-      format: {
-        type: "json",
-        subject_token_field_name: "access_token",
-      },
-    },
-    universe_domain: "googleapis.com",
-  },
-  projectId: "",
-});
+const s3: S3Client | null =
+  R2_ENDPOINT && R2_ACCESS_KEY_ID && R2_SECRET_ACCESS_KEY
+    ? new S3Client({
+        region: "auto",
+        endpoint: R2_ENDPOINT,
+        credentials: {
+          accessKeyId: R2_ACCESS_KEY_ID,
+          secretAccessKey: R2_SECRET_ACCESS_KEY,
+        },
+      })
+    : null;
 
 export class ObjectNotFoundError extends Error {
   constructor() {
@@ -42,31 +53,40 @@ export class ObjectStorageService {
   private bucketName: string | null = null;
 
   constructor() {
-    this.bucketName = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID || null;
+    this.bucketName = R2_BUCKET || null;
   }
 
   isConfigured(): boolean {
-    return !!this.bucketName;
+    return !!(this.bucketName && s3);
   }
 
   getBucketName(): string {
-    if (!this.bucketName) {
+    if (!this.bucketName || !s3) {
       throw new ObjectStorageConfigError(
-        "Object Storage not configured. Please set up Object Storage in the Replit tools panel."
+        "Object Storage not configured. Set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY and R2_BUCKET.",
       );
     }
     return this.bucketName;
   }
 
-  async downloadObject(file: File, res: Response, cacheTtlSec: number = 3600) {
+  // Streams an object (identified by its storage key) to the HTTP response.
+  async downloadObject(objectKey: string, res: Response, cacheTtlSec: number = 3600) {
+    const bucket = this.getBucketName();
     try {
-      const [metadata] = await file.getMetadata();
+      const head = await s3!.send(
+        new HeadObjectCommand({ Bucket: bucket, Key: objectKey }),
+      );
       res.set({
-        "Content-Type": metadata.contentType || "application/octet-stream",
-        "Content-Length": metadata.size,
+        "Content-Type": head.ContentType || "application/octet-stream",
+        ...(head.ContentLength != null
+          ? { "Content-Length": String(head.ContentLength) }
+          : {}),
         "Cache-Control": `public, max-age=${cacheTtlSec}`,
       });
-      const stream = file.createReadStream();
+      const obj = await s3!.send(
+        new GetObjectCommand({ Bucket: bucket, Key: objectKey }),
+      );
+      const stream = obj.Body as Readable;
       stream.on("error", (err) => {
         console.error("Stream error:", err);
         if (!res.headersSent) {
@@ -82,59 +102,56 @@ export class ObjectStorageService {
     }
   }
 
-  async uploadBuffer(buffer: Buffer, category: string, filename: string, contentType: string): Promise<string> {
-    const bucketName = this.getBucketName();
+  async uploadBuffer(
+    buffer: Buffer,
+    category: string,
+    filename: string,
+    contentType: string,
+  ): Promise<string> {
+    const bucket = this.getBucketName();
     const objectId = randomUUID();
-    const ext = filename.includes('.') ? filename.split('.').pop() : '';
-    const objectName = `public/${category}/${objectId}${ext ? `.${ext}` : ''}`;
+    const ext = filename.includes(".") ? filename.split(".").pop() : "";
+    const objectName = `public/${category}/${objectId}${ext ? `.${ext}` : ""}`;
 
-    const bucket = objectStorageClient.bucket(bucketName);
-    const file = bucket.file(objectName);
-    
-    await file.save(buffer, {
-      metadata: {
-        contentType,
-      },
-    });
+    await s3!.send(
+      new PutObjectCommand({
+        Bucket: bucket,
+        Key: objectName,
+        Body: buffer,
+        ContentType: contentType,
+      }),
+    );
 
-    return `/objects/${category}/${objectId}${ext ? `.${ext}` : ''}`;
+    return `/objects/${category}/${objectId}${ext ? `.${ext}` : ""}`;
   }
 
-  async getObjectFile(objectPath: string): Promise<File> {
+  // Resolves a public "/objects/..." path to a verified storage key.
+  async getObjectFile(objectPath: string): Promise<string> {
     if (!objectPath.startsWith("/objects/")) {
       throw new ObjectNotFoundError();
     }
-
-    const bucketName = this.getBucketName();
+    const bucket = this.getBucketName();
     const parts = objectPath.slice("/objects/".length);
     const objectName = `public/${parts}`;
-    
-    const bucket = objectStorageClient.bucket(bucketName);
-    const objectFile = bucket.file(objectName);
-    const [exists] = await objectFile.exists();
-    if (!exists) {
+    try {
+      await s3!.send(new HeadObjectCommand({ Bucket: bucket, Key: objectName }));
+    } catch {
       throw new ObjectNotFoundError();
     }
-    return objectFile;
+    return objectName;
   }
 
   async deleteObject(objectPath: string): Promise<void> {
     if (!objectPath.startsWith("/objects/")) {
       return;
     }
-
     try {
-      const bucketName = this.getBucketName();
+      const bucket = this.getBucketName();
       const parts = objectPath.slice("/objects/".length);
       const objectName = `public/${parts}`;
-      
-      const bucket = objectStorageClient.bucket(bucketName);
-      const file = bucket.file(objectName);
-      const [exists] = await file.exists();
-      
-      if (exists) {
-        await file.delete();
-      }
+      await s3!.send(
+        new DeleteObjectCommand({ Bucket: bucket, Key: objectName }),
+      );
     } catch (error) {
       if (error instanceof ObjectStorageConfigError) {
         return;

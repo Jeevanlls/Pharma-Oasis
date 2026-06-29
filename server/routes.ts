@@ -5254,7 +5254,7 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
       const objectStorageCheck = new ObjectStorageService();
       if (!objectStorageCheck.isConfigured()) {
         return res.status(503).json({ 
-          message: "Image upload is not available. Object Storage needs to be configured in the Replit tools panel." 
+          message: "Image upload is not available. Object storage (Cloudflare R2) is not configured." 
         });
       }
 
