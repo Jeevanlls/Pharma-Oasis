@@ -328,7 +328,11 @@ export default function AdminCurrentCostsPage() {
                           </span>
                         </TableCell>
                         <TableCell className="text-sm">{r.description || "—"}</TableCell>
-                        <TableCell className="text-right text-sm tabular-nums text-muted-foreground">{money(r.costPrice)}</TableCell>
+                        <TableCell className="text-right text-sm tabular-nums">
+                          {!r.costPrice || r.costPrice <= 0
+                            ? <Badge variant="outline" className="border-amber-400 text-amber-700 dark:text-amber-300 font-normal text-[10px]">Needs cost</Badge>
+                            : <span className="text-muted-foreground">{money(r.costPrice)}</span>}
+                        </TableCell>
                         <TableCell>
                           <div className="relative">
                             <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">£</span>

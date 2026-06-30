@@ -313,8 +313,13 @@ export async function buildPriceList(input: {
     .returning();
 
   let itemCount = 0;
+  let skippedNoCost = 0;
   if (base && base.rows.length) {
-    const values = base.rows.map((row) => {
+    // Only price products that actually have a cost (> 0). Zero/blank-cost rows are
+    // kept in Current Costs as "needs cost" and left out here so we never make a £0 price.
+    const priceable = base.rows.filter((row) => { const c = num(row.costPrice); return c !== null && c > 0; });
+    skippedNoCost = base.rows.length - priceable.length;
+    const values = priceable.map((row) => {
       const cost = num(row.costPrice);
       return {
         priceListId: list.id,
@@ -334,10 +339,10 @@ export async function buildPriceList(input: {
         isActive: true,
       };
     });
-    await db.insert(priceListItems).values(values);
+    if (values.length) await db.insert(priceListItems).values(values);
     itemCount = values.length;
   }
-  return { list, itemCount };
+  return { list, itemCount, skippedNoCost };
 }
 
 /** Create a CATEGORY-scoped list and auto-fill one item per product in the category
@@ -369,8 +374,11 @@ export async function buildCategoryPriceList(input: {
     .returning();
 
   let itemCount = 0;
+  let skippedNoCost = 0;
   if (base.rows.length) {
-    const values = base.rows.map((row) => {
+    const priceable = base.rows.filter((row) => { const c = num(row.costPrice); return c !== null && c > 0; });
+    skippedNoCost = base.rows.length - priceable.length;
+    const values = priceable.map((row) => {
       const cost = num(row.costPrice);
       return {
         priceListId: list.id,
@@ -390,10 +398,10 @@ export async function buildCategoryPriceList(input: {
         isActive: true,
       };
     });
-    await db.insert(priceListItems).values(values);
+    if (values.length) await db.insert(priceListItems).values(values);
     itemCount = values.length;
   }
-  return { list, itemCount };
+  return { list, itemCount, skippedNoCost };
 }
 
 export async function updatePriceListMeta(
@@ -515,6 +523,9 @@ export async function refreshFromBaseCost(id: number): Promise<{ updated: number
   for (const it of items) {
     if (!it.ean || !costByEan.has(it.ean)) continue;
     const cost = costByEan.get(it.ean) ?? null;
+    // A cost that has gone to zero/blank can't make a valid price — leave the line
+    // untouched (keeps its last good price) rather than repricing it to £0.
+    if ((cost === null || cost <= 0) && it.method !== "fixed") continue;
     if (it.method === "fixed") {
       fixedToReview++;
       await db.update(priceListItems).set({ costPrice: toStr(cost), updatedAt: new Date() }).where(eq(priceListItems.id, it.id));

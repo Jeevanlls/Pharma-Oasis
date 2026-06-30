@@ -249,11 +249,11 @@ export async function updateUploadComment(id: number, comment: string | null): P
  *  matched costs onto products (active cost cache).
  *  Gating: refuses to publish while duplicate EANs remain; incomplete rows
  *  (missing EAN or cost) are skipped (deleted) and reported, never published. */
-export async function publishUpload(id: number): Promise<{ updated: number; skipped: number }> {
+export async function publishUpload(id: number): Promise<{ updated: number; skipped: number; noCost: number }> {
   const found = await getUpload(id);
   if (!found) throw new Error("Upload not found");
   const { upload, rows } = found;
-  if (upload.status === "published") return { updated: 0, skipped: 0 };
+  if (upload.status === "published") return { updated: 0, skipped: 0, noCost: 0 };
 
   // Hard block: duplicate EANs must be resolved before publishing.
   const counts = new Map<string, number>();
@@ -268,15 +268,18 @@ export async function publishUpload(id: number): Promise<{ updated: number; skip
     );
   }
 
-  // Drop incomplete rows (no EAN or no cost) — they can never be part of a price list.
-  const incomplete = rows.filter((r) => !normEan(r.ean) || r.costPrice === null || Number(r.costPrice) <= 0);
-  if (incomplete.length) {
+  // Drop only rows with NO EAN (they can't be identified, matched or priced).
+  // Rows that have an EAN but a zero/blank cost are KEPT as "needs cost" — they stay
+  // visible in Current Costs and are simply excluded from price lists until a cost is added.
+  const noEan = rows.filter((r) => !normEan(r.ean));
+  if (noEan.length) {
     await db.delete(costUploadRows).where(
-      and(eq(costUploadRows.uploadId, id), inArray(costUploadRows.id, incomplete.map((r) => r.id))),
+      and(eq(costUploadRows.uploadId, id), inArray(costUploadRows.id, noEan.map((r) => r.id))),
     );
   }
-  const skipped = incomplete.length;
-  const liveRows = rows.filter((r) => !incomplete.includes(r));
+  const skipped = noEan.length;
+  const liveRows = rows.filter((r) => normEan(r.ean));
+  const noCost = liveRows.filter((r) => r.costPrice === null || Number(r.costPrice) <= 0).length;
 
   // Supersede prior published uploads for the same brand.
   await db
@@ -287,7 +290,7 @@ export async function publishUpload(id: number): Promise<{ updated: number; skip
   const now = new Date();
   let updated = 0;
   for (const row of liveRows) {
-    if (!row.productId || row.costPrice === null) continue;
+    if (!row.productId || row.costPrice === null || Number(row.costPrice) <= 0) continue;
     const expiry = row.validUntil ?? upload.validUntil ?? null;
     const status = expiry && expiry < now ? "expired" : "active";
     await db
@@ -317,7 +320,7 @@ export async function publishUpload(id: number): Promise<{ updated: number; skip
     })
     .where(eq(costUploads.id, id));
 
-  return { updated, skipped };
+  return { updated, skipped, noCost };
 }
 
 /** Mark products whose cost validity has passed as expired (price still shown). */

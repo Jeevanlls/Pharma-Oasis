@@ -214,7 +214,7 @@ export default function AdminCostUploadsPage() {
     mutationFn: async (id: number) => apiRequest("POST", `/api/admin/cost-uploads/${id}/publish`),
     onSuccess: async (res) => {
       const data = await res.json();
-      toast({ title: "Published", description: `${data.updated} cost(s) now live${data.skipped ? `, ${data.skipped} incomplete line(s) skipped` : ""}.` });
+      toast({ title: "Published", description: `${data.updated} cost(s) now live${data.noCost ? `, ${data.noCost} kept without a cost (add a cost to price them)` : ""}${data.skipped ? `, ${data.skipped} dropped (no EAN)` : ""}.` });
       setPreview(null);
       queryClient.invalidateQueries({ queryKey: ["/api/admin/cost-uploads"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/cost-alerts"] });
@@ -287,7 +287,7 @@ export default function AdminCostUploadsPage() {
       const data = await res.json();
       toast({
         title: "Published",
-        description: `${data.updated} cost(s) now live${data.skipped ? `, ${data.skipped} incomplete line(s) skipped` : ""}.`,
+        description: `${data.updated} cost(s) now live${data.noCost ? `, ${data.noCost} kept without a cost (add a cost to price them)` : ""}${data.skipped ? `, ${data.skipped} dropped (no EAN)` : ""}.`,
       });
       setPreview(null);
       queryClient.invalidateQueries({ queryKey: ["/api/admin/cost-uploads"] });
@@ -512,7 +512,7 @@ export default function AdminCostUploadsPage() {
                   : unconfirmed > 0
                     ? <span className="text-red-600 dark:text-red-400">{unconfirmed} big change(s) need confirming.</span>
                     : counts.missing_info > 0
-                      ? <span className="text-amber-700 dark:text-amber-400">{counts.missing_info} incomplete line(s) will be skipped.</span>
+                      ? <span className="text-amber-700 dark:text-amber-400">{counts.missing_info} line(s) have no cost — saved but not priced.</span>
                       : <span className="text-muted-foreground">{total} rows · {dirty ? "unsaved edits" : "saved"}</span>}
               </span>
             </div>
@@ -729,7 +729,7 @@ export default function AdminCostUploadsPage() {
                 : unconfirmed > 0
                   ? <span className="text-xs text-red-600 dark:text-red-400">{unconfirmed} large cost change(s) need confirming (tick the box) before publishing.</span>
                   : counts.missing_info > 0
-                    ? <span className="text-xs text-amber-700 dark:text-amber-400">{counts.missing_info} incomplete line(s) will be skipped on publish.</span>
+                    ? <span className="text-xs text-amber-700 dark:text-amber-400">{counts.missing_info} line(s) have no cost — they will be saved but left unpriced until you add a cost.</span>
                     : null}
             </div>
           </CardContent>

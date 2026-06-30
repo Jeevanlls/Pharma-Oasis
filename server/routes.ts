@@ -4748,6 +4748,9 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
       if (result.itemCount === 0) {
         return res.json({ ...result, warning: "No published costs found for products in this category yet — the list was created empty." });
       }
+      if (result.skippedNoCost > 0) {
+        return res.json({ ...result, warning: `${result.skippedNoCost} product(s) had no cost yet and were left out. Add a cost in Current Costs, then refresh this list to include them.` });
+      }
       res.json(result);
     } catch (e: any) {
       res.status(500).json({ message: e.message || "Failed to build category price list" });
@@ -4773,6 +4776,9 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
       const result = await pricingV2.buildPriceList({ brandId, name, defaultMarginPercent, roundingMode });
       if (result.itemCount === 0) {
         return res.json({ ...result, warning: "No published base cost found for this brand yet — the list was created empty. Upload & publish a cost first." });
+      }
+      if (result.skippedNoCost > 0) {
+        return res.json({ ...result, warning: `${result.skippedNoCost} product(s) had no cost yet and were left out. Add a cost in Current Costs, then refresh this list to include them.` });
       }
       res.json(result);
     } catch (e: any) {
