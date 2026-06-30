@@ -4418,6 +4418,12 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
       if (!parsed.rows.length) {
         return res.status(400).json({ message: "No data rows found. Check the file matches the template format." });
       }
+      // If a category was picked in the UI, stamp every row with it so the review
+      // screen shows it immediately (overrides any Category: blocks in the file).
+      if (req.body.categoryId) {
+        const cat = (await pricingV2.listPricingCategories()).find((c) => c.id === Number(req.body.categoryId));
+        if (cat) for (const r of parsed.rows) r.categoryName = cat.name;
+      }
       const threshold = await getCostThreshold();
       // Compare against the brand's prior PUBLISHED cost upload (same pricing_brands
       // id namespace) — NOT the catalogue products table.
