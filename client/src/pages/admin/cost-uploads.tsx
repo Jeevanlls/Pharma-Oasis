@@ -526,15 +526,15 @@ export default function AdminCostUploadsPage() {
                       </TableCell>
                       <TableCell>
                         <Input value={r.ean} onChange={(e) => patchRow(i, { ean: e.target.value })}
-                          className="h-8 font-mono text-[11px] px-2" placeholder="EAN" />
+                          className="h-8 font-mono text-[10px] px-1.5" placeholder="EAN" />
                       </TableCell>
                       <TableCell className="align-top">
                         <Textarea value={r.description} onChange={(e) => patchRow(i, { description: e.target.value })}
-                          rows={2} title={r.description} className="text-xs leading-snug resize-none min-h-[3rem] py-1" placeholder="Description" />
+                          rows={2} title={r.description} className="text-[11px] leading-snug resize-none min-h-[2.8rem] py-1" placeholder="Description" />
                       </TableCell>
                       <TableCell>
                         <Select value={r.categoryName || ""} onValueChange={(v) => patchRow(i, { categoryName: v })}>
-                          <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="—" /></SelectTrigger>
+                          <SelectTrigger className="h-8 text-[11px]"><SelectValue placeholder="—" /></SelectTrigger>
                           <SelectContent>
                             {pricingCategories.map((c) => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}
                           </SelectContent>
@@ -542,28 +542,28 @@ export default function AdminCostUploadsPage() {
                       </TableCell>
                       <TableCell>
                         <Input value={r.caseSize} onChange={(e) => patchRow(i, { caseSize: e.target.value })}
-                          className="h-8 text-xs px-2" placeholder="—" />
+                          className="h-8 text-[11px] px-1.5" placeholder="—" />
                       </TableCell>
-                      <TableCell className="text-right text-xs tabular-nums text-muted-foreground">{money(r.previousCost)}</TableCell>
+                      <TableCell className="text-right text-[11px] tabular-nums text-muted-foreground">{money(r.previousCost)}</TableCell>
                       <TableCell>
                         <div className="relative">
                           <span className="pointer-events-none absolute left-1.5 top-1/2 -translate-y-1/2 text-[11px] text-muted-foreground">£</span>
                           <Input type="number" step="0.01" value={r.costPrice ?? ""}
                             onChange={(e) => patchRow(i, { costPrice: e.target.value === "" ? null : Number(e.target.value) })}
-                            className={`h-8 text-xs text-right tabular-nums pl-4 ${(!r.costPrice || r.costPrice <= 0) ? "border-red-400 bg-red-50 dark:bg-red-950/30" : ""}`} placeholder="0.00" />
+                            className={`h-8 text-[11px] text-right tabular-nums pl-4 ${(!r.costPrice || r.costPrice <= 0) ? "border-red-400 bg-red-50 dark:bg-red-950/30" : ""}`} placeholder="0.00" />
                         </div>
                       </TableCell>
-                      <TableCell className={`text-right text-xs ${r.changePercent && Math.abs(r.changePercent) > s.threshold ? "text-red-600 dark:text-red-400 font-semibold" : ""}`}>
+                      <TableCell className={`text-right text-[11px] ${r.changePercent && Math.abs(r.changePercent) > s.threshold ? "text-red-600 dark:text-red-400 font-semibold" : ""}`}>
                         {r.changePercent === null ? "—" : `${r.changePercent > 0 ? "+" : ""}${r.changePercent}%`}
                       </TableCell>
                       <TableCell>
                         <Input type="number" value={r.supplierQty ?? ""}
                           onChange={(e) => patchRow(i, { supplierQty: e.target.value === "" ? null : Number(e.target.value) })}
-                          className="h-8 text-xs text-right" placeholder="—" />
+                          className="h-8 text-[11px] text-right" placeholder="—" />
                       </TableCell>
                       <TableCell>
                         <Input value={r.comment ?? ""} onChange={(e) => patchRow(i, { comment: e.target.value })}
-                          className="h-8 text-xs" placeholder="Internal note" />
+                          className="h-8 text-[11px]" placeholder="Internal note" />
                       </TableCell>
                       <TableCell>
                         <Badge className={`font-normal ${statusMeta[r.rowStatus].cls}`} title={r.flagReason}>
