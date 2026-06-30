@@ -50,6 +50,45 @@ const normEan = (v: string | null | undefined) =>
   (v ?? "").toString().replace(/\s+/g, "").replace(/\.0$/, "").trim();
 const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
+// Cost field that always shows 2 decimals (£2.00, not £2) when not being edited,
+// allows free typing while focused, and normalises to 2dp on blur.
+function CostInput({
+  value, onChange, className, placeholder = "0.00", disabled,
+}: {
+  value: number | null;
+  onChange: (n: number | null) => void;
+  className?: string;
+  placeholder?: string;
+  disabled?: boolean;
+}) {
+  const fmt = (v: number | null) => (v === null || v === undefined ? "" : Number(v).toFixed(2));
+  const [text, setText] = useState<string>(fmt(value));
+  const [focused, setFocused] = useState(false);
+  useEffect(() => { if (!focused) setText(fmt(value)); }, [value, focused]);
+  return (
+    <Input
+      type="text" inputMode="decimal" disabled={disabled}
+      className={className} placeholder={placeholder} value={text}
+      onFocus={() => setFocused(true)}
+      onChange={(e) => {
+        const t = e.target.value;
+        setText(t);
+        if (t.trim() === "") { onChange(null); return; }
+        const n = Number(t);
+        if (Number.isFinite(n)) onChange(n);
+      }}
+      onBlur={() => {
+        setFocused(false);
+        const t = text.trim();
+        if (t === "") { onChange(null); setText(""); return; }
+        const n = Number(t);
+        if (Number.isFinite(n)) { onChange(round2(n)); setText(round2(n).toFixed(2)); }
+        else setText(fmt(value));
+      }}
+    />
+  );
+}
+
 export default function AdminCostUploadsPage() {
   const { toast } = useToast();
   const [brandId, setBrandId] = useState<string>("");
@@ -574,9 +613,9 @@ export default function AdminCostUploadsPage() {
                       <TableCell>
                         <div className="relative">
                           <span className="pointer-events-none absolute left-1.5 top-1/2 -translate-y-1/2 text-[11px] text-muted-foreground">£</span>
-                          <Input type="number" step="0.01" value={r.costPrice ?? ""}
-                            onChange={(e) => patchRow(i, { costPrice: e.target.value === "" ? null : Number(e.target.value) })}
-                            className={`h-8 text-[11px] text-right tabular-nums pl-4 ${(!r.costPrice || r.costPrice <= 0) ? "border-red-400 bg-red-50 dark:bg-red-950/30" : ""}`} placeholder="0.00" />
+                          <CostInput value={r.costPrice}
+                            onChange={(n) => patchRow(i, { costPrice: n })}
+                            className={`h-8 text-[11px] text-right tabular-nums pl-4 ${(!r.costPrice || r.costPrice <= 0) ? "border-red-400 bg-red-50 dark:bg-red-950/30" : ""}`} />
                         </div>
                       </TableCell>
                       <TableCell className={`text-right text-[11px] ${r.changePercent && Math.abs(r.changePercent) > s.threshold ? "text-red-600 dark:text-red-400 font-semibold" : ""}`}>

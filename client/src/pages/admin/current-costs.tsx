@@ -314,7 +314,7 @@ export default function AdminCurrentCostsPage() {
                   {filtered.map((r) => {
                     const key = r.ean ?? "";
                     const e = key ? edits[key] : undefined;
-                    const costStr = e?.cost ?? (r.costPrice ?? "").toString();
+                    const costStr = e?.cost ?? (r.costPrice !== null ? Number(r.costPrice).toFixed(2) : "");
                     const edited = !!e && (
                       (e.cost !== "" && round2(Number(e.cost)) !== round2(r.costPrice ?? NaN)) ||
                       (e.comment ?? "") !== (r.comment ?? "")
@@ -332,11 +332,17 @@ export default function AdminCurrentCostsPage() {
                         <TableCell>
                           <div className="relative">
                             <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">£</span>
-                            <Input type="number" step="0.01" disabled={!r.ean}
+                            <Input type="text" inputMode="decimal" disabled={!r.ean}
                               className={`h-9 pl-5 text-right tabular-nums ${edited ? "border-amber-400 focus-visible:ring-amber-400 dark:border-amber-600" : ""}`}
                               placeholder={r.costPrice !== null ? Number(r.costPrice).toFixed(2) : "0.00"}
                               value={costStr}
-                              onChange={(ev) => setCost(key, ev.target.value, r.comment ?? "")} />
+                              onChange={(ev) => setCost(key, ev.target.value, r.comment ?? "")}
+                              onBlur={() => {
+                                const cur = edits[key]?.cost;
+                                if (cur === undefined || cur.trim() === "") return;
+                                const n = Number(cur);
+                                if (Number.isFinite(n)) setCost(key, round2(n).toFixed(2), r.comment ?? "");
+                              }} />
                           </div>
                         </TableCell>
                         <TableCell>
