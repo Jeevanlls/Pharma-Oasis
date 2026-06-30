@@ -313,14 +313,12 @@ export async function buildPriceList(input: {
     .returning();
 
   let itemCount = 0;
-  let skippedNoCost = 0;
+  let onRequestCount = 0;
   if (base && base.rows.length) {
-    // Only price products that actually have a cost (> 0). Zero/blank-cost rows are
-    // kept in Current Costs as "needs cost" and left out here so we never make a £0 price.
-    const priceable = base.rows.filter((row) => { const c = num(row.costPrice); return c !== null && c > 0; });
-    skippedNoCost = base.rows.length - priceable.length;
-    const values = priceable.map((row) => {
+    const values = base.rows.map((row) => {
       const cost = num(row.costPrice);
+      const priceable = cost !== null && cost > 0;
+      if (!priceable) onRequestCount++;
       return {
         priceListId: list.id,
         costRowId: row.id,
@@ -334,7 +332,8 @@ export async function buildPriceList(input: {
         fixedPrice: null,
         plusAmount: null,
         roundingMode: rounding,
-        preparedPrice: toStr(computePrepared("margin", cost, margin, null, null, rounding)),
+        // No cost yet -> null price = "Price on request" in the portal (orderable via quote).
+        preparedPrice: priceable ? toStr(computePrepared("margin", cost, margin, null, null, rounding)) : null,
         supplierQty: row.supplierQty ?? null,
         isActive: true,
       };
@@ -342,7 +341,7 @@ export async function buildPriceList(input: {
     if (values.length) await db.insert(priceListItems).values(values);
     itemCount = values.length;
   }
-  return { list, itemCount, skippedNoCost };
+  return { list, itemCount, onRequestCount };
 }
 
 /** Create a CATEGORY-scoped list and auto-fill one item per product in the category
@@ -374,12 +373,12 @@ export async function buildCategoryPriceList(input: {
     .returning();
 
   let itemCount = 0;
-  let skippedNoCost = 0;
+  let onRequestCount = 0;
   if (base.rows.length) {
-    const priceable = base.rows.filter((row) => { const c = num(row.costPrice); return c !== null && c > 0; });
-    skippedNoCost = base.rows.length - priceable.length;
-    const values = priceable.map((row) => {
+    const values = base.rows.map((row) => {
       const cost = num(row.costPrice);
+      const priceable = cost !== null && cost > 0;
+      if (!priceable) onRequestCount++;
       return {
         priceListId: list.id,
         costRowId: row.id,
@@ -393,7 +392,7 @@ export async function buildCategoryPriceList(input: {
         fixedPrice: null,
         plusAmount: null,
         roundingMode: rounding,
-        preparedPrice: toStr(computePrepared("margin", cost, margin, null, null, rounding)),
+        preparedPrice: priceable ? toStr(computePrepared("margin", cost, margin, null, null, rounding)) : null,
         supplierQty: row.supplierQty ?? null,
         isActive: true,
       };
@@ -401,7 +400,7 @@ export async function buildCategoryPriceList(input: {
     if (values.length) await db.insert(priceListItems).values(values);
     itemCount = values.length;
   }
-  return { list, itemCount, skippedNoCost };
+  return { list, itemCount, onRequestCount };
 }
 
 export async function updatePriceListMeta(
@@ -523,9 +522,15 @@ export async function refreshFromBaseCost(id: number): Promise<{ updated: number
   for (const it of items) {
     if (!it.ean || !costByEan.has(it.ean)) continue;
     const cost = costByEan.get(it.ean) ?? null;
-    // A cost that has gone to zero/blank can't make a valid price — leave the line
-    // untouched (keeps its last good price) rather than repricing it to £0.
-    if ((cost === null || cost <= 0) && it.method !== "fixed") continue;
+    // Cost gone to zero/blank on a margin/cost-plus line -> show as "Price on request"
+    // (null price) so the customer can still see it and request a quote.
+    if ((cost === null || cost <= 0) && it.method !== "fixed") {
+      await db.update(priceListItems)
+        .set({ costPrice: toStr(cost), preparedPrice: null, updatedAt: new Date() })
+        .where(eq(priceListItems.id, it.id));
+      updated++;
+      continue;
+    }
     if (it.method === "fixed") {
       fixedToReview++;
       await db.update(priceListItems).set({ costPrice: toStr(cost), updatedAt: new Date() }).where(eq(priceListItems.id, it.id));

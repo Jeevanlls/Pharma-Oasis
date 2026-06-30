@@ -591,7 +591,9 @@ export default function PriceBuilderPage() {
                                   </TableCell>
                                   <TableCell className="text-right tabular-nums">
                                     <span className={belowCost ? "text-destructive font-bold" : "font-semibold"}>
-                                      {p == null ? "—" : `£${p.toFixed(2)}`}
+                                      {p == null
+                                        ? <span className="text-amber-600 dark:text-amber-400 text-xs font-medium">On request</span>
+                                        : `£${p.toFixed(2)}`}
                                     </span>
                                     {belowCost && <div className="text-xs text-destructive">below cost!</div>}
                                   </TableCell>

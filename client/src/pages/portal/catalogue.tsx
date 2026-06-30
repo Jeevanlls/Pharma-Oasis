@@ -169,7 +169,7 @@ export default function PortalCataloguePage() {
                   <Input type="number" min={1} className="w-16 h-9" value={qty[p.itemId] ?? 1}
                     onChange={(e) => setQty({ ...qty, [p.itemId]: Math.max(1, Number(e.target.value)) })} />
                   <Button size="sm" className="flex-1" onClick={() => add(p)} disabled={p.availability === "out_of_stock"}>
-                    <ShoppingCart className="h-4 w-4 mr-1" /> Add
+                    <ShoppingCart className="h-4 w-4 mr-1" /> {p.price === null ? "Request price" : "Add"}
                   </Button>
                 </div>
               </CardContent>
