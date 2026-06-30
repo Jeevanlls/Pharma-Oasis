@@ -141,6 +141,7 @@ export default function AdminCostUploadsPage() {
 
   async function handleUpload() {
     if (!brandId) { toast({ title: "Select a brand first", variant: "destructive" }); return; }
+    if (!categoryId) { toast({ title: "Select a category first", variant: "destructive" }); return; }
     if (!file) { toast({ title: "Choose a file", variant: "destructive" }); return; }
     setUploading(true);
     setPreview(null);
@@ -313,7 +314,7 @@ export default function AdminCostUploadsPage() {
               </Select>
             </div>
             <div>
-              <Label>Category</Label>
+              <Label>Category *</Label>
               <Select value={categoryId} onValueChange={setCategoryId}>
                 <SelectTrigger><SelectValue placeholder="Assign a category" /></SelectTrigger>
                 <SelectContent>
@@ -496,6 +497,7 @@ export default function AdminCostUploadsPage() {
                     </TableHead>
                     <TableHead className="w-[190px]">EAN</TableHead>
                     <TableHead>Description</TableHead>
+                    <TableHead className="w-[170px]">Category</TableHead>
                     <TableHead className="text-right w-[80px]">Prev</TableHead>
                     <TableHead className="text-right w-[110px]">New cost</TableHead>
                     <TableHead className="text-right w-[80px]">Change</TableHead>
@@ -507,7 +509,7 @@ export default function AdminCostUploadsPage() {
                 </TableHeader>
                 <TableBody>
                   {visible.length === 0 && (
-                    <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground text-sm">No rows for this filter</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground text-sm">No rows for this filter</TableCell></TableRow>
                   )}
                   {visible.map(({ r, i }) => (
                     <TableRow key={i} className={r.rowStatus === "duplicate" || r.rowStatus === "missing_info" ? "bg-red-50 dark:bg-red-950/30" : ""}>
@@ -523,6 +525,14 @@ export default function AdminCostUploadsPage() {
                       <TableCell>
                         <Input value={r.description} onChange={(e) => patchRow(i, { description: e.target.value })}
                           className="h-8 text-xs" placeholder="Description" />
+                      </TableCell>
+                      <TableCell>
+                        <Select value={r.categoryName || ""} onValueChange={(v) => patchRow(i, { categoryName: v })}>
+                          <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="—" /></SelectTrigger>
+                          <SelectContent>
+                            {pricingCategories.map((c) => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
                       </TableCell>
                       <TableCell className="text-right text-xs tabular-nums text-muted-foreground">{money(r.previousCost)}</TableCell>
                       <TableCell>
