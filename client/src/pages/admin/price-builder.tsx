@@ -80,6 +80,7 @@ export default function PriceBuilderPage() {
   const [newCategoryId, setNewCategoryId] = useState("");
   const [newName, setNewName] = useState("");
   const [newMargin, setNewMargin] = useState("20");
+  const [newRounding, setNewRounding] = useState<"none" | "charm_99" | "charm_49_99">("none");
 
   // local unsaved edits keyed by itemId
   const [edits, setEdits] = useState<Record<number, Partial<PriceListItem>>>({});
@@ -224,8 +225,8 @@ export default function PriceBuilderPage() {
         "POST",
         newScope === "category" ? "/api/admin/v2/category-price-lists" : "/api/admin/v2/price-lists",
         newScope === "category"
-          ? { categoryId: Number(newCategoryId), name: newName, defaultMarginPercent: Number(newMargin) || 0 }
-          : { brandId: Number(newBrandId), name: newName, defaultMarginPercent: Number(newMargin) || 0 },
+          ? { categoryId: Number(newCategoryId), name: newName, defaultMarginPercent: Number(newMargin) || 0, roundingMode: newRounding }
+          : { brandId: Number(newBrandId), name: newName, defaultMarginPercent: Number(newMargin) || 0, roundingMode: newRounding },
       )).json(),
     onSuccess: (res: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/v2/price-lists"] });
@@ -660,6 +661,20 @@ export default function PriceBuilderPage() {
             <div>
               <Label htmlFor="new-margin">Default margin %</Label>
               <Input id="new-margin" type="number" value={newMargin} onChange={(e) => setNewMargin(e.target.value)} />
+            </div>
+            <div>
+              <Label>Smart pricing (price endings)</Label>
+              <Select value={newRounding} onValueChange={(v) => setNewRounding(v as any)}>
+                <SelectTrigger data-testid="select-new-rounding"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Exact (2 decimals)</SelectItem>
+                  <SelectItem value="charm_99">Round to .99</SelectItem>
+                  <SelectItem value="charm_49_99">Round to .49 or .99</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Applies a tidy ending to every margin/cost-plus price (e.g. £5.74 → {newRounding === "charm_49_99" ? "£5.99 / £5.49" : newRounding === "charm_99" ? "£5.99" : "£5.74"}). Fixed prices are left exactly as typed.
+              </p>
             </div>
           </div>
           <DialogFooter>

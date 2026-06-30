@@ -4733,6 +4733,9 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
   });
 
   // Create a CATEGORY-scoped list, auto-filled from cross-brand costs in the category.
+  const ROUNDING_MODES = new Set(["none", "charm_99", "charm_49_99"]);
+  const parseRounding = (v: any): "none" | "charm_99" | "charm_49_99" =>
+    ROUNDING_MODES.has(v) ? v : "none";
   app.post("/api/admin/v2/category-price-lists", requireAdmin, async (req, res) => {
     try {
       const categoryId = parseInt(req.body.categoryId, 10);
@@ -4740,7 +4743,8 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
       const defaultMarginPercent = Number(req.body.defaultMarginPercent) || 0;
       if (!categoryId) return res.status(400).json({ message: "categoryId is required" });
       if (!name) return res.status(400).json({ message: "name is required" });
-      const result = await pricingV2.buildCategoryPriceList({ categoryId, name, defaultMarginPercent });
+      const roundingMode = parseRounding(req.body.roundingMode);
+      const result = await pricingV2.buildCategoryPriceList({ categoryId, name, defaultMarginPercent, roundingMode });
       if (result.itemCount === 0) {
         return res.json({ ...result, warning: "No published costs found for products in this category yet — the list was created empty." });
       }
@@ -4765,7 +4769,8 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
       const defaultMarginPercent = Number(req.body.defaultMarginPercent) || 0;
       if (!brandId) return res.status(400).json({ message: "brandId is required" });
       if (!name) return res.status(400).json({ message: "name is required" });
-      const result = await pricingV2.buildPriceList({ brandId, name, defaultMarginPercent });
+      const roundingMode = parseRounding(req.body.roundingMode);
+      const result = await pricingV2.buildPriceList({ brandId, name, defaultMarginPercent, roundingMode });
       if (result.itemCount === 0) {
         return res.json({ ...result, warning: "No published base cost found for this brand yet — the list was created empty. Upload & publish a cost first." });
       }

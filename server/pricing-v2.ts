@@ -39,6 +39,27 @@ const slugify = (s: string): string =>
   s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 
 export type PriceMethod = "margin" | "fixed" | "cost_plus";
+export type RoundingMode = "none" | "charm_99" | "charm_49_99";
+
+/** Apply a "smart price" ending to a 2dp price. charm_99 -> nearest x.99;
+ *  charm_49_99 -> nearest x.49 or x.99. Never returns <= 0 (falls back to plain 2dp). */
+export function applyCharm(price: number | null, mode: RoundingMode | null | undefined): number | null {
+  if (price === null || !Number.isFinite(price)) return price;
+  const m = mode ?? "none";
+  if (m === "none") return round2(price);
+  let out: number;
+  if (m === "charm_99") {
+    // nearest integer, then drop a penny -> x.99
+    out = Math.round(price) - 0.01;
+  } else if (m === "charm_49_99") {
+    // nearest half-pound point that ends .49 or .99: round to nearest 0.50 grid offset by 0.49
+    out = Math.round((price - 0.49) / 0.5) * 0.5 + 0.49;
+  } else {
+    return round2(price);
+  }
+  out = round2(out);
+  return out > 0 ? out : round2(price);
+}
 
 /** The core price-preparation maths. */
 export function computePrepared(
@@ -47,12 +68,14 @@ export function computePrepared(
   marginPercent: number | null,
   fixedPrice: number | null,
   plusAmount: number | null,
+  rounding: RoundingMode | null = "none",
 ): number | null {
+  // Fixed prices are entered by hand, so respect them exactly (no charm rounding).
   if (method === "fixed") return fixedPrice !== null ? round2(fixedPrice) : null;
   if (method === "cost_plus")
-    return cost !== null && plusAmount !== null ? round2(cost + plusAmount) : null;
+    return cost !== null && plusAmount !== null ? applyCharm(cost + plusAmount, rounding) : null;
   // margin (default)
-  if (cost !== null && marginPercent !== null) return round2(cost * (1 + marginPercent / 100));
+  if (cost !== null && marginPercent !== null) return applyCharm(cost * (1 + marginPercent / 100), rounding);
   return null;
 }
 
@@ -266,9 +289,11 @@ export async function buildPriceList(input: {
   brandId: number;
   name: string;
   defaultMarginPercent: number;
+  roundingMode?: RoundingMode;
 }): Promise<{ list: PriceList; itemCount: number }> {
   const base = await getBaseCostForBrand(input.brandId);
   const margin = input.defaultMarginPercent;
+  const rounding: RoundingMode = input.roundingMode ?? "none";
 
   const [list] = await db
     .insert(priceLists)
@@ -277,6 +302,7 @@ export async function buildPriceList(input: {
       brandId: input.brandId,
       baseCostUploadId: base?.uploadId ?? null,
       defaultMarginPercent: toStr(margin),
+      roundingMode: rounding,
       status: "draft",
       type: "customer",
       isActive: true,
@@ -299,7 +325,8 @@ export async function buildPriceList(input: {
         marginPercent: toStr(margin),
         fixedPrice: null,
         plusAmount: null,
-        preparedPrice: toStr(computePrepared("margin", cost, margin, null, null)),
+        roundingMode: rounding,
+        preparedPrice: toStr(computePrepared("margin", cost, margin, null, null, rounding)),
         supplierQty: row.supplierQty ?? null,
         isActive: true,
       };
@@ -316,9 +343,11 @@ export async function buildCategoryPriceList(input: {
   categoryId: number;
   name: string;
   defaultMarginPercent: number;
+  roundingMode?: RoundingMode;
 }): Promise<{ list: PriceList; itemCount: number }> {
   const base = await getBaseCostForCategory(input.categoryId);
   const margin = input.defaultMarginPercent;
+  const rounding: RoundingMode = input.roundingMode ?? "none";
 
   const [list] = await db
     .insert(priceLists)
@@ -329,6 +358,7 @@ export async function buildCategoryPriceList(input: {
       categoryId: input.categoryId,
       baseCostUploadId: null, // category lists draw from many uploads
       defaultMarginPercent: toStr(margin),
+      roundingMode: rounding,
       status: "draft",
       type: "customer",
       isActive: true,
@@ -351,7 +381,8 @@ export async function buildCategoryPriceList(input: {
         marginPercent: toStr(margin),
         fixedPrice: null,
         plusAmount: null,
-        preparedPrice: toStr(computePrepared("margin", cost, margin, null, null)),
+        roundingMode: rounding,
+        preparedPrice: toStr(computePrepared("margin", cost, margin, null, null, rounding)),
         supplierQty: row.supplierQty ?? null,
         isActive: true,
       };
@@ -410,7 +441,8 @@ export async function applyDefaultMargin(id: number, margin: number): Promise<nu
       .update(priceListItems)
       .set({
         marginPercent: toStr(margin),
-        preparedPrice: toStr(computePrepared("margin", cost, margin, null, null)),
+        roundingMode: (it.roundingMode as RoundingMode),
+        preparedPrice: toStr(computePrepared("margin", cost, margin, null, null, (it.roundingMode as RoundingMode))),
         updatedAt: new Date(),
       })
       .where(eq(priceListItems.id, it.id));
@@ -426,6 +458,7 @@ export interface ItemPatch {
   marginPercent?: number | null;
   fixedPrice?: number | null;
   plusAmount?: number | null;
+  roundingMode?: RoundingMode | null;
 }
 
 /** Update one or many item overrides, recomputing each prepared price. */
@@ -439,6 +472,7 @@ export async function updatePriceListItems(listId: number, patches: ItemPatch[])
     const margin = p.marginPercent !== undefined ? p.marginPercent : num(it.marginPercent);
     const fixed = p.fixedPrice !== undefined ? p.fixedPrice : num(it.fixedPrice);
     const plus = p.plusAmount !== undefined ? p.plusAmount : num(it.plusAmount);
+    const rounding: RoundingMode = (p.roundingMode ?? (it.roundingMode as RoundingMode)) ?? "none";
     await db
       .update(priceListItems)
       .set({
@@ -446,7 +480,8 @@ export async function updatePriceListItems(listId: number, patches: ItemPatch[])
         marginPercent: toStr(margin),
         fixedPrice: toStr(fixed),
         plusAmount: toStr(plus),
-        preparedPrice: toStr(computePrepared(method, cost, margin, fixed, plus)),
+        roundingMode: rounding,
+        preparedPrice: toStr(computePrepared(method, cost, margin, fixed, plus, rounding)),
         updatedAt: new Date(),
       })
       .where(eq(priceListItems.id, p.id));
@@ -487,7 +522,7 @@ export async function refreshFromBaseCost(id: number): Promise<{ updated: number
       .set({
         costPrice: toStr(cost),
         preparedPrice: toStr(
-          computePrepared(it.method as PriceMethod, cost, num(it.marginPercent), num(it.fixedPrice), num(it.plusAmount)),
+          computePrepared(it.method as PriceMethod, cost, num(it.marginPercent), num(it.fixedPrice), num(it.plusAmount), (it.roundingMode as RoundingMode)),
         ),
         updatedAt: new Date(),
       })
@@ -665,7 +700,7 @@ export async function reconcileApply(listId: number, d: ReconcileDecisions): Pro
         costPrice: toStr(cost),
         supplierQty: baseRow.supplierQty ?? null,
         preparedPrice: toStr(
-          computePrepared(it.method as PriceMethod, cost, num(it.marginPercent), num(it.fixedPrice), num(it.plusAmount)),
+          computePrepared(it.method as PriceMethod, cost, num(it.marginPercent), num(it.fixedPrice), num(it.plusAmount), (it.roundingMode as RoundingMode)),
         ),
         updatedAt: new Date(),
       })
@@ -692,7 +727,7 @@ export async function reconcileApply(listId: number, d: ReconcileDecisions): Pro
             marginPercent: toStr(newMargin),
             fixedPrice: null,
             plusAmount: null,
-            preparedPrice: toStr(computePrepared("margin", cost, newMargin, null, null)),
+            preparedPrice: toStr(computePrepared("margin", cost, newMargin, null, null, (it.roundingMode as RoundingMode))),
             supplierQty: row.supplierQty ?? null,
             isActive: true,
           };
@@ -893,6 +928,7 @@ export async function previewCostEdits(brandId: number, edits: CostEdit[]): Prom
       const oldPrice = num(it.preparedPrice);
       const newPrice = computePrepared(
         it.method as PriceMethod, newCost, num(it.marginPercent), num(it.fixedPrice), num(it.plusAmount),
+        (it.roundingMode as RoundingMode),
       );
       const cp = pctChange(oldCost, newCost);
       if (custs === null) custs = await customerNamesForList(list.id);
@@ -1020,7 +1056,7 @@ export async function applyCostEdits(
         .set({
           costPrice: toStr(cost),
           preparedPrice: toStr(
-            computePrepared(it.method as PriceMethod, cost, num(it.marginPercent), num(it.fixedPrice), num(it.plusAmount)),
+            computePrepared(it.method as PriceMethod, cost, num(it.marginPercent), num(it.fixedPrice), num(it.plusAmount), (it.roundingMode as RoundingMode)),
           ),
           updatedAt: now,
         })

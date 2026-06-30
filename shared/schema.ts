@@ -1322,6 +1322,7 @@ export const priceLists = pgTable("price_lists", {
   endsAt: timestamp("ends_at"), // promotion live window end / auto-expire (scope='promotion')
   baseCostUploadId: integer("base_cost_upload_id"), // which base cost this list was prepared from
   defaultMarginPercent: decimal("default_margin_percent", { precision: 6, scale: 2 }), // list-wide default applied on build
+  roundingMode: varchar("rounding_mode", { length: 20 }).notNull().default("none"), // none | charm_99 | charm_49_99 (smart price endings)
   status: varchar("status", { length: 20 }).notNull().default("draft"), // draft | published | archived
   publishedAt: timestamp("published_at"), // when the list last went live (status -> published)
   archivedAt: timestamp("archived_at"), // when the list was archived (soft-delete)
@@ -1511,6 +1512,7 @@ export const priceListItems = pgTable("price_list_items", {
   fixedPrice: decimal("fixed_price", { precision: 10, scale: 2 }), // when method = fixed
   plusAmount: decimal("plus_amount", { precision: 10, scale: 2 }), // when method = cost_plus
   preparedPrice: decimal("prepared_price", { precision: 10, scale: 2 }), // the stored customer price
+  roundingMode: varchar("rounding_mode", { length: 20 }).notNull().default("none"), // snapshot of smart-pricing mode used for this line
   supplierQty: integer("supplier_qty"), // availability snapshot (null = on request)
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow().notNull(),
