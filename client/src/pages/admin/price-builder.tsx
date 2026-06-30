@@ -445,28 +445,19 @@ export default function PriceBuilderPage() {
                           <CheckCircle2 className="h-4 w-4 mr-1" /> Publish
                         </Button>
                       )}
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button size="sm" variant="outline" data-testid="button-more-actions">
-                            <MoreHorizontal className="h-4 w-4 mr-1" /> More
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-56">
-                          <DropdownMenuItem onClick={() => setReconcileOpen(true)} data-testid="menu-reconcile">
-                            <RefreshCw className="h-4 w-4 mr-2" /> Check for cost changes
-                          </DropdownMenuItem>
-                          {selected.status === "published" && (
-                            <DropdownMenuItem onClick={() => setStatus.mutate("draft")}>
-                              <Eye className="h-4 w-4 mr-2" /> Unpublish (back to draft)
-                            </DropdownMenuItem>
-                          )}
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-destructive focus:text-destructive" data-testid="menu-archive"
-                            onClick={() => { if (confirm("Archive this price list? Customers will be unassigned and it moves to Archived. You can restore it later.")) archive.mutate(selected.id); }}>
-                            <Archive className="h-4 w-4 mr-2" /> Archive
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      <Button size="sm" variant="outline" onClick={() => setReconcileOpen(true)} data-testid="button-reconcile">
+                        <RefreshCw className="h-4 w-4 mr-1" /> Check for cost changes
+                      </Button>
+                      {selected.status === "published" && (
+                        <Button size="sm" variant="outline" onClick={() => setStatus.mutate("draft")} data-testid="button-unpublish">
+                          <Eye className="h-4 w-4 mr-1" /> Unpublish
+                        </Button>
+                      )}
+                      <Button size="sm" variant="outline" data-testid="button-archive"
+                        className="text-destructive hover:text-destructive border-destructive/30 hover:bg-destructive/5"
+                        onClick={() => { if (confirm("Archive this price list? Customers will be unassigned and it moves to Archived. You can restore it later.")) archive.mutate(selected.id); }}>
+                        <Archive className="h-4 w-4 mr-1" /> Archive
+                      </Button>
                     </div>
                   </div>
                 </CardHeader>
