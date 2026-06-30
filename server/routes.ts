@@ -1640,6 +1640,19 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     }
   });
 
+  app.post("/api/admin/products/bulk-delete", requireStaffOrAdmin, async (req: any, res) => {
+    try {
+      const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(Number).filter((n: number) => Number.isFinite(n)) : [];
+      if (!ids.length) return res.status(400).json({ message: "No ids provided" });
+      let deleted = 0;
+      for (const id of ids) { try { await storage.deleteProduct(id); deleted++; } catch (e) { console.error("bulk product delete", id, e); } }
+      res.json({ deleted });
+    } catch (error) {
+      console.error("Bulk delete products error:", error);
+      res.status(500).json({ message: "Failed to delete products" });
+    }
+  });
+
   // Admin - SEO update endpoints
   app.patch("/api/admin/products/:id/seo", requireStaffOrAdmin, async (req, res) => {
     try {
@@ -1955,6 +1968,19 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
       res.json({ message: "Brand deleted" });
     } catch (error) {
       res.status(500).json({ message: "Failed to delete brand" });
+    }
+  });
+
+  app.post("/api/admin/brands/bulk-delete", requireStaffOrAdmin, async (req: any, res) => {
+    try {
+      const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(Number).filter((n: number) => Number.isFinite(n)) : [];
+      if (!ids.length) return res.status(400).json({ message: "No ids provided" });
+      let deleted = 0;
+      for (const id of ids) { try { await storage.deleteBrand(id); deleted++; } catch (e) { console.error("bulk brand delete", id, e); } }
+      res.json({ deleted });
+    } catch (error) {
+      console.error("Bulk delete brands error:", error);
+      res.status(500).json({ message: "Failed to delete brands" });
     }
   });
 

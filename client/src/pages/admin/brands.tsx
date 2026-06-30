@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -30,6 +31,7 @@ export default function AdminBrandsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingBrand, setEditingBrand] = useState<Brand | null>(null);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
   const [isGeneratingDescription, setIsGeneratingDescription] = useState(false);
   const { toast } = useToast();
 
@@ -92,6 +94,17 @@ export default function AdminBrandsPage() {
     onError: () => {
       toast({ title: "Failed to delete brand", variant: "destructive" });
     },
+  });
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (ids: number[]) => apiRequest("POST", "/api/admin/brands/bulk-delete", { ids }),
+    onSuccess: (_d, ids) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/brands"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/brands"] });
+      toast({ title: `${ids.length} brand(s) deleted` });
+      setSelected(new Set());
+    },
+    onError: () => toast({ title: "Bulk delete failed", variant: "destructive" }),
   });
 
   const filteredBrands = brands?.filter(brand =>
@@ -159,6 +172,26 @@ export default function AdminBrandsPage() {
         </div>
       </div>
 
+      {filteredBrands && filteredBrands.length > 0 && (
+        <div className="flex items-center gap-3 text-sm">
+          <Checkbox
+            checked={filteredBrands.length > 0 && filteredBrands.every((b) => selected.has(b.id))}
+            onCheckedChange={(v) => setSelected(v ? new Set(filteredBrands!.map((b) => b.id)) : new Set())}
+            aria-label="Select all brands"
+          />
+          <span className="text-muted-foreground">Select all ({filteredBrands.length})</span>
+          {selected.size > 0 && (
+            <>
+              <Button size="sm" variant="destructive" className="ml-2" disabled={bulkDeleteMutation.isPending}
+                onClick={() => { if (window.confirm(`Delete ${selected.size} selected brand(s)? This cannot be undone.`)) bulkDeleteMutation.mutate(Array.from(selected)); }}>
+                <Trash2 className="h-4 w-4 mr-1" /> Delete selected ({selected.size})
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>Clear</Button>
+            </>
+          )}
+        </div>
+      )}
+
       {isLoading ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 6 }).map((_, i) => (
@@ -175,6 +208,9 @@ export default function AdminBrandsPage() {
             <Card key={brand.id} data-testid={`card-admin-brand-${brand.id}`}>
               <CardContent className="p-4">
                 <div className="flex items-start gap-4">
+                  <Checkbox className="mt-1" checked={selected.has(brand.id)}
+                    onCheckedChange={(v) => setSelected((prev) => { const n = new Set(prev); v ? n.add(brand.id) : n.delete(brand.id); return n; })}
+                    aria-label="Select brand" />
                   <div className="h-12 w-12 flex-shrink-0 overflow-hidden rounded-lg bg-muted flex items-center justify-center">
                     {brand.logoUrl ? (
                       <img

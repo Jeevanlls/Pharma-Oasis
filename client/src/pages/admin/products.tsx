@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -34,6 +35,7 @@ export default function AdminProductsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
   const [isGeneratingDescription, setIsGeneratingDescription] = useState(false);
   const { toast } = useToast();
 
@@ -139,6 +141,16 @@ export default function AdminProductsPage() {
     onError: () => {
       toast({ title: "Failed to delete product", variant: "destructive" });
     },
+  });
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (ids: number[]) => apiRequest("POST", "/api/admin/products/bulk-delete", { ids }),
+    onSuccess: (_d, ids) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      toast({ title: `${ids.length} product(s) deleted` });
+      setSelected(new Set());
+    },
+    onError: () => toast({ title: "Bulk delete failed", variant: "destructive" }),
   });
 
   const generateDescription = async () => {
@@ -261,6 +273,26 @@ export default function AdminProductsPage() {
         </div>
       </div>
 
+      {filteredProducts && filteredProducts.length > 0 && (
+        <div className="flex items-center gap-3 text-sm">
+          <Checkbox
+            checked={filteredProducts.length > 0 && filteredProducts.every((p) => selected.has(p.id))}
+            onCheckedChange={(v) => setSelected(v ? new Set(filteredProducts!.map((p) => p.id)) : new Set())}
+            aria-label="Select all products on this page"
+          />
+          <span className="text-muted-foreground">Select all on this page ({filteredProducts.length})</span>
+          {selected.size > 0 && (
+            <>
+              <Button size="sm" variant="destructive" className="ml-2" disabled={bulkDeleteMutation.isPending}
+                onClick={() => { if (window.confirm(`Delete ${selected.size} selected product(s)? This cannot be undone.`)) bulkDeleteMutation.mutate(Array.from(selected)); }}>
+                <Trash2 className="h-4 w-4 mr-1" /> Delete selected ({selected.size})
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>Clear</Button>
+            </>
+          )}
+        </div>
+      )}
+
       {isLoading ? (
         <div className="space-y-4">
           {Array.from({ length: 5 }).map((_, i) => (
@@ -279,6 +311,9 @@ export default function AdminProductsPage() {
               <Card key={product.id} data-testid={`card-admin-product-${product.id}`}>
                 <CardContent className="p-4">
                   <div className="flex items-center gap-4">
+                    <Checkbox checked={selected.has(product.id)}
+                      onCheckedChange={(v) => setSelected((prev) => { const n = new Set(prev); v ? n.add(product.id) : n.delete(product.id); return n; })}
+                      aria-label="Select product" />
                     <div className="h-16 w-16 flex-shrink-0 overflow-hidden rounded-md bg-muted">
                       {product.imageUrl ? (
                         <img
