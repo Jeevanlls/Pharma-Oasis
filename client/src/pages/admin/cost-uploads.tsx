@@ -177,6 +177,7 @@ export default function AdminCostUploadsPage() {
       setPreview(null);
       queryClient.invalidateQueries({ queryKey: ["/api/admin/cost-uploads"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/cost-alerts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pricing-brands-cost-status"] });
     },
     onError: (e: any) => toast({ title: "Publish failed", description: e.message, variant: "destructive" }),
   });
@@ -216,6 +217,7 @@ export default function AdminCostUploadsPage() {
       if (!res.ok) throw new Error(data.message || "Reset failed");
       const cc = data.counts || {};
       queryClient.invalidateQueries({ queryKey: ["/api/admin/cost-uploads"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pricing-brands-cost-status"] });
       setPreview(null);
       toast({ title: "Pricing data cleared", description: `${cc.costUploads ?? 0} upload(s) and ${cc.priceLists ?? 0} price list(s) removed. Brands & categories kept.` });
     } catch (e: any) {
@@ -249,6 +251,7 @@ export default function AdminCostUploadsPage() {
       setPreview(null);
       queryClient.invalidateQueries({ queryKey: ["/api/admin/cost-uploads"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/cost-alerts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pricing-brands-cost-status"] });
     } catch (e: any) {
       toast({ title: "Publish failed", description: e.message, variant: "destructive" });
     }

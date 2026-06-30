@@ -30,6 +30,9 @@ export default function PricingBrandsPage() {
   const { data: brands = [], isLoading } = useQuery<PricingBrand[]>({
     queryKey: ["/api/admin/pricing-brands"],
   });
+  const { data: costStatus = {} } = useQuery<Record<string, { publishedAt: string | null; rowCount: number }>>({
+    queryKey: ["/api/admin/pricing-brands-cost-status"],
+  });
 
   const reset = () => { setEditing(null); setName(""); setSortOrder("0"); setIsActive(true); setNotes(""); };
 
@@ -108,8 +111,22 @@ export default function PricingBrandsPage() {
                           {b.isActive ? "Active" : "Inactive"}
                         </Badge>
                       </div>
-                      <div className="text-xs text-muted-foreground mt-0.5">
-                        Sort order {b.sortOrder ?? 0}{b.notes ? ` · ${b.notes}` : ""}
+                      <div className="text-xs text-muted-foreground mt-1 flex items-center gap-2 flex-wrap">
+                        <span>Sort order {b.sortOrder ?? 0}{b.notes ? ` · ${b.notes}` : ""}</span>
+                        {(() => {
+                          const cs = (costStatus as any)[b.id];
+                          if (!cs || !cs.publishedAt) {
+                            return <Badge variant="outline" className="border-amber-400 text-amber-700 dark:text-amber-300 font-normal">No costs uploaded yet</Badge>;
+                          }
+                          const d = new Date(cs.publishedAt);
+                          const days = Math.floor((Date.now() - d.getTime()) / 86400000);
+                          const stale = days > 30;
+                          return (
+                            <Badge variant="outline" className={`font-normal ${stale ? "border-amber-400 text-amber-700 dark:text-amber-300" : "border-emerald-400 text-emerald-700 dark:text-emerald-300"}`}>
+                              Costs · {d.toLocaleDateString()} · {cs.rowCount} items{stale ? ` · ${days}d old` : ""}
+                            </Badge>
+                          );
+                        })()}
                       </div>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">

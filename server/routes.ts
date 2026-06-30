@@ -4669,6 +4669,10 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
   });
 
   // ==================== PRICING v2 — STANDALONE BRANDS ====================
+  app.get("/api/admin/pricing-brands-cost-status", requireAdmin, async (_req, res) => {
+    res.json(await pricingStore.publishedCostStatusByBrand());
+  });
+
   app.get("/api/admin/pricing-brands", requireAdmin, async (req, res) => {
     res.json(await pricingV2.listPricingBrands());
   });

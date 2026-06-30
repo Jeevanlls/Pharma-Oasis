@@ -104,6 +104,24 @@ export async function createDraftUpload(input: CreateUploadInput): Promise<CostU
   return upload;
 }
 
+export async function publishedCostStatusByBrand(): Promise<Record<number, { publishedAt: string | null; rowCount: number }>> {
+  const rows = await db
+    .select({ brandId: costUploads.brandId, publishedAt: costUploads.publishedAt, rowCount: costUploads.rowCount })
+    .from(costUploads)
+    .where(eq(costUploads.status, "published"))
+    .orderBy(desc(costUploads.publishedAt));
+  const map: Record<number, { publishedAt: string | null; rowCount: number }> = {};
+  for (const r of rows) {
+    if (!(r.brandId in map)) {
+      map[r.brandId] = {
+        publishedAt: r.publishedAt ? new Date(r.publishedAt as any).toISOString() : null,
+        rowCount: r.rowCount ?? 0,
+      };
+    }
+  }
+  return map;
+}
+
 export async function listUploads(brandId?: number): Promise<(CostUpload & { brandName: string | null })[]> {
   const rows = await db
     .select({ upload: costUploads, brandName: pricingBrands.name })
