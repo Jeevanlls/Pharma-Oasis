@@ -69,7 +69,7 @@ export default function AdminCostUploadsPage() {
   const [editRows, setEditRows] = useState<PreviewRow[]>([]);
   const [editComment, setEditComment] = useState("");
   const [keepRemoved, setKeepRemoved] = useState<Record<string, boolean>>({});
-  const [statusFilter, setStatusFilter] = useState<RowStatus | "all">("all");
+  const [statusFilter, setStatusFilter] = useState<RowStatus | "all" | "zero_cost">("all");
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [dirty, setDirty] = useState(false);
   // Big cost changes the admin has explicitly ticked to confirm. Keyed by EAN+cost
@@ -416,10 +416,11 @@ export default function AdminCostUploadsPage() {
         for (const r of liveRows) counts[r.rowStatus]++;
         const total = liveRows.length;
         const liveHasDuplicates = counts.duplicate > 0;
+        const zeroCostCount = liveRows.filter((r) => !r.costPrice || r.costPrice <= 0).length;
 
         const visible = liveRows
           .map((r, i) => ({ r, i }))
-          .filter(({ r }) => statusFilter === "all" || r.rowStatus === statusFilter);
+          .filter(({ r }) => statusFilter === "zero_cost" ? (!r.costPrice || r.costPrice <= 0) : (statusFilter === "all" || r.rowStatus === statusFilter));
 
         // A "big" cost change (beyond the ± threshold) must be ticked to confirm
         // before publishing — guards against a mistyped cost going live unnoticed.
@@ -460,7 +461,7 @@ export default function AdminCostUploadsPage() {
 
             <div className="flex items-center gap-2">
               <Filter className="h-4 w-4 text-muted-foreground" />
-              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as RowStatus | "all")}>
+              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as RowStatus | "all" | "zero_cost")}>
                 <SelectTrigger className="w-56"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All rows ({total})</SelectItem>
@@ -468,6 +469,7 @@ export default function AdminCostUploadsPage() {
                   <SelectItem value="new">New ({counts.new})</SelectItem>
                   <SelectItem value="duplicate">Duplicate ({counts.duplicate})</SelectItem>
                   <SelectItem value="missing_info">Missing info ({counts.missing_info})</SelectItem>
+                  <SelectItem value="zero_cost">Zero / no cost ({zeroCostCount})</SelectItem>
                   <SelectItem value="ok">Unchanged ({counts.ok})</SelectItem>
                 </SelectContent>
               </Select>
@@ -481,7 +483,7 @@ export default function AdminCostUploadsPage() {
             </div>
 
             <div className="max-h-[460px] overflow-auto border rounded-lg">
-              <Table className="min-w-[1400px]">
+              <Table className="min-w-[1080px]">
                 <TableHeader className="sticky top-0 z-10">
                   <TableRow className="bg-muted/60 hover:bg-muted/60 border-b [&>th]:text-[11px] [&>th]:uppercase [&>th]:tracking-wider [&>th]:font-semibold [&>th]:text-muted-foreground">
                     <TableHead className="w-[44px]">
@@ -495,17 +497,17 @@ export default function AdminCostUploadsPage() {
                         aria-label="Select all shown"
                       />
                     </TableHead>
-                    <TableHead className="w-[150px]">EAN</TableHead>
-                    <TableHead className="min-w-[400px]">Description</TableHead>
-                    <TableHead className="w-[160px]">Category</TableHead>
-                    <TableHead className="w-[80px]">Case</TableHead>
-                    <TableHead className="text-right w-[70px]">Prev</TableHead>
-                    <TableHead className="text-right w-[100px]">New cost</TableHead>
-                    <TableHead className="text-right w-[70px]">Change</TableHead>
-                    <TableHead className="w-[72px]">QTY</TableHead>
-                    <TableHead className="w-[150px]">Notes</TableHead>
-                    <TableHead className="w-[110px]">Status</TableHead>
-                    <TableHead className="w-[44px]"></TableHead>
+                    <TableHead className="w-[140px]">EAN</TableHead>
+                    <TableHead className="w-[250px]">Description</TableHead>
+                    <TableHead className="w-[150px]">Category</TableHead>
+                    <TableHead className="w-[64px]">Case</TableHead>
+                    <TableHead className="text-right w-[64px]">Prev</TableHead>
+                    <TableHead className="text-right w-[96px]">New cost</TableHead>
+                    <TableHead className="text-right w-[64px]">Change</TableHead>
+                    <TableHead className="w-[64px]">QTY</TableHead>
+                    <TableHead className="w-[120px]">Notes</TableHead>
+                    <TableHead className="w-[96px]">Status</TableHead>
+                    <TableHead className="w-[40px]"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -523,9 +525,9 @@ export default function AdminCostUploadsPage() {
                         <Input value={r.ean} onChange={(e) => patchRow(i, { ean: e.target.value })}
                           className="h-8 font-mono text-[11px] px-2" placeholder="EAN" />
                       </TableCell>
-                      <TableCell>
-                        <Input value={r.description} onChange={(e) => patchRow(i, { description: e.target.value })}
-                          title={r.description} className="h-8 text-xs" placeholder="Description" />
+                      <TableCell className="align-top">
+                        <Textarea value={r.description} onChange={(e) => patchRow(i, { description: e.target.value })}
+                          rows={2} title={r.description} className="text-xs leading-snug resize-none min-h-[3rem] py-1" placeholder="Description" />
                       </TableCell>
                       <TableCell>
                         <Select value={r.categoryName || ""} onValueChange={(v) => patchRow(i, { categoryName: v })}>
@@ -545,7 +547,7 @@ export default function AdminCostUploadsPage() {
                           <span className="pointer-events-none absolute left-1.5 top-1/2 -translate-y-1/2 text-[11px] text-muted-foreground">£</span>
                           <Input type="number" step="0.01" value={r.costPrice ?? ""}
                             onChange={(e) => patchRow(i, { costPrice: e.target.value === "" ? null : Number(e.target.value) })}
-                            className="h-8 text-xs text-right tabular-nums pl-4" placeholder="0.00" />
+                            className={`h-8 text-xs text-right tabular-nums pl-4 ${(!r.costPrice || r.costPrice <= 0) ? "border-red-400 bg-red-50 dark:bg-red-950/30" : ""}`} placeholder="0.00" />
                         </div>
                       </TableCell>
                       <TableCell className={`text-right text-xs ${r.changePercent && Math.abs(r.changePercent) > s.threshold ? "text-red-600 dark:text-red-400 font-semibold" : ""}`}>
