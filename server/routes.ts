@@ -4426,6 +4426,7 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
 
       const upload = await pricingStore.createDraftUpload({
         brandId,
+        categoryId: req.body.categoryId ? Number(req.body.categoryId) : null,
         supplierName: req.body.supplierName || null,
         validFrom: parseDate(req.body.validFrom),
         validUntil: parseDate(req.body.validUntil),

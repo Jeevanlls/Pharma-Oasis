@@ -53,6 +53,7 @@ const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 export default function AdminCostUploadsPage() {
   const { toast } = useToast();
   const [brandId, setBrandId] = useState<string>("");
+  const [categoryId, setCategoryId] = useState<string>("");
   const [supplierName, setSupplierName] = useState("");
   const [validFrom, setValidFrom] = useState("");
   const [validUntil, setValidUntil] = useState("");
@@ -100,6 +101,7 @@ export default function AdminCostUploadsPage() {
   }
 
   const { data: brands = [] } = useQuery<Brand[]>({ queryKey: ["/api/admin/pricing-brands"] });
+  const { data: pricingCategories = [] } = useQuery<{ id: number; name: string }[]>({ queryKey: ["/api/admin/pricing-categories"] });
   const { data: uploads = [] } = useQuery<CostUpload[]>({ queryKey: ["/api/admin/cost-uploads"] });
   const { data: alerts = [] } = useQuery<{ brandId: number; brandName: string | null; count: number }[]>({
     queryKey: ["/api/admin/cost-alerts"],
@@ -147,6 +149,7 @@ export default function AdminCostUploadsPage() {
       const fd = new FormData();
       fd.append("file", file);
       fd.append("brandId", brandId);
+      if (categoryId) fd.append("categoryId", categoryId);
       fd.append("supplierName", supplierName);
       fd.append("validFrom", validFrom);
       fd.append("validUntil", validUntil);
@@ -306,6 +309,15 @@ export default function AdminCostUploadsPage() {
                 <SelectTrigger><SelectValue placeholder="Select brand" /></SelectTrigger>
                 <SelectContent>
                   {brands.map((b) => <SelectItem key={b.id} value={String(b.id)}>{b.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Category</Label>
+              <Select value={categoryId} onValueChange={setCategoryId}>
+                <SelectTrigger><SelectValue placeholder="Assign a category" /></SelectTrigger>
+                <SelectContent>
+                  {pricingCategories.map((c) => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>

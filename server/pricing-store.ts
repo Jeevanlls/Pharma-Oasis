@@ -11,6 +11,7 @@ import {
   products,
   brands,
   pricingBrands,
+  pricingCategories,
   users,
   orders,
   orderItems,
@@ -41,6 +42,7 @@ export interface CreateUploadInput {
   comment?: string | null;
   fileName?: string | null;
   uploadedBy?: number | null;
+  categoryId?: number | null;
   rows: PreviewRow[];
 }
 
@@ -69,14 +71,22 @@ export async function createDraftUpload(input: CreateUploadInput): Promise<CostU
     const catIdByName = new Map<string, number | null>();
     for (const name of uniqueCats) catIdByName.set(name, await ensurePricingCategory(name));
 
+    // If a category was picked in the UI, stamp every row with it (overrides the file).
+    let overrideCatId: number | null = null;
+    let overrideCatName: string | null = null;
+    if (input.categoryId) {
+      const [cat] = await db.select().from(pricingCategories).where(eq(pricingCategories.id, input.categoryId));
+      if (cat) { overrideCatId = cat.id; overrideCatName = cat.name; }
+    }
+
     await db.insert(costUploadRows).values(
       input.rows.map((r) => ({
         uploadId: upload.id,
         productId: r.productId,
         ean: r.ean || null,
         description: r.description || null,
-        categoryName: r.categoryName || null,
-        pricingCategoryId: catIdByName.get((r.categoryName || "").trim()) ?? null,
+        categoryName: overrideCatName ?? (r.categoryName || null),
+        pricingCategoryId: overrideCatId ?? (catIdByName.get((r.categoryName || "").trim()) ?? null),
         caseSize: r.caseSize || null,
         costPrice: toStr(r.costPrice),
         supplierQty: r.supplierQty,
