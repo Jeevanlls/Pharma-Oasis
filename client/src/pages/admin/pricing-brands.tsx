@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,7 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Pencil, Trash2, Building2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Building2, Coins } from "lucide-react";
 
 interface PricingBrand {
   id: number; name: string; slug: string | null; isActive: boolean | null;
@@ -20,6 +21,7 @@ interface PricingBrand {
 
 export default function PricingBrandsPage() {
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<PricingBrand | null>(null);
   const [name, setName] = useState("");
@@ -106,7 +108,11 @@ export default function PricingBrandsPage() {
                     className="flex items-center justify-between gap-3 rounded-lg border p-3.5 hover:bg-muted/40 transition-colors">
                     <div className="min-w-0">
                       <div className="font-semibold truncate flex items-center gap-2">
-                        {b.name}
+                        <button type="button" onClick={() => setLocation(`/admin/current-costs?brand=${b.id}`)}
+                          title="Open this brand's current costs"
+                          className="truncate hover:text-emerald-700 hover:underline dark:hover:text-emerald-400 text-left">
+                          {b.name}
+                        </button>
                         <Badge variant={b.isActive ? "default" : "secondary"} className={b.isActive ? "bg-emerald-600" : ""}>
                           {b.isActive ? "Active" : "Inactive"}
                         </Badge>
@@ -130,6 +136,11 @@ export default function PricingBrandsPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
+                      <Button size="sm" variant="ghost" onClick={() => setLocation(`/admin/current-costs?brand=${b.id}`)}
+                        title="Open current costs for this brand" data-testid={`button-costs-brand-${b.id}`}
+                        className="text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 dark:text-emerald-400">
+                        <Coins className="h-4 w-4 mr-1.5" /> Costs
+                      </Button>
                       <Button size="sm" variant="ghost" onClick={() => openEdit(b)} data-testid={`button-edit-brand-${b.id}`}>
                         <Pencil className="h-4 w-4" />
                       </Button>

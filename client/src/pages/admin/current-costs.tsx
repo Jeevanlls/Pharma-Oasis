@@ -48,7 +48,10 @@ function daysAgo(iso: string | null): { label: string; stale: boolean } | null {
 
 export default function AdminCurrentCostsPage() {
   const { toast } = useToast();
-  const [brandId, setBrandId] = useState<string>("");
+  const [brandId, setBrandId] = useState<string>(() => {
+    if (typeof window === "undefined") return "";
+    return new URLSearchParams(window.location.search).get("brand") || "";
+  });
   const [search, setSearch] = useState("");
   const [brandSearch, setBrandSearch] = useState(""); // presentation-only: filters the left brand rail
   // EAN -> edited cost (string while typing) and note.
