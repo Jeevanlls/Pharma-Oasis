@@ -44,6 +44,7 @@ export default function DealWorkspacePage() {
   const [expiry, setExpiry] = useState("");
   const [internalNote, setInternalNote] = useState("");
   const [leadTime, setLeadTime] = useState("");
+  const [orderMsg, setOrderMsg] = useState("");
 
   const isOrder = kind === "order";
   const root = data ? (isOrder ? data.order : data) : null;
@@ -86,6 +87,12 @@ export default function DealWorkspacePage() {
       toast({ title: body.status === "accepted" ? `Accepted — order O-${body.orderId} created` : "Quote declined" });
     },
     onError: (e: any) => toast({ title: "Action failed", description: e?.message, variant: "destructive" }),
+  });
+  const respondOrder = useMutation({
+    mutationFn: async (payload: { status?: string; adminResponse: string; sendEmail: boolean }) =>
+      apiRequest("POST", `/api/admin/orders/${id}/respond`, payload),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [qKey] }); setOrderMsg(""); toast({ title: "Customer updated" }); },
+    onError: (e: any) => toast({ title: "Couldn't update", description: e?.message, variant: "destructive" }),
   });
 
   if (isLoading) return <div className="space-y-6"><div className="h-40 animate-pulse rounded-lg bg-muted/40" /></div>;
@@ -232,6 +239,36 @@ export default function DealWorkspacePage() {
               )}
             </CardContent>
           </Card>
+
+          {/* Order response panel — confirm supply & email the customer */}
+          {isOrder && !["cancelled", "entered"].includes(status) && (
+            <Card>
+              <CardHeader><CardTitle className="text-lg">Respond to customer</CardTitle></CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">Confirm what you can supply — all or part — and email the customer. They'll see the update and your message in their portal.</p>
+                <div>
+                  <label className="text-sm font-medium">Message to customer</label>
+                  <Textarea value={orderMsg} onChange={(e) => setOrderMsg(e.target.value)}
+                    placeholder="e.g. Thanks for your order — we can supply all items, dispatch within 3 working days. (Or: we can supply 80 of 100 now; the remainder follows in ~2 weeks.)" />
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  <Button onClick={() => respondOrder.mutate({ status: "confirmed", adminResponse: orderMsg, sendEmail: true })}
+                    disabled={!orderMsg.trim() || respondOrder.isPending}>
+                    {respondOrder.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Check className="h-4 w-4 mr-2" />} Confirm &amp; email
+                  </Button>
+                  <Button variant="outline" onClick={() => respondOrder.mutate({ adminResponse: orderMsg, sendEmail: true })}
+                    disabled={!orderMsg.trim() || respondOrder.isPending}>
+                    <Send className="h-4 w-4 mr-2" /> Send message only
+                  </Button>
+                  <Button variant="outline" className="text-destructive hover:text-destructive border-destructive/30"
+                    onClick={() => { if (confirm("Cancel this order and email the customer?")) respondOrder.mutate({ status: "cancelled", adminResponse: orderMsg || "Unfortunately we're unable to fulfil this order.", sendEmail: true }); }}
+                    disabled={respondOrder.isPending}>
+                    <X className="h-4 w-4 mr-2" /> Cancel order
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* E2: send / respond panel for editable quotes */}
           {editable && (

@@ -10,10 +10,19 @@ interface OrderItem { id: number; productId: number; productName: string | null;
 
 const statusColor: Record<string, string> = {
   submitted: "bg-amber-100 text-amber-800",
+  entered: "bg-blue-100 text-blue-800",
   confirmed: "bg-green-100 text-green-800",
   processing: "bg-blue-100 text-blue-800",
   completed: "bg-green-100 text-green-800",
   cancelled: "bg-gray-100 text-gray-600",
+};
+const statusLabel: Record<string, string> = {
+  submitted: "Received — awaiting confirmation",
+  entered: "Being processed",
+  confirmed: "Confirmed",
+  processing: "Processing",
+  completed: "Completed",
+  cancelled: "Cancelled",
 };
 
 function OrderRow({ order }: { order: Order }) {
@@ -34,14 +43,14 @@ function OrderRow({ order }: { order: Order }) {
           </div>
           <div className="flex items-center gap-3">
             <span className="font-semibold">{money(order.totalAmount)}</span>
-            <Badge className={statusColor[order.status] ?? ""}>{order.status}</Badge>
+            <Badge className={statusColor[order.status] ?? ""}>{statusLabel[order.status] ?? order.status}</Badge>
             <Button variant="ghost" size="icon" onClick={() => setOpen((o) => !o)}>
               {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             </Button>
           </div>
         </div>
         {order.adminResponse && (
-          <div className="mt-3 p-3 bg-muted rounded text-sm"><span className="font-medium">Response: </span>{order.adminResponse}</div>
+          <div className="mt-3 p-3 rounded text-sm bg-emerald-50 border border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-900"><span className="font-medium text-emerald-800 dark:text-emerald-300">Our reply: </span>{order.adminResponse}</div>
         )}
         {open && data && (
           <div className="mt-3 border-t pt-3 space-y-1">
