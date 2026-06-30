@@ -104,6 +104,49 @@ export async function createDraftUpload(input: CreateUploadInput): Promise<CostU
   return upload;
 }
 
+export async function brandsByPricingCategory(): Promise<Record<number, { id: number; name: string; items: number }[]>> {
+  // For each pricing category, which brands (suppliers) have published cost rows in it,
+  // and how many. Resolves category by pricingCategoryId, falling back to categoryName.
+  const cats = await db.select({ id: pricingCategories.id, name: pricingCategories.name }).from(pricingCategories);
+  const nameToId = new Map<string, number>();
+  for (const c of cats) nameToId.set(c.name.trim().toLowerCase(), c.id);
+
+  const ups = await db
+    .select({ id: costUploads.id, brandId: costUploads.brandId })
+    .from(costUploads)
+    .where(eq(costUploads.status, "published"));
+  if (ups.length === 0) return {};
+  const upBrand = new Map<number, number>();
+  for (const u of ups) upBrand.set(u.id, u.brandId);
+
+  const brands = await db.select({ id: pricingBrands.id, name: pricingBrands.name }).from(pricingBrands);
+  const brandName = new Map<number, string>();
+  for (const b of brands) brandName.set(b.id, b.name);
+
+  const rows = await db
+    .select({ uploadId: costUploadRows.uploadId, catId: costUploadRows.pricingCategoryId, catName: costUploadRows.categoryName })
+    .from(costUploadRows)
+    .where(inArray(costUploadRows.uploadId, ups.map((u) => u.id)));
+
+  const acc: Record<number, Record<number, number>> = {};
+  for (const r of rows) {
+    const catId = r.catId ?? (r.catName ? nameToId.get(r.catName.trim().toLowerCase()) : undefined);
+    if (!catId) continue;
+    const brandId = upBrand.get(r.uploadId);
+    if (!brandId) continue;
+    (acc[catId] ??= {});
+    acc[catId][brandId] = (acc[catId][brandId] ?? 0) + 1;
+  }
+
+  const out: Record<number, { id: number; name: string; items: number }[]> = {};
+  for (const [catId, brandMap] of Object.entries(acc)) {
+    out[Number(catId)] = Object.entries(brandMap)
+      .map(([bid, items]) => ({ id: Number(bid), name: brandName.get(Number(bid)) ?? `#${bid}`, items }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+  return out;
+}
+
 export async function publishedCostStatusByBrand(): Promise<Record<number, { publishedAt: string | null; rowCount: number }>> {
   const rows = await db
     .select({ brandId: costUploads.brandId, publishedAt: costUploads.publishedAt, rowCount: costUploads.rowCount })

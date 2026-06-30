@@ -4680,6 +4680,9 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
   app.get("/api/admin/pricing-brands-cost-status", requireAdmin, async (_req, res) => {
     res.json(await pricingStore.publishedCostStatusByBrand());
   });
+  app.get("/api/admin/pricing-categories-brands", requireAdmin, async (_req, res) => {
+    res.json(await pricingStore.brandsByPricingCategory());
+  });
 
   app.get("/api/admin/pricing-brands", requireAdmin, async (req, res) => {
     res.json(await pricingV2.listPricingBrands());

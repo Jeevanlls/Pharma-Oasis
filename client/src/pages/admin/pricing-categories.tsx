@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,10 @@ interface PricingCategory {
 
 export default function PricingCategoriesPage() {
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
+  const { data: catBrands = {} } = useQuery<Record<string, { id: number; name: string; items: number }[]>>({
+    queryKey: ["/api/admin/pricing-categories-brands"],
+  });
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<PricingCategory | null>(null);
   const [name, setName] = useState("");
@@ -105,6 +110,26 @@ export default function PricingCategoriesPage() {
                         </Badge>
                       </div>
                       <div className="text-xs text-muted-foreground mt-0.5">Sort order {c.sortOrder ?? 0}</div>
+                      {(() => {
+                        const sup = (catBrands as any)[c.id] as { id: number; name: string; items: number }[] | undefined;
+                        if (!sup || sup.length === 0) {
+                          return <div className="mt-1.5 text-[11px] text-muted-foreground">No suppliers have costs in this category yet.</div>;
+                        }
+                        return (
+                          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                            <span className="text-[11px] text-muted-foreground mr-0.5">Suppliers:</span>
+                            {sup.map((b) => (
+                              <button key={b.id} type="button"
+                                onClick={() => setLocation(`/admin/current-costs?brand=${b.id}`)}
+                                title={`Open ${b.name} current costs (${b.items} item(s) in this category)`}
+                                className="inline-flex items-center gap-1 rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-800 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
+                                {b.name}
+                                <span className="text-emerald-600/80 dark:text-emerald-400/80">{b.items}</span>
+                              </button>
+                            ))}
+                          </div>
+                        );
+                      })()}
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
                       <Button size="sm" variant="ghost" onClick={() => openEdit(c)} data-testid={`button-edit-category-${c.id}`}>
