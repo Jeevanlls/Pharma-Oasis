@@ -272,7 +272,13 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
                 return res.status(500).json({ message: "Login failed" });
               }
               req.session.userId = user.id;
-              return res.json({ user: publicUser(user) });
+              return req.session.save((saveErr) => {
+                if (saveErr) {
+                  console.error("Session save error:", saveErr);
+                  return res.status(500).json({ message: "Login failed" });
+                }
+                res.json({ user: publicUser(user) });
+              });
             });
             return;
           }
@@ -283,7 +289,13 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
               return res.status(500).json({ message: "Login failed" });
             }
             req.session.pending2faUserId = user.id;
-            return res.json({ twoFactorRequired: true });
+            return req.session.save((saveErr) => {
+              if (saveErr) {
+                console.error("Session save error:", saveErr);
+                return res.status(500).json({ message: "Login failed" });
+              }
+              res.json({ twoFactorRequired: true });
+            });
           });
           return;
         }
@@ -294,7 +306,13 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
             return res.status(500).json({ message: "Login failed" });
           }
           req.session.pending2faUserId = user.id;
-          return res.json({ twoFactorSetupRequired: true });
+          return req.session.save((saveErr) => {
+            if (saveErr) {
+              console.error("Session save error:", saveErr);
+              return res.status(500).json({ message: "Login failed" });
+            }
+            res.json({ twoFactorSetupRequired: true });
+          });
         });
         return;
       }
@@ -306,7 +324,13 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
           return res.status(500).json({ message: "Login failed" });
         }
         req.session.userId = user.id;
-        res.json({ user: publicUser(user) });
+        req.session.save((saveErr) => {
+          if (saveErr) {
+            console.error("Session save error:", saveErr);
+            return res.status(500).json({ message: "Login failed" });
+          }
+          res.json({ user: publicUser(user) });
+        });
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -542,7 +566,13 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
         }
         req.session.userId = user.id;
         if (trustToken) setTrustedCookie(res, trustToken);
-        res.json({ user: publicUser(user) });
+        req.session.save((saveErr) => {
+          if (saveErr) {
+            console.error("Session save error:", saveErr);
+            return res.status(500).json({ message: "Login failed" });
+          }
+          res.json({ user: publicUser(user) });
+        });
       });
     } catch (error) {
       console.error("2FA verify error:", error);
@@ -600,7 +630,13 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
             return res.status(500).json({ message: "Login failed" });
           }
           req.session.userId = user.id;
-          res.json({ enabled: true, backupCodes: plain, user: publicUser({ ...user, twoFactorEnabled: true }) });
+          req.session.save((saveErr) => {
+            if (saveErr) {
+              console.error("Session save error:", saveErr);
+              return res.status(500).json({ message: "Login failed" });
+            }
+            res.json({ enabled: true, backupCodes: plain, user: publicUser({ ...user, twoFactorEnabled: true }) });
+          });
         });
         return;
       }
