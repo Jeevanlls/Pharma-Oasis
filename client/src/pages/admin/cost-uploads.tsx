@@ -451,6 +451,29 @@ export default function AdminCostUploadsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Always-visible action bar — sticks to the top while you scroll the review list. */}
+            <div className="sticky top-0 z-20 -mx-6 -mt-6 px-6 py-2.5 mb-1 border-b bg-background/95 backdrop-blur flex flex-wrap items-center gap-2">
+              <Button size="sm" variant="secondary" onClick={() => saveDraftMut.mutate(preview.uploadId)} disabled={busy}>
+                {busy ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Save className="h-4 w-4 mr-1.5" />}
+                Save changes
+              </Button>
+              <Button size="sm" onClick={() => handlePublish(preview.uploadId)} disabled={busy || !canPublish}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                <CheckCircle2 className="h-4 w-4 mr-1.5" /> Publish — make live
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => deleteMut.mutate(preview.uploadId)} disabled={busy}>
+                <Trash2 className="h-4 w-4 mr-1.5" /> Discard
+              </Button>
+              <span className="ml-auto text-xs">
+                {liveHasDuplicates
+                  ? <span className="text-red-600 dark:text-red-400">Resolve duplicate EANs to publish.</span>
+                  : unconfirmed > 0
+                    ? <span className="text-red-600 dark:text-red-400">{unconfirmed} big change(s) need confirming.</span>
+                    : counts.missing_info > 0
+                      ? <span className="text-amber-700 dark:text-amber-400">{counts.missing_info} incomplete line(s) will be skipped.</span>
+                      : <span className="text-muted-foreground">{total} rows · {dirty ? "unsaved edits" : "saved"}</span>}
+              </span>
+            </div>
             {liveHasDuplicates && (
               <Alert variant="destructive">
                 <AlertTriangle className="h-4 w-4" />

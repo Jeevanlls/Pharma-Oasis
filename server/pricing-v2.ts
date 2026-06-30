@@ -39,7 +39,7 @@ const slugify = (s: string): string =>
   s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 
 export type PriceMethod = "margin" | "fixed" | "cost_plus";
-export type RoundingMode = "none" | "charm_99" | "charm_49_99";
+export type RoundingMode = "none" | "charm_99" | "charm_49_99" | "charm_x9";
 
 /** Apply a "smart price" ending to a 2dp price. charm_99 -> nearest x.99;
  *  charm_49_99 -> nearest x.49 or x.99. Never returns <= 0 (falls back to plain 2dp). */
@@ -54,6 +54,9 @@ export function applyCharm(price: number | null, mode: RoundingMode | null | und
   } else if (m === "charm_49_99") {
     // nearest half-pound point that ends .49 or .99: round to nearest 0.50 grid offset by 0.49
     out = Math.round((price - 0.49) / 0.5) * 0.5 + 0.49;
+  } else if (m === "charm_x9") {
+    // nearest price ending in 9 pence on a 10p grid (…x.29, x.39, x.49…)
+    out = Math.round((price + 0.01) / 0.1) * 0.1 - 0.01;
   } else {
     return round2(price);
   }

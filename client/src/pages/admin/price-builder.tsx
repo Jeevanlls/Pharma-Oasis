@@ -80,7 +80,7 @@ export default function PriceBuilderPage() {
   const [newCategoryId, setNewCategoryId] = useState("");
   const [newName, setNewName] = useState("");
   const [newMargin, setNewMargin] = useState("20");
-  const [newRounding, setNewRounding] = useState<"none" | "charm_99" | "charm_49_99">("none");
+  const [newRounding, setNewRounding] = useState<"none" | "charm_49_99" | "charm_x9">("none");
 
   // local unsaved edits keyed by itemId
   const [edits, setEdits] = useState<Record<number, Partial<PriceListItem>>>({});
@@ -667,13 +667,18 @@ export default function PriceBuilderPage() {
               <Select value={newRounding} onValueChange={(v) => setNewRounding(v as any)}>
                 <SelectTrigger data-testid="select-new-rounding"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">Exact (2 decimals)</SelectItem>
-                  <SelectItem value="charm_99">Round to .99</SelectItem>
-                  <SelectItem value="charm_49_99">Round to .49 or .99</SelectItem>
+                  <SelectItem value="none">Exact — keep 2 decimals (£5.74 → £5.74)</SelectItem>
+                  <SelectItem value="charm_49_99">Round to .49 / .99 (£5.74 → £5.99, £5.30 → £5.49)</SelectItem>
+                  <SelectItem value="charm_x9">Round to nearest .x9 (£5.74 → £5.79, £5.30 → £5.29)</SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-[11px] text-muted-foreground mt-1">
-                Applies a tidy ending to every margin/cost-plus price (e.g. £5.74 → {newRounding === "charm_49_99" ? "£5.99 / £5.49" : newRounding === "charm_99" ? "£5.99" : "£5.74"}). Fixed prices are left exactly as typed.
+                {newRounding === "charm_49_99"
+                  ? "Each margin/cost-plus price rounds to the nearest .49 or .99 (e.g. £5.74 → £5.99, £5.30 → £5.49)."
+                  : newRounding === "charm_x9"
+                    ? "Each margin/cost-plus price rounds to the nearest ending in 9 pence (e.g. £5.74 → £5.79, £5.30 → £5.29)."
+                    : "Prices keep their exact 2-decimal value (e.g. £5.74 stays £5.74)."}
+                {" "}Fixed prices are always left exactly as typed.
               </p>
             </div>
           </div>

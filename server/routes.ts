@@ -4733,8 +4733,8 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
   });
 
   // Create a CATEGORY-scoped list, auto-filled from cross-brand costs in the category.
-  const ROUNDING_MODES = new Set(["none", "charm_99", "charm_49_99"]);
-  const parseRounding = (v: any): "none" | "charm_99" | "charm_49_99" =>
+  const ROUNDING_MODES = new Set(["none", "charm_99", "charm_49_99", "charm_x9"]);
+  const parseRounding = (v: any): "none" | "charm_99" | "charm_49_99" | "charm_x9" =>
     ROUNDING_MODES.has(v) ? v : "none";
   app.post("/api/admin/v2/category-price-lists", requireAdmin, async (req, res) => {
     try {
