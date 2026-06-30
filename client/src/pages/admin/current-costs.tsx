@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -15,7 +16,7 @@ import {
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { AlertTriangle, Loader2, Search, Save, CheckCircle2, RotateCcw, Clock, Coins } from "lucide-react";
+import { AlertTriangle, Loader2, Search, Save, CheckCircle2, RotateCcw, Clock, Coins, Plus } from "lucide-react";
 
 interface Brand { id: number; name: string; }
 interface CurrentCostRow {
@@ -79,6 +80,66 @@ export default function AdminCurrentCostsPage() {
     enabled: !!brandId,
   });
   const depKey = (ean: string | null) => (ean ?? "").replace(/[^0-9]/g, "");
+
+  // --- Manual "Add product" ---
+  const { data: categories = [] } = useQuery<{ id: number; name: string }[]>({ queryKey: ["/api/admin/pricing-categories"] });
+  const [addOpen, setAddOpen] = useState(false);
+  const [addEan, setAddEan] = useState("");
+  const [addDesc, setAddDesc] = useState("");
+  const [addCost, setAddCost] = useState("");
+  const [addCat, setAddCat] = useState("");
+  const [addCase, setAddCase] = useState("");
+  const [addQty, setAddQty] = useState("");
+  const [addNote, setAddNote] = useState("");
+  const [addBusy, setAddBusy] = useState(false);
+  const [eanHits, setEanHits] = useState<{ id: number; name: string }[]>([]);
+  const [eanChecking, setEanChecking] = useState(false);
+
+  // Debounced duplicate-EAN check while typing.
+  useEffect(() => {
+    const digits = addEan.replace(/[^0-9]/g, "");
+    if (!addOpen || digits.length < 6) { setEanHits([]); setEanChecking(false); return; }
+    setEanChecking(true);
+    const t = setTimeout(async () => {
+      try {
+        const res = await apiRequest("GET", `/api/admin/cost-ean-check?ean=${encodeURIComponent(addEan.trim())}`);
+        setEanHits(await res.json());
+      } catch { setEanHits([]); }
+      finally { setEanChecking(false); }
+    }, 400);
+    return () => clearTimeout(t);
+  }, [addEan, addOpen]);
+
+  const dupInThisBrand = eanHits.some((b) => String(b.id) === brandId);
+  const dupOtherBrands = eanHits.filter((b) => String(b.id) !== brandId);
+  const eanDigits = addEan.replace(/[^0-9]/g, "");
+
+  function openAdd() {
+    setAddEan(""); setAddDesc(""); setAddCost(""); setAddCat(""); setAddCase(""); setAddQty(""); setAddNote("");
+    setEanHits([]); setAddOpen(true);
+  }
+  async function addProduct() {
+    if (!brandId) return;
+    setAddBusy(true);
+    try {
+      const res = await apiRequest("POST", `/api/admin/current-costs/${brandId}/add-product`, {
+        ean: addEan.trim(), description: addDesc.trim(),
+        costPrice: addCost.trim() === "" ? null : Number(addCost),
+        categoryId: addCat ? Number(addCat) : null,
+        caseSize: addCase.trim() || null,
+        supplierQty: addQty.trim() === "" ? null : Number(addQty),
+        comment: addNote.trim() || null,
+      });
+      const data = await res.json();
+      toast({ title: "Product added", description: `${addDesc.trim() || addEan} added to this brand's costs${data.matched ? " (image borrowed from catalogue)" : ""}.` });
+      setAddOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/current-costs", brandId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/current-costs", brandId, "dependencies"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pricing-brands-cost-status"] });
+    } catch (e: any) {
+      toast({ title: "Couldn't add product", description: e.message, variant: "destructive" });
+    } finally { setAddBusy(false); }
+  }
 
   // Reset edits when switching brands.
   // Keep the URL-provided category filter on first load; clear it once the user
@@ -258,7 +319,10 @@ export default function AdminCurrentCostsPage() {
             <Alert>
               <AlertTriangle className="h-4 w-4" />
               <AlertTitle>No live costs for this brand yet</AlertTitle>
-              <AlertDescription>Upload and publish a cost file in <strong>Cost Uploads</strong> first.</AlertDescription>
+              <AlertDescription>
+                Upload and publish a cost file in <strong>Cost Uploads</strong> — or add a single product manually.
+                <div className="mt-2"><Button size="sm" variant="outline" onClick={openAdd}><Plus className="h-4 w-4 mr-1.5" /> Add product</Button></div>
+              </AlertDescription>
             </Alert>
           )}
 
@@ -271,11 +335,14 @@ export default function AdminCurrentCostsPage() {
                 <Badge variant="outline">{rows.length} products</Badge>
                 {changedCount > 0 && <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">{changedCount} edited</Badge>}
               </CardTitle>
-              {published && (
-                <Badge className={published.stale ? "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300" : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"}>
-                  <Clock className="h-3 w-3 mr-1" /> {published.label}
-                </Badge>
-              )}
+              <div className="flex items-center gap-2">
+                {published && (
+                  <Badge className={published.stale ? "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300" : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"}>
+                    <Clock className="h-3 w-3 mr-1" /> {published.label}
+                  </Badge>
+                )}
+                <Button size="sm" variant="outline" onClick={openAdd}><Plus className="h-4 w-4 mr-1.5" /> Add product</Button>
+              </div>
             </div>
             <CardDescription>Search, then edit the cost or note on just the lines you need.</CardDescription>
           </CardHeader>
@@ -392,6 +459,66 @@ export default function AdminCurrentCostsPage() {
       )}
         </div>
       </div>
+
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Add a product to this brand</DialogTitle>
+            <DialogDescription>Adds one line to this brand's live costs. The EAN is checked for duplicates as you type.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label>EAN *</Label>
+              <div className="relative">
+                <Input value={addEan} onChange={(e) => setAddEan(e.target.value)} placeholder="e.g. 5012345678900" inputMode="numeric"
+                  className={dupInThisBrand ? "border-red-400 focus-visible:ring-red-400" : ""} />
+                {eanChecking && <Loader2 className="h-4 w-4 animate-spin absolute right-2 top-2.5 text-muted-foreground" />}
+              </div>
+              {dupInThisBrand && <p className="text-xs text-red-600 dark:text-red-400 mt-1">This EAN is already in this brand's costs — edit that line instead of adding a duplicate.</p>}
+              {!dupInThisBrand && dupOtherBrands.length > 0 && <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">Heads up: this EAN already exists under <strong>{dupOtherBrands.map((b) => b.name).join(", ")}</strong>. You can still add it here if that's intended.</p>}
+              {!eanChecking && eanDigits.length >= 6 && eanHits.length === 0 && <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">No duplicate found — good to add.</p>}
+            </div>
+            <div>
+              <Label>Description *</Label>
+              <Input value={addDesc} onChange={(e) => setAddDesc(e.target.value)} placeholder="Product name" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Cost (£)</Label>
+                <Input type="text" inputMode="decimal" value={addCost} onChange={(e) => setAddCost(e.target.value)} placeholder="0.00" />
+                <p className="text-[11px] text-muted-foreground mt-0.5">Blank = "Price on request".</p>
+              </div>
+              <div>
+                <Label>Category</Label>
+                <Select value={addCat} onValueChange={setAddCat}>
+                  <SelectTrigger><SelectValue placeholder="Optional" /></SelectTrigger>
+                  <SelectContent>{categories.map((c) => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Case size</Label>
+                <Input value={addCase} onChange={(e) => setAddCase(e.target.value)} placeholder="e.g. 6" />
+              </div>
+              <div>
+                <Label>Supplier QTY</Label>
+                <Input type="number" value={addQty} onChange={(e) => setAddQty(e.target.value)} placeholder="Optional" />
+              </div>
+            </div>
+            <div>
+              <Label>Note (internal)</Label>
+              <Textarea value={addNote} onChange={(e) => setAddNote(e.target.value)} placeholder="Optional" rows={2} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
+            <Button onClick={addProduct} disabled={addBusy || dupInThisBrand || eanDigits.length < 6 || !addDesc.trim()}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white">
+              {addBusy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
+              Add product
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!preview} onOpenChange={(o) => { if (!o) setPreview(null); }}>
         <DialogContent className="max-w-3xl">

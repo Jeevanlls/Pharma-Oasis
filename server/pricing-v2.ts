@@ -975,6 +975,123 @@ export interface CostEditResult {
  *  "published on" date is always truthful), then reprice every affected customer
  *  price-list line. Auto-applies — the route calls previewCostEdits first so the
  *  admin has already confirmed the customer-price impact. */
+export async function costEanLookup(ean: string): Promise<{ id: number; name: string }[]> {
+  // Which brands already have this EAN in their latest PUBLISHED costs?
+  const key = normEan(ean);
+  if (!key) return [];
+  const ups = await db
+    .select({ id: costUploads.id, brandId: costUploads.brandId, publishedAt: costUploads.publishedAt })
+    .from(costUploads)
+    .where(eq(costUploads.status, "published"))
+    .orderBy(desc(costUploads.publishedAt));
+  const latestByBrand = new Map<number, number>();
+  const brandOfUpload = new Map<number, number>();
+  for (const u of ups) {
+    if (u.brandId != null && !latestByBrand.has(u.brandId)) {
+      latestByBrand.set(u.brandId, u.id);
+      brandOfUpload.set(u.id, u.brandId);
+    }
+  }
+  const uploadIds = Array.from(latestByBrand.values());
+  if (!uploadIds.length) return [];
+  const rows = await db
+    .select({ uploadId: costUploadRows.uploadId, ean: costUploadRows.ean })
+    .from(costUploadRows)
+    .where(inArray(costUploadRows.uploadId, uploadIds));
+  const hitBrandIds = new Set<number>();
+  for (const r of rows) if (normEan(r.ean) === key) { const b = brandOfUpload.get(r.uploadId); if (b != null) hitBrandIds.add(b); }
+  if (!hitBrandIds.size) return [];
+  return db
+    .select({ id: pricingBrands.id, name: pricingBrands.name })
+    .from(pricingBrands)
+    .where(inArray(pricingBrands.id, Array.from(hitBrandIds)));
+}
+
+export async function addProductToBrandCosts(
+  brandId: number,
+  input: {
+    ean: string; description: string; costPrice: number | null;
+    categoryId?: number | null; caseSize?: string | null; supplierQty?: number | null; comment?: string | null;
+  },
+  meta: { uploadedBy?: number | null } = {},
+): Promise<{ uploadId: number; ean: string; matched: boolean }> {
+  const ean = (input.ean || "").trim();
+  if (!normEan(ean)) throw new Error("A valid EAN is required.");
+  if (!input.description || !input.description.trim()) throw new Error("A product description is required.");
+
+  const [prior] = await db
+    .select()
+    .from(costUploads)
+    .where(and(eq(costUploads.brandId, brandId), eq(costUploads.status, "published")))
+    .orderBy(desc(costUploads.publishedAt))
+    .limit(1);
+  const priorRows = prior ? await db.select().from(costUploadRows).where(eq(costUploadRows.uploadId, prior.id)) : [];
+
+  // Hard duplicate guard within this brand.
+  if (priorRows.some((r) => normEan(r.ean) === normEan(ean)))
+    throw new Error(`EAN ${ean} is already in this brand's costs — edit that line instead of adding a duplicate.`);
+
+  let categoryName: string | null = null;
+  if (input.categoryId) {
+    const [c] = await db.select().from(pricingCategories).where(eq(pricingCategories.id, input.categoryId));
+    categoryName = c?.name ?? null;
+  }
+  const [prod] = await db.select({ id: products.id }).from(products).where(eq(products.ean, ean)).limit(1);
+  const productId = prod?.id ?? null;
+  const cost = input.costPrice === null || input.costPrice === undefined || !Number.isFinite(Number(input.costPrice))
+    ? null : Number(input.costPrice);
+  const now = new Date();
+
+  const [newUpload] = await db
+    .insert(costUploads)
+    .values({
+      brandId,
+      supplierName: prior?.supplierName ?? null,
+      validFrom: prior?.validFrom ?? null,
+      validUntil: prior?.validUntil ?? null,
+      comment: `Added product ${ean}`,
+      fileName: null,
+      uploadedBy: meta.uploadedBy ?? null,
+      status: "published",
+      publishedAt: now,
+      rowCount: priorRows.length + 1,
+      matchedCount: priorRows.length + 1,
+      unmatchedCount: 0,
+    })
+    .returning();
+
+  if (priorRows.length) {
+    await db.insert(costUploadRows).values(priorRows.map((r) => ({
+      uploadId: newUpload.id, productId: r.productId, ean: r.ean, description: r.description,
+      categoryName: r.categoryName, pricingCategoryId: r.pricingCategoryId, caseSize: r.caseSize,
+      costPrice: r.costPrice, supplierQty: r.supplierQty, supplierName: null, validUntil: null,
+      comment: r.comment, matchStatus: "matched" as const, previousCost: r.previousCost,
+      changePercent: null, flagged: false, flagReason: null,
+    })));
+  }
+
+  await db.insert(costUploadRows).values({
+    uploadId: newUpload.id, productId, ean, description: input.description.trim(),
+    categoryName, pricingCategoryId: input.categoryId ?? null, caseSize: input.caseSize ?? null,
+    costPrice: toStr(cost), supplierQty: input.supplierQty ?? null, supplierName: null, validUntil: null,
+    comment: input.comment ?? null, matchStatus: productId ? "matched" : "new",
+    previousCost: null, changePercent: null, flagged: false, flagReason: null,
+  });
+
+  await db
+    .update(costUploads)
+    .set({ status: "superseded", updatedAt: now })
+    .where(and(eq(costUploads.brandId, brandId), eq(costUploads.status, "published"), ne(costUploads.id, newUpload.id)));
+
+  if (productId && cost && cost > 0) {
+    await db.update(products)
+      .set({ activeCostPrice: toStr(cost), activeCostUploadId: newUpload.id, costEffectiveDate: now, costStatus: "active", updatedAt: now })
+      .where(eq(products.id, productId));
+  }
+
+  return { uploadId: newUpload.id, ean, matched: !!productId };
+}
+
 export async function applyCostEdits(
   brandId: number,
   edits: CostEdit[],

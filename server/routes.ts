@@ -4646,6 +4646,32 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
       res.status(500).json({ message: e.message || "Failed to load current costs" });
     }
   });
+  // Check whether an EAN already exists in any brand's latest published costs (duplicate guard).
+  app.get("/api/admin/cost-ean-check", requireAdmin, async (req, res) => {
+    try {
+      const ean = String(req.query.ean || "");
+      res.json(await pricingV2.costEanLookup(ean));
+    } catch (e: any) {
+      res.status(500).json({ message: e.message || "EAN check failed" });
+    }
+  });
+  // Manually add a single product line to a brand's current costs.
+  app.post("/api/admin/current-costs/:brandId/add-product", requireAdmin, async (req: any, res) => {
+    try {
+      const brandId = parseInt(req.params.brandId, 10);
+      const result = await pricingV2.addProductToBrandCosts(brandId, {
+        ean: req.body?.ean, description: req.body?.description,
+        costPrice: req.body?.costPrice === "" || req.body?.costPrice == null ? null : Number(req.body.costPrice),
+        categoryId: req.body?.categoryId ? Number(req.body.categoryId) : null,
+        caseSize: req.body?.caseSize || null,
+        supplierQty: req.body?.supplierQty === "" || req.body?.supplierQty == null ? null : Number(req.body.supplierQty),
+        comment: req.body?.comment || null,
+      }, { uploadedBy: req.session?.userId ?? null });
+      res.json({ success: true, ...result });
+    } catch (e: any) {
+      res.status(400).json({ message: e.message || "Failed to add product" });
+    }
+  });
   // Per-EAN dependency counts (how many price-list lines / customers rely on each cost).
   app.get("/api/admin/current-costs/:brandId/dependencies", requireAdmin, async (req, res) => {
     try {
