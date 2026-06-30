@@ -4600,6 +4600,17 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
     }
   });
 
+  // One-time cleanup: remove all test cost uploads + price lists (keep brands & categories).
+  app.post("/api/admin/pricing/reset-test-data", requireAdmin, async (_req, res) => {
+    try {
+      const counts = await pricingV2.resetTestPricingData();
+      res.json({ ok: true, counts });
+    } catch (error: any) {
+      console.error("Reset test pricing error:", error);
+      res.status(500).json({ message: error.message || "Failed to reset pricing data" });
+    }
+  });
+
   app.post("/api/admin/cost-uploads/:id/publish", requireAdmin, async (req, res) => {
     try {
       const result = await pricingStore.publishUpload(parseInt(req.params.id, 10));

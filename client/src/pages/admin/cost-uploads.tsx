@@ -203,6 +203,22 @@ export default function AdminCostUploadsPage() {
     onError: (e: any) => toast({ title: "Save failed", description: e.message, variant: "destructive" }),
   });
 
+  async function handleResetTest() {
+    const c = window.prompt("This permanently deletes ALL cost uploads, price lists, items and customer assignments. Your brands & categories are KEPT. Type DELETE to confirm:");
+    if (c !== "DELETE") return;
+    try {
+      const res = await fetch("/api/admin/pricing/reset-test-data", { method: "POST", credentials: "include" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Reset failed");
+      const cc = data.counts || {};
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/cost-uploads"] });
+      setPreview(null);
+      toast({ title: "Pricing data cleared", description: `${cc.costUploads ?? 0} upload(s) and ${cc.priceLists ?? 0} price list(s) removed. Brands & categories kept.` });
+    } catch (e: any) {
+      toast({ title: "Reset failed", description: e.message, variant: "destructive" });
+    }
+  }
+
   async function openDraft(uploadId: number) {
     try {
       const res = await fetch(`/api/admin/cost-uploads/${uploadId}/review`, { credentials: "include" });
@@ -661,6 +677,18 @@ export default function AdminCostUploadsPage() {
             </TableBody>
           </Table>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-red-300 dark:border-red-900/50">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-red-700 dark:text-red-400"><AlertTriangle className="h-5 w-5" /> Danger zone</CardTitle>
+          <CardDescription>Clear all test pricing data — deletes every cost upload, price list and customer assignment. Your <b>brands and categories are kept</b>. Use this once before uploading real costs.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button variant="destructive" onClick={handleResetTest}>
+            <Trash2 className="h-4 w-4 mr-2" /> Clear all test pricing data
+          </Button>
         </CardContent>
       </Card>
     </div>

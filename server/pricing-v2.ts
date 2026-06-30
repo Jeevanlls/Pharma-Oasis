@@ -15,10 +15,11 @@ import {
   customerPriceLists,
   costUploads,
   costUploadRows,
+  priceListRules,
   users,
   products,
 } from "@shared/schema";
-import { eq, and, desc, asc, ne, inArray, sql, or, isNull, lte, gte, ilike } from "drizzle-orm";
+import { eq, and, desc, asc, ne, inArray, sql, or, isNull, isNotNull, lte, gte, ilike } from "drizzle-orm";
 import type {
   PricingBrand,
   InsertPricingBrand,
@@ -1194,6 +1195,26 @@ export interface PortalFilter {
 
 /** Resolve the full priced catalogue a customer can see (only their nominated
  *  lists; one brand → one list, so no duplicates). Cost/margin NEVER included. */
+/** One-time cleanup: wipe all cost uploads, price lists, items, rules and customer
+ *  assignments, and reset the cached cost on catalogue products. KEEPS pricing
+ *  brands and categories. Use to clear test data before real cost uploads. */
+export async function resetTestPricingData(): Promise<Record<string, number>> {
+  const counts: Record<string, number> = {};
+  counts.assignments = (await db.delete(customerPriceLists).returning({ id: customerPriceLists.id })).length;
+  counts.priceListItems = (await db.delete(priceListItems).returning({ id: priceListItems.id })).length;
+  counts.priceListRules = (await db.delete(priceListRules).returning({ id: priceListRules.id })).length;
+  counts.priceLists = (await db.delete(priceLists).returning({ id: priceLists.id })).length;
+  counts.costUploadRows = (await db.delete(costUploadRows).returning({ id: costUploadRows.id })).length;
+  counts.costUploads = (await db.delete(costUploads).returning({ id: costUploads.id })).length;
+  const reset = await db
+    .update(products)
+    .set({ activeCostPrice: null, activeCostUploadId: null, costEffectiveDate: null, costExpiryDate: null, costStatus: "none", updatedAt: new Date() })
+    .where(or(isNotNull(products.activeCostUploadId), ne(products.costStatus, "none")))
+    .returning({ id: products.id });
+  counts.productsCostReset = reset.length;
+  return counts;
+}
+
 /** Borrow product images from the public catalogue (products table) by EAN so the
  *  customer portal can show a picture for priced items. null when no image exists. */
 async function attachImagesByEan(items: PortalItem[]): Promise<void> {
