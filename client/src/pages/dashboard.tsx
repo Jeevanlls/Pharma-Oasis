@@ -13,7 +13,7 @@ import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Quote, User } from "@shared/schema";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import { 
   User as UserIcon, 
   FileText, 
@@ -261,20 +261,29 @@ export default function DashboardPage() {
                             const status = statusConfig[quote.status] || statusConfig.pending;
                             const StatusIcon = status.icon;
                             return (
-                              <div key={quote.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                                <div className="flex items-center gap-3">
-                                  <FileText className="h-5 w-5 text-muted-foreground" />
-                                  <div>
+                              <div key={quote.id} className="flex items-center justify-between gap-2 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
+                                <Link href={`/my-quotes/${quote.id}`} className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer">
+                                  <FileText className="h-5 w-5 text-muted-foreground shrink-0" />
+                                  <div className="min-w-0">
                                     <p className="font-medium">Quote #{quote.id}</p>
                                     <p className="text-sm text-muted-foreground">
                                       {format(new Date(quote.createdAt), "MMM d, yyyy")}
+                                      {quote.status === "pending" && <> · waiting {formatDistanceToNow(new Date(quote.createdAt))}</>}
                                     </p>
                                   </div>
+                                </Link>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <Badge variant={status.variant} className="gap-1">
+                                    <StatusIcon className="h-3 w-3" />
+                                    {status.label}
+                                  </Badge>
+                                  {quote.status === "pending" && (
+                                    <a href={`mailto:sales@pharmaoasis.co.uk?subject=${encodeURIComponent(`Chasing Quote #${quote.id}`)}&body=${encodeURIComponent(`Hi,\n\nPlease could you update me on Quote #${quote.id}?\n\nThanks.`)}`}
+                                      onClick={(e) => e.stopPropagation()}>
+                                      <Button variant="outline" size="sm" className="h-7 text-xs">Chase</Button>
+                                    </a>
+                                  )}
                                 </div>
-                                <Badge variant={status.variant} className="gap-1">
-                                  <StatusIcon className="h-3 w-3" />
-                                  {status.label}
-                                </Badge>
                               </div>
                             );
                           })}

@@ -65,7 +65,10 @@ export default function PortalOrdersPage() {
 
   return (
     <div className="space-y-4 max-w-3xl">
-      <h1 className="text-2xl font-bold">My Orders</h1>
+      <div>
+        <h1 className="text-2xl font-bold">My Orders</h1>
+        <p className="text-xs text-muted-foreground mt-1">Totals are per unit and exclude VAT, duty, customs and delivery (ex-works). We confirm stock and final pricing before dispatch.</p>
+      </div>
       {isLoading ? (
         <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
       ) : orders.length === 0 ? (
