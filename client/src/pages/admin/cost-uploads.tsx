@@ -15,7 +15,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
-  Upload, Download, AlertTriangle, CheckCircle2, Trash2, Loader2, FileUp, Clock, Save, Filter, ClipboardCheck,
+  Upload, Download, AlertTriangle, CheckCircle2, Trash2, Loader2, FileUp, Clock, Save, Filter, ClipboardCheck, ChevronDown, ChevronRight,
 } from "lucide-react";
 
 interface Brand { id: number; name: string; }
@@ -101,6 +101,8 @@ export default function AdminCostUploadsPage() {
   const [bulkFiles, setBulkFiles] = useState<FileList | null>(null);
   const [bulkUploading, setBulkUploading] = useState(false);
   const [bulkResult, setBulkResult] = useState<any | null>(null);
+  const [uploadMode, setUploadMode] = useState<"single" | "bulk">("single");
+  const [showMore, setShowMore] = useState(false);
   const [preview, setPreview] = useState<{ uploadId: number; summary: PreviewSummary } | null>(null);
   const [uploading, setUploading] = useState(false);
 
@@ -326,95 +328,96 @@ export default function AdminCostUploadsPage() {
       )}
 
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><FileUp className="h-5 w-5" /> New cost upload</CardTitle>
-          <CardDescription>One brand per file, in the template format. Brand &amp; categories are read from the file; matching is by EAN.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-wrap items-end gap-3">
-            <Button variant="outline" asChild>
-              <a href="/api/admin/cost-template"><Download className="h-4 w-4 mr-2" /> Download template</a>
-            </Button>
-            <div className="flex items-end gap-2 ml-auto">
-              <div>
-                <Label className="text-xs">Cost-change alert threshold (±%)</Label>
-                <Input type="number" className="w-28" value={effectiveThreshold}
-                  onChange={(e) => setThreshold(e.target.value)} />
+        <CardHeader className="pb-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <CardTitle className="flex items-center gap-2"><FileUp className="h-5 w-5" /> Upload costs</CardTitle>
+              <CardDescription>Template format, matched by EAN. Brand &amp; categories are read from the file.</CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" asChild>
+                <a href="/api/admin/cost-template"><Download className="h-4 w-4 mr-1.5" /> Template</a>
+              </Button>
+              <div className="inline-flex rounded-lg border p-0.5">
+                <Button type="button" size="sm" variant={uploadMode === "single" ? "default" : "ghost"} className="h-7" onClick={() => setUploadMode("single")}>Single file</Button>
+                <Button type="button" size="sm" variant={uploadMode === "bulk" ? "default" : "ghost"} className="h-7" onClick={() => setUploadMode("bulk")}>Multiple files</Button>
               </div>
-              <Button variant="secondary" onClick={() => saveThreshold.mutate(effectiveThreshold)}>Save</Button>
             </div>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label>Brand *</Label>
-              <Select value={brandId} onValueChange={setBrandId}>
-                <SelectTrigger><SelectValue placeholder="Select brand" /></SelectTrigger>
-                <SelectContent>
-                  {brands.map((b) => <SelectItem key={b.id} value={String(b.id)}>{b.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Category *</Label>
-              <Select value={categoryId} onValueChange={setCategoryId}>
-                <SelectTrigger><SelectValue placeholder="Assign a category" /></SelectTrigger>
-                <SelectContent>
-                  {pricingCategories.map((c) => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Supplier name</Label>
-              <Input value={supplierName} onChange={(e) => setSupplierName(e.target.value)} placeholder="e.g. Acme Pharma Ltd" />
-            </div>
-            <div>
-              <Label>Valid from</Label>
-              <Input type="date" value={validFrom} onChange={(e) => setValidFrom(e.target.value)} />
-            </div>
-            <div>
-              <Label>Valid until</Label>
-              <Input type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} />
-            </div>
-          </div>
-          <div>
-            <Label>Comment (internal)</Label>
-            <Textarea value={comment} onChange={(e) => setComment(e.target.value)} placeholder="e.g. Promo batch, min order 5 cases" />
-          </div>
-          <div className="flex items-center gap-3">
-            <Input type="file" accept=".xlsx,.xls,.csv" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-            <Button onClick={handleUpload} disabled={uploading} className="bg-emerald-600 hover:bg-emerald-700 text-white">
-              {uploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
-              Upload &amp; preview
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><FileUp className="h-5 w-5" /> Bulk upload (many brands at once)</CardTitle>
-          <CardDescription>Select multiple brand files — one draft is created per brand, matched (or created) by the brand name in each file. Review &amp; publish each in the history below.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="flex flex-wrap items-center gap-3">
-            <Input type="file" accept=".xlsx,.xls,.csv" multiple onChange={(e) => setBulkFiles(e.target.files)} className="max-w-md" />
-            <Button onClick={handleBulkUpload} disabled={bulkUploading} variant="outline">
-              {bulkUploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
-              Upload {bulkFiles?.length ? `${bulkFiles.length} file(s)` : "selected"}
-            </Button>
-          </div>
-          {bulkResult && (
-            <div className="rounded-md border divide-y text-sm max-h-72 overflow-auto">
-              <div className="p-2 bg-muted/50 font-medium sticky top-0">Created {bulkResult.created} of {bulkResult.total} draft(s) — review &amp; publish each below.</div>
-              {bulkResult.results.map((r: any, i: number) => (
-                <div key={i} className="flex items-center gap-2 p-2">
-                  {r.ok
-                    ? <span className="truncate"><CheckCircle2 className="h-4 w-4 text-emerald-600 inline mr-1" /><b>{r.brand}</b> — {r.rows} rows{r.brandCreated ? " (new brand)" : ""}</span>
-                    : <span className="truncate"><AlertTriangle className="h-4 w-4 text-red-600 inline mr-1" />{r.file} — {r.error}</span>}
+          {uploadMode === "single" ? (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <Label>Brand *</Label>
+                  <Select value={brandId} onValueChange={setBrandId}>
+                    <SelectTrigger><SelectValue placeholder="Select brand" /></SelectTrigger>
+                    <SelectContent>
+                      {brands.map((b) => <SelectItem key={b.id} value={String(b.id)}>{b.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </div>
-              ))}
-            </div>
+                <div>
+                  <Label>Category *</Label>
+                  <Select value={categoryId} onValueChange={setCategoryId}>
+                    <SelectTrigger><SelectValue placeholder="Assign a category" /></SelectTrigger>
+                    <SelectContent>
+                      {pricingCategories.map((c) => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <Input type="file" accept=".xlsx,.xls,.csv" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="max-w-md" />
+                <Button onClick={handleUpload} disabled={uploading} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                  {uploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
+                  Upload &amp; preview
+                </Button>
+              </div>
+              <button type="button" onClick={() => setShowMore((v) => !v)}
+                className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1">
+                {showMore ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                More options — supplier, valid dates, comment, alert threshold
+              </button>
+              {showMore && (
+                <div className="rounded-lg border bg-muted/20 p-3 space-y-3">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div><Label>Supplier name</Label><Input value={supplierName} onChange={(e) => setSupplierName(e.target.value)} placeholder="e.g. Acme Pharma Ltd" /></div>
+                    <div><Label>Valid from</Label><Input type="date" value={validFrom} onChange={(e) => setValidFrom(e.target.value)} /></div>
+                    <div><Label>Valid until</Label><Input type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} /></div>
+                  </div>
+                  <div><Label>Comment (internal)</Label><Textarea value={comment} onChange={(e) => setComment(e.target.value)} placeholder="e.g. Promo batch, min order 5 cases" /></div>
+                  <div className="flex items-end gap-2">
+                    <div><Label className="text-xs">Cost-change alert threshold (±%)</Label><Input type="number" className="w-28" value={effectiveThreshold} onChange={(e) => setThreshold(e.target.value)} /></div>
+                    <Button variant="secondary" size="sm" onClick={() => saveThreshold.mutate(effectiveThreshold)}>Save</Button>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <p className="text-xs text-muted-foreground">Select multiple brand files (same template). One draft is created per brand — matched, or created, by the brand name in each file. Review &amp; publish each in the history below.</p>
+              <div className="flex flex-wrap items-center gap-3">
+                <Input type="file" accept=".xlsx,.xls,.csv" multiple onChange={(e) => setBulkFiles(e.target.files)} className="max-w-md" />
+                <Button onClick={handleBulkUpload} disabled={bulkUploading} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                  {bulkUploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
+                  Upload {bulkFiles?.length ? `${bulkFiles.length} file(s)` : "selected"}
+                </Button>
+              </div>
+              {bulkResult && (
+                <div className="rounded-md border divide-y text-sm max-h-72 overflow-auto">
+                  <div className="p-2 bg-muted/50 font-medium sticky top-0">Created {bulkResult.created} of {bulkResult.total} draft(s) — review &amp; publish each below.</div>
+                  {bulkResult.results.map((r: any, i: number) => (
+                    <div key={i} className="flex items-center gap-2 p-2">
+                      {r.ok
+                        ? <span className="truncate"><CheckCircle2 className="h-4 w-4 text-emerald-600 inline mr-1" /><b>{r.brand}</b> — {r.rows} rows{r.brandCreated ? " (new brand)" : ""}</span>
+                        : <span className="truncate"><AlertTriangle className="h-4 w-4 text-red-600 inline mr-1" />{r.file} — {r.error}</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
