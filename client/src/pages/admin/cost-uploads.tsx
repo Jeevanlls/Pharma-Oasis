@@ -69,6 +69,7 @@ export default function AdminCostUploadsPage() {
   const [editComment, setEditComment] = useState("");
   const [keepRemoved, setKeepRemoved] = useState<Record<string, boolean>>({});
   const [statusFilter, setStatusFilter] = useState<RowStatus | "all">("all");
+  const [selected, setSelected] = useState<Set<number>>(new Set());
   const [dirty, setDirty] = useState(false);
   // Big cost changes the admin has explicitly ticked to confirm. Keyed by EAN+cost
   // so that editing the cost (or EAN) invalidates an earlier confirmation.
@@ -76,6 +77,7 @@ export default function AdminCostUploadsPage() {
 
   // Re-seed the editable copy whenever a fresh preview arrives (upload or save).
   useEffect(() => {
+    setSelected(new Set());
     if (!preview) { setEditRows([]); return; }
     setEditRows(preview.summary.rows.map((r) => ({ ...r })));
     setKeepRemoved((prev) => {
@@ -441,13 +443,30 @@ export default function AdminCostUploadsPage() {
                 </SelectContent>
               </Select>
               <span className="text-xs text-muted-foreground">Showing {visible.length} of {total}. Cost, EAN, QTY &amp; Notes are editable.</span>
+              {selected.size > 0 && (
+                <Button size="sm" variant="destructive" className="ml-auto"
+                  onClick={() => { setEditRows((rows) => rows.filter((_, idx) => !selected.has(idx))); setSelected(new Set()); setDirty(true); }}>
+                  <Trash2 className="h-4 w-4 mr-1" /> Delete selected ({selected.size})
+                </Button>
+              )}
             </div>
 
             <div className="max-h-[460px] overflow-auto border rounded-lg">
               <Table>
                 <TableHeader className="sticky top-0 z-10">
                   <TableRow className="bg-muted/60 hover:bg-muted/60 border-b [&>th]:text-[11px] [&>th]:uppercase [&>th]:tracking-wider [&>th]:font-semibold [&>th]:text-muted-foreground">
-                    <TableHead className="w-[140px]">EAN</TableHead>
+                    <TableHead className="w-[44px]">
+                      <Checkbox
+                        checked={visible.length > 0 && visible.every((v) => selected.has(v.i))}
+                        onCheckedChange={(v) => setSelected((prev) => {
+                          const next = new Set(prev);
+                          if (v) visible.forEach((x) => next.add(x.i)); else visible.forEach((x) => next.delete(x.i));
+                          return next;
+                        })}
+                        aria-label="Select all shown"
+                      />
+                    </TableHead>
+                    <TableHead className="w-[190px]">EAN</TableHead>
                     <TableHead>Description</TableHead>
                     <TableHead className="text-right w-[80px]">Prev</TableHead>
                     <TableHead className="text-right w-[110px]">New cost</TableHead>
@@ -460,13 +479,18 @@ export default function AdminCostUploadsPage() {
                 </TableHeader>
                 <TableBody>
                   {visible.length === 0 && (
-                    <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground text-sm">No rows for this filter</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground text-sm">No rows for this filter</TableCell></TableRow>
                   )}
                   {visible.map(({ r, i }) => (
                     <TableRow key={i} className={r.rowStatus === "duplicate" || r.rowStatus === "missing_info" ? "bg-red-50 dark:bg-red-950/30" : ""}>
                       <TableCell>
+                        <Checkbox checked={selected.has(i)}
+                          onCheckedChange={(v) => setSelected((prev) => { const n = new Set(prev); v ? n.add(i) : n.delete(i); return n; })}
+                          aria-label="Select row" />
+                      </TableCell>
+                      <TableCell>
                         <Input value={r.ean} onChange={(e) => patchRow(i, { ean: e.target.value })}
-                          className="h-8 font-mono text-xs" placeholder="EAN" />
+                          className="h-8 font-mono text-xs px-2" placeholder="EAN" />
                       </TableCell>
                       <TableCell>
                         <Input value={r.description} onChange={(e) => patchRow(i, { description: e.target.value })}
