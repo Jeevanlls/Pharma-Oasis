@@ -409,6 +409,8 @@ export default function QuoteDetailPage() {
                       £{Number(quote.totalEstimate).toFixed(2)}
                     </span>
                   </div>
+                  <p className="text-xs text-muted-foreground mt-2">All prices are per unit and exclude VAT, duty, customs and delivery (ex-works).</p>
+                  {quote.leadTime && <p className="text-sm mt-1"><span className="text-muted-foreground">Lead time:</span> <strong>{quote.leadTime}</strong></p>}
                 </>
               )}
 

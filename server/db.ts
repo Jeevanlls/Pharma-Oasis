@@ -179,6 +179,7 @@ pool.query(`
   ALTER TABLE users ADD COLUMN IF NOT EXISTS two_factor_enabled BOOLEAN NOT NULL DEFAULT false;
   ALTER TABLE users ADD COLUMN IF NOT EXISTS two_factor_backup_codes TEXT;
   ALTER TABLE quote_items ADD COLUMN IF NOT EXISTS unit_cost DECIMAL(10,2);
+  ALTER TABLE quotes ADD COLUMN IF NOT EXISTS lead_time VARCHAR(160);
   ALTER TABLE quote_items ADD COLUMN IF NOT EXISTS margin_applied DECIMAL(6,2);
   -- Price list publish/archive tracking (v2)
   ALTER TABLE price_lists ADD COLUMN IF NOT EXISTS published_at TIMESTAMP;

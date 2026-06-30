@@ -2684,6 +2684,7 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
       const updates: any = { status: "quoted" };
       if (expiryDate) updates.expiryDate = expiryDate;
       if (req.body?.adminNotes !== undefined) updates.adminNotes = req.body.adminNotes;
+      if (req.body?.leadTime !== undefined) updates.leadTime = req.body.leadTime || null;
       const updated = await storage.updateQuote(id, updates);
 
       const customer = await storage.getUser(quote.userId);

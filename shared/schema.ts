@@ -169,6 +169,7 @@ export const quotes = pgTable("quotes", {
   adminNotes: text("admin_notes"),
   totalEstimate: decimal("total_estimate", { precision: 12, scale: 2 }),
   expiryDate: timestamp("expiry_date"),
+  leadTime: varchar("lead_time", { length: 160 }), // e.g. "2–3 weeks from order" — shown on the quote
   version: integer("version").notNull().default(1),
   parentQuoteId: integer("parent_quote_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),

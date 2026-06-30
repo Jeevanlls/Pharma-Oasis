@@ -43,6 +43,7 @@ export default function DealWorkspacePage() {
   const [message, setMessage] = useState("");
   const [expiry, setExpiry] = useState("");
   const [internalNote, setInternalNote] = useState("");
+  const [leadTime, setLeadTime] = useState("");
 
   const isOrder = kind === "order";
   const root = data ? (isOrder ? data.order : data) : null;
@@ -62,6 +63,7 @@ export default function DealWorkspacePage() {
       priceListItemId: it.priceListItemId ?? null,
     })));
     setInternalNote(data.adminNotes ?? "");
+    setLeadTime(data.leadTime ?? "");
     if (data.expiryDate) setExpiry(String(data.expiryDate).slice(0, 10));
     setDirty(false);
   }, [data, isOrder]);
@@ -72,7 +74,7 @@ export default function DealWorkspacePage() {
     onError: (e: any) => toast({ title: "Couldn't save", description: e?.message, variant: "destructive" }),
   });
   const sendQuote = useMutation({
-    mutationFn: async () => apiRequest("POST", `/api/admin/quotes/${id}/send`, { message, expiryDate: expiry || null, adminNotes: internalNote }),
+    mutationFn: async () => apiRequest("POST", `/api/admin/quotes/${id}/send`, { message, expiryDate: expiry || null, adminNotes: internalNote, leadTime: leadTime || null }),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: [qKey] }); toast({ title: "Quote sent to customer" }); },
     onError: (e: any) => toast({ title: "Couldn't send", description: e?.message, variant: "destructive" }),
   });
@@ -163,27 +165,45 @@ export default function DealWorkspacePage() {
             <CardContent className="p-0">
               {editable ? (
                 <>
-                  <Table>
-                    <TableHeader><TableRow>
-                      <TableHead>Item</TableHead><TableHead className="w-24">EAN</TableHead><TableHead className="w-16 text-right">Qty</TableHead>
-                      <TableHead className="w-24 text-right">Cost</TableHead><TableHead className="w-16 text-right">Margin</TableHead><TableHead className="w-24 text-right">Unit price</TableHead>
-                      <TableHead className="w-24 text-right">Line</TableHead><TableHead className="w-8" />
-                    </TableRow></TableHeader>
-                    <TableBody>
-                      {lines.map((l, i) => (
-                        <TableRow key={i}>
-                          <TableCell><Input value={l.description} placeholder="Description" onChange={(e) => updateLine(i, { description: e.target.value })} /></TableCell>
-                          <TableCell><Input value={l.ean} placeholder="EAN" onChange={(e) => updateLine(i, { ean: e.target.value })} /></TableCell>
-                          <TableCell><Input type="number" min={1} className="text-right" value={l.quantity} onChange={(e) => updateLine(i, { quantity: Math.max(1, Number(e.target.value) || 1) })} /></TableCell>
-                          <TableCell><Input type="number" min={0} step="0.01" className="text-right" value={l.unitCost} placeholder="—" onChange={(e) => updateLine(i, { unitCost: e.target.value })} /></TableCell>
-                          <TableCell className="text-right text-muted-foreground text-sm">{marginOf(l.unitPrice, l.unitCost)}</TableCell>
-                          <TableCell><Input type="number" min={0} step="0.01" className="text-right" value={l.unitPrice} placeholder="On request" onChange={(e) => updateLine(i, { unitPrice: e.target.value })} /></TableCell>
-                          <TableCell className="text-right font-medium">{l.unitPrice === "" ? "—" : money(Number(l.unitPrice) * l.quantity)}</TableCell>
-                          <TableCell><Button variant="ghost" size="icon" onClick={() => removeLine(i)}><Trash2 className="h-4 w-4" /></Button></TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                  <div className="divide-y">
+                    {lines.length === 0 && <p className="p-4 text-sm text-muted-foreground">No lines yet. Use “Add line”.</p>}
+                    {lines.map((l, i) => (
+                      <div key={i} className="p-3 space-y-2">
+                        <div className="flex items-start gap-2">
+                          <div className="flex-1">
+                            <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Product</label>
+                            <Input className="h-9" value={l.description} placeholder="Full product description" onChange={(e) => updateLine(i, { description: e.target.value })} />
+                          </div>
+                          <Button variant="ghost" size="icon" className="mt-5 text-destructive" onClick={() => removeLine(i)} title="Remove line"><Trash2 className="h-4 w-4" /></Button>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-12 gap-2 items-end">
+                          <div className="sm:col-span-4">
+                            <label className="text-[11px] uppercase tracking-wide text-muted-foreground">EAN</label>
+                            <Input className="h-9 font-mono text-xs" value={l.ean} placeholder="Barcode" onChange={(e) => updateLine(i, { ean: e.target.value })} />
+                          </div>
+                          <div className="sm:col-span-2">
+                            <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Qty</label>
+                            <Input className="h-9 text-right" type="number" min={1} value={l.quantity} onChange={(e) => updateLine(i, { quantity: Math.max(1, Number(e.target.value) || 1) })} />
+                          </div>
+                          <div className="sm:col-span-2">
+                            <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Cost £</label>
+                            <Input className="h-9 text-right" type="number" min={0} step="0.01" value={l.unitCost} placeholder="—" onChange={(e) => updateLine(i, { unitCost: e.target.value })} />
+                          </div>
+                          <div className="sm:col-span-2">
+                            <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Unit price £</label>
+                            <Input className="h-9 text-right" type="number" min={0} step="0.01" value={l.unitPrice} placeholder="On request" onChange={(e) => updateLine(i, { unitPrice: e.target.value })} />
+                          </div>
+                          <div className="sm:col-span-2 text-right">
+                            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Margin · Line</div>
+                            <div className="text-sm h-9 flex items-center justify-end gap-1">
+                              <span className="text-muted-foreground">{marginOf(l.unitPrice, l.unitCost)}</span>
+                              <span className="font-semibold">{l.unitPrice === "" ? "—" : money(Number(l.unitPrice) * l.quantity)}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                   <div className="flex items-center justify-between border-t p-4">
                     <Button onClick={() => saveItems.mutate()} disabled={!dirty || saveItems.isPending}>{saveItems.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />} Save prices</Button>
                     <div className="flex gap-6"><span className="text-muted-foreground">Estimated total</span><span className="text-lg font-bold">{money(liveTotal)}</span></div>
@@ -220,6 +240,7 @@ export default function DealWorkspacePage() {
               <CardContent className="space-y-4">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div><label className="text-sm font-medium">Valid until</label><Input type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)} /></div>
+                  <div><label className="text-sm font-medium">Lead time (shown on quote)</label><Input value={leadTime} onChange={(e) => setLeadTime(e.target.value)} placeholder="e.g. 2–3 weeks from order" /></div>
                 </div>
                 <div><label className="text-sm font-medium">Message to customer (sent with the quote)</label><Textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="e.g. Pleased to quote as below; prices held until the validity date." /></div>
                 <div><label className="text-sm font-medium">Internal note (private)</label><Textarea value={internalNote} onChange={(e) => setInternalNote(e.target.value)} placeholder="Notes for the team — not shown to the customer." /></div>
@@ -258,7 +279,12 @@ export default function DealWorkspacePage() {
               {customer?.id && <Link href={`/admin/users?id=${customer.id}`}><Button variant="ghost" size="sm" className="px-0 mt-1">View account →</Button></Link>}
             </CardContent>
           </Card>
-          {root.expiryDate && !editable && <Card><CardContent className="p-4 text-sm"><span className="text-muted-foreground">Valid until </span>{fmt(root.expiryDate)}</CardContent></Card>}
+          {!editable && (root.expiryDate || root.leadTime) && (
+            <Card><CardContent className="p-4 text-sm space-y-1">
+              {root.expiryDate && <div><span className="text-muted-foreground">Valid until </span>{fmt(root.expiryDate)}</div>}
+              {root.leadTime && <div><span className="text-muted-foreground">Lead time: </span>{root.leadTime}</div>}
+            </CardContent></Card>
+          )}
           <Card>
             <CardHeader><CardTitle className="text-lg">Activity</CardTitle></CardHeader>
             <CardContent className="space-y-3">
