@@ -420,7 +420,10 @@ export default function AdminCostUploadsPage() {
 
         const visible = liveRows
           .map((r, i) => ({ r, i }))
-          .filter(({ r }) => statusFilter === "zero_cost" ? (!r.costPrice || r.costPrice <= 0) : (statusFilter === "all" || r.rowStatus === statusFilter));
+          .filter(({ r }) => statusFilter === "zero_cost" ? (!r.costPrice || r.costPrice <= 0) : (statusFilter === "all" || r.rowStatus === statusFilter))
+          // When viewing Duplicates, group copies of the same EAN next to each other
+          // so the user can compare them and delete the right one.
+          .sort((a, b) => statusFilter === "duplicate" ? (a.r.ean || "").localeCompare(b.r.ean || "") : 0);
 
         // A "big" cost change (beyond the ± threshold) must be ticked to confirm
         // before publishing — guards against a mistyped cost going live unnoticed.
