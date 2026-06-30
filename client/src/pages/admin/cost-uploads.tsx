@@ -471,7 +471,7 @@ export default function AdminCostUploadsPage() {
                   <SelectItem value="ok">Unchanged ({counts.ok})</SelectItem>
                 </SelectContent>
               </Select>
-              <span className="text-xs text-muted-foreground">Showing {visible.length} of {total}. Cost, EAN, QTY &amp; Notes are editable.</span>
+              <span className="text-xs text-muted-foreground">Showing {visible.length} of {total}. Description, Category, Case, Cost, EAN, QTY &amp; Notes are editable.</span>
               {selected.size > 0 && (
                 <Button size="sm" variant="destructive" className="ml-auto"
                   onClick={() => { setEditRows((rows) => rows.filter((_, idx) => !selected.has(idx))); setSelected(new Set()); setDirty(true); }}>
@@ -481,7 +481,7 @@ export default function AdminCostUploadsPage() {
             </div>
 
             <div className="max-h-[460px] overflow-auto border rounded-lg">
-              <Table className="min-w-[1180px]">
+              <Table className="min-w-[1400px]">
                 <TableHeader className="sticky top-0 z-10">
                   <TableRow className="bg-muted/60 hover:bg-muted/60 border-b [&>th]:text-[11px] [&>th]:uppercase [&>th]:tracking-wider [&>th]:font-semibold [&>th]:text-muted-foreground">
                     <TableHead className="w-[44px]">
@@ -496,7 +496,7 @@ export default function AdminCostUploadsPage() {
                       />
                     </TableHead>
                     <TableHead className="w-[150px]">EAN</TableHead>
-                    <TableHead className="min-w-[200px]">Description</TableHead>
+                    <TableHead className="min-w-[400px]">Description</TableHead>
                     <TableHead className="w-[160px]">Category</TableHead>
                     <TableHead className="w-[80px]">Case</TableHead>
                     <TableHead className="text-right w-[70px]">Prev</TableHead>
@@ -525,7 +525,7 @@ export default function AdminCostUploadsPage() {
                       </TableCell>
                       <TableCell>
                         <Input value={r.description} onChange={(e) => patchRow(i, { description: e.target.value })}
-                          className="h-8 text-xs" placeholder="Description" />
+                          title={r.description} className="h-8 text-xs" placeholder="Description" />
                       </TableCell>
                       <TableCell>
                         <Select value={r.categoryName || ""} onValueChange={(v) => patchRow(i, { categoryName: v })}>
