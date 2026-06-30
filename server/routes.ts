@@ -4416,6 +4416,63 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
     }
   });
 
+  // Bulk upload: many brand cost files at once -> one DRAFT per brand. The brand is
+  // taken from each file (auto-matched by name, created if new). Review/publish each after.
+  app.post("/api/admin/cost-uploads/bulk", requireAdmin, upload.array("files", 200), async (req: any, res) => {
+    try {
+      const files = (req.files as any[]) || [];
+      if (!files.length) return res.status(400).json({ message: "No files uploaded" });
+
+      const threshold = await getCostThreshold();
+      const brands = await pricingV2.listPricingBrands();
+      const brandByName = new Map<string, number>();
+      for (const b of brands) brandByName.set(b.name.trim().toLowerCase(), b.id);
+
+      const results: any[] = [];
+      let created = 0;
+      for (const file of files) {
+        const fname = file.originalname || "file";
+        try {
+          const parsed = parseCostFile(file.buffer);
+          if (!parsed.brandName) { results.push({ file: fname, ok: false, error: "No brand name row found" }); continue; }
+          if (!parsed.rows.length) { results.push({ file: fname, ok: false, error: "No data rows found" }); continue; }
+
+          const key = parsed.brandName.trim().toLowerCase();
+          let brandId = brandByName.get(key);
+          let brandCreated = false;
+          if (!brandId) {
+            const nb = await pricingV2.createPricingBrand({ name: parsed.brandName.trim() });
+            brandId = nb.id; brandByName.set(key, brandId); brandCreated = true;
+          }
+
+          const base = await pricingV2.getBaseCostForBrand(brandId);
+          const summary = buildPreview(parsed, base?.rows ?? [], threshold);
+          const uploadRec = await pricingStore.createDraftUpload({
+            brandId,
+            supplierName: req.body?.supplierName || null,
+            validFrom: parseDate(req.body?.validFrom),
+            validUntil: parseDate(req.body?.validUntil),
+            comment: req.body?.comment || null,
+            fileName: fname,
+            uploadedBy: req.session.userId,
+            rows: summary.rows,
+          });
+          created++;
+          results.push({
+            file: fname, ok: true, brand: parsed.brandName.trim(), brandId, brandCreated,
+            uploadId: uploadRec.id, rows: summary.rows.length,
+          });
+        } catch (e: any) {
+          results.push({ file: fname, ok: false, error: e?.message || "Failed to process" });
+        }
+      }
+      res.json({ created, total: files.length, results });
+    } catch (error: any) {
+      console.error("Bulk cost upload error:", error);
+      res.status(500).json({ message: error.message || "Failed to process bulk upload" });
+    }
+  });
+
   // Save edits made in the review screen (inline cost/EAN/notes fixes, carried-forward
   // "kept" missing products, and the upload-level comment), then re-validate + return
   // a fresh preview. Draft only.

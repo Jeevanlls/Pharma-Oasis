@@ -58,6 +58,9 @@ export default function AdminCostUploadsPage() {
   const [validUntil, setValidUntil] = useState("");
   const [comment, setComment] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [bulkFiles, setBulkFiles] = useState<FileList | null>(null);
+  const [bulkUploading, setBulkUploading] = useState(false);
+  const [bulkResult, setBulkResult] = useState<any | null>(null);
   const [preview, setPreview] = useState<{ uploadId: number; summary: PreviewSummary } | null>(null);
   const [uploading, setUploading] = useState(false);
 
@@ -111,6 +114,26 @@ export default function AdminCostUploadsPage() {
       toast({ title: "Threshold saved" });
     },
   });
+
+  async function handleBulkUpload() {
+    if (!bulkFiles || bulkFiles.length === 0) { toast({ title: "Select one or more files first", variant: "destructive" }); return; }
+    setBulkUploading(true); setBulkResult(null);
+    try {
+      const fd = new FormData();
+      Array.from(bulkFiles).forEach((f) => fd.append("files", f));
+      if (supplierName) fd.append("supplierName", supplierName);
+      const res = await fetch("/api/admin/cost-uploads/bulk", { method: "POST", body: fd, credentials: "include" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Bulk upload failed");
+      setBulkResult(data);
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/cost-uploads"] });
+      toast({ title: `Created ${data.created} draft upload(s)`, description: `from ${data.total} file(s)` });
+    } catch (e: any) {
+      toast({ title: "Bulk upload failed", description: e.message, variant: "destructive" });
+    } finally {
+      setBulkUploading(false);
+    }
+  }
 
   async function handleUpload() {
     if (!brandId) { toast({ title: "Select a brand first", variant: "destructive" }); return; }
@@ -279,6 +302,34 @@ export default function AdminCostUploadsPage() {
               Upload &amp; preview
             </Button>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><FileUp className="h-5 w-5" /> Bulk upload (many brands at once)</CardTitle>
+          <CardDescription>Select multiple brand files — one draft is created per brand, matched (or created) by the brand name in each file. Review &amp; publish each in the history below.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <Input type="file" accept=".xlsx,.xls,.csv" multiple onChange={(e) => setBulkFiles(e.target.files)} className="max-w-md" />
+            <Button onClick={handleBulkUpload} disabled={bulkUploading} variant="outline">
+              {bulkUploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
+              Upload {bulkFiles?.length ? `${bulkFiles.length} file(s)` : "selected"}
+            </Button>
+          </div>
+          {bulkResult && (
+            <div className="rounded-md border divide-y text-sm max-h-72 overflow-auto">
+              <div className="p-2 bg-muted/50 font-medium sticky top-0">Created {bulkResult.created} of {bulkResult.total} draft(s) — review &amp; publish each below.</div>
+              {bulkResult.results.map((r: any, i: number) => (
+                <div key={i} className="flex items-center gap-2 p-2">
+                  {r.ok
+                    ? <span className="truncate"><CheckCircle2 className="h-4 w-4 text-emerald-600 inline mr-1" /><b>{r.brand}</b> — {r.rows} rows{r.brandCreated ? " (new brand)" : ""}</span>
+                    : <span className="truncate"><AlertTriangle className="h-4 w-4 text-red-600 inline mr-1" />{r.file} — {r.error}</span>}
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 
