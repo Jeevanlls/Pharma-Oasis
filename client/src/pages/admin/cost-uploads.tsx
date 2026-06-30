@@ -201,6 +201,19 @@ export default function AdminCostUploadsPage() {
     onError: (e: any) => toast({ title: "Save failed", description: e.message, variant: "destructive" }),
   });
 
+  async function openDraft(uploadId: number) {
+    try {
+      const res = await fetch(`/api/admin/cost-uploads/${uploadId}/review`, { credentials: "include" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to open draft");
+      setEditComment(data.upload?.comment ?? "");
+      setPreview({ uploadId, summary: data.summary });
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (e: any) {
+      toast({ title: "Couldn't open draft", description: e.message, variant: "destructive" });
+    }
+  }
+
   async function handlePublish(uploadId: number) {
     try {
       // Always persist the latest edits + keep/remove decisions before publishing.
@@ -613,6 +626,7 @@ export default function AdminCostUploadsPage() {
                   <TableCell className="text-right">
                     {u.status === "draft" && (
                       <div className="flex gap-1 justify-end">
+                        <Button size="sm" variant="ghost" onClick={() => openDraft(u.id)}>Review</Button>
                         <Button size="sm" variant="ghost" onClick={() => publishMut.mutate(u.id)}>Publish</Button>
                         <Button size="sm" variant="ghost" onClick={() => deleteMut.mutate(u.id)}><Trash2 className="h-4 w-4" /></Button>
                       </div>

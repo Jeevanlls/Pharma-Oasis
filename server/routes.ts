@@ -4546,6 +4546,34 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
     res.json(found);
   });
 
+  // Re-open a DRAFT into the review screen: rebuild the editable preview summary
+  // from the stored rows, compared against the brand's prior published base cost.
+  app.get("/api/admin/cost-uploads/:id/review", requireAdmin, async (req, res) => {
+    try {
+      const found = await pricingStore.getUpload(parseInt(req.params.id, 10));
+      if (!found) return res.status(404).json({ message: "Upload not found" });
+      const threshold = await getCostThreshold();
+      const base = await pricingV2.getBaseCostForBrand(found.upload.brandId);
+      const parsedLike: any = {
+        brandName: null,
+        rows: found.rows.map((r: any) => ({
+          ean: r.ean || "",
+          description: r.description || "",
+          caseSize: r.caseSize || "",
+          costPrice: r.costPrice === null || r.costPrice === undefined ? null : Number(r.costPrice),
+          supplierQty: r.supplierQty ?? null,
+          categoryName: r.categoryName || "",
+          comment: r.comment || null,
+        })),
+      };
+      const summary = buildPreview(parsedLike, base?.rows ?? [], threshold);
+      res.json({ upload: found.upload, summary: { ...summary, threshold } });
+    } catch (error: any) {
+      console.error("Cost upload review error:", error);
+      res.status(500).json({ message: error.message || "Failed to open draft" });
+    }
+  });
+
   app.post("/api/admin/cost-uploads/:id/publish", requireAdmin, async (req, res) => {
     try {
       const result = await pricingStore.publishUpload(parseInt(req.params.id, 10));
