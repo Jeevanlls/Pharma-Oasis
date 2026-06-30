@@ -481,7 +481,7 @@ export default function AdminCostUploadsPage() {
             </div>
 
             <div className="max-h-[460px] overflow-auto border rounded-lg">
-              <Table>
+              <Table className="min-w-[1180px]">
                 <TableHeader className="sticky top-0 z-10">
                   <TableRow className="bg-muted/60 hover:bg-muted/60 border-b [&>th]:text-[11px] [&>th]:uppercase [&>th]:tracking-wider [&>th]:font-semibold [&>th]:text-muted-foreground">
                     <TableHead className="w-[44px]">
@@ -495,21 +495,22 @@ export default function AdminCostUploadsPage() {
                         aria-label="Select all shown"
                       />
                     </TableHead>
-                    <TableHead className="w-[190px]">EAN</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead className="w-[170px]">Category</TableHead>
-                    <TableHead className="text-right w-[80px]">Prev</TableHead>
-                    <TableHead className="text-right w-[110px]">New cost</TableHead>
-                    <TableHead className="text-right w-[80px]">Change</TableHead>
-                    <TableHead className="text-right w-[80px]">QTY</TableHead>
-                    <TableHead className="w-[180px]">Notes</TableHead>
-                    <TableHead className="w-[120px]">Status</TableHead>
-                    <TableHead className="w-[50px]"></TableHead>
+                    <TableHead className="w-[150px]">EAN</TableHead>
+                    <TableHead className="min-w-[200px]">Description</TableHead>
+                    <TableHead className="w-[160px]">Category</TableHead>
+                    <TableHead className="w-[80px]">Case</TableHead>
+                    <TableHead className="text-right w-[70px]">Prev</TableHead>
+                    <TableHead className="text-right w-[100px]">New cost</TableHead>
+                    <TableHead className="text-right w-[70px]">Change</TableHead>
+                    <TableHead className="w-[72px]">QTY</TableHead>
+                    <TableHead className="w-[150px]">Notes</TableHead>
+                    <TableHead className="w-[110px]">Status</TableHead>
+                    <TableHead className="w-[44px]"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {visible.length === 0 && (
-                    <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground text-sm">No rows for this filter</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={12} className="text-center text-muted-foreground text-sm">No rows for this filter</TableCell></TableRow>
                   )}
                   {visible.map(({ r, i }) => (
                     <TableRow key={i} className={r.rowStatus === "duplicate" || r.rowStatus === "missing_info" ? "bg-red-50 dark:bg-red-950/30" : ""}>
@@ -520,7 +521,7 @@ export default function AdminCostUploadsPage() {
                       </TableCell>
                       <TableCell>
                         <Input value={r.ean} onChange={(e) => patchRow(i, { ean: e.target.value })}
-                          className="h-8 font-mono text-xs px-2" placeholder="EAN" />
+                          className="h-8 font-mono text-[11px] px-2" placeholder="EAN" />
                       </TableCell>
                       <TableCell>
                         <Input value={r.description} onChange={(e) => patchRow(i, { description: e.target.value })}
@@ -533,6 +534,10 @@ export default function AdminCostUploadsPage() {
                             {pricingCategories.map((c) => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}
                           </SelectContent>
                         </Select>
+                      </TableCell>
+                      <TableCell>
+                        <Input value={r.caseSize} onChange={(e) => patchRow(i, { caseSize: e.target.value })}
+                          className="h-8 text-xs px-2" placeholder="—" />
                       </TableCell>
                       <TableCell className="text-right text-xs tabular-nums text-muted-foreground">{money(r.previousCost)}</TableCell>
                       <TableCell>
