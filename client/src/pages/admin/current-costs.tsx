@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -52,6 +52,10 @@ export default function AdminCurrentCostsPage() {
     if (typeof window === "undefined") return "";
     return new URLSearchParams(window.location.search).get("brand") || "";
   });
+  const [categoryFilter, setCategoryFilter] = useState<string>(() => {
+    if (typeof window === "undefined") return "";
+    return new URLSearchParams(window.location.search).get("category") || "";
+  });
   const [search, setSearch] = useState("");
   const [brandSearch, setBrandSearch] = useState(""); // presentation-only: filters the left brand rail
   // EAN -> edited cost (string while typing) and note.
@@ -77,17 +81,27 @@ export default function AdminCurrentCostsPage() {
   const depKey = (ean: string | null) => (ean ?? "").replace(/[^0-9]/g, "");
 
   // Reset edits when switching brands.
-  useEffect(() => { setEdits({}); setPreview(null); }, [brandId]);
+  // Keep the URL-provided category filter on first load; clear it once the user
+  // manually switches to a different brand from the rail.
+  const initialBrandRef = useRef(brandId);
+  useEffect(() => {
+    setEdits({});
+    setPreview(null);
+    if (brandId !== initialBrandRef.current) setCategoryFilter("");
+  }, [brandId]);
 
   const rows = current?.rows ?? [];
   const published = daysAgo(current?.publishedAt ?? null);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter((r) =>
-      (r.description ?? "").toLowerCase().includes(q) || (r.ean ?? "").toLowerCase().includes(q));
-  }, [rows, search]);
+    const cf = categoryFilter.trim().toLowerCase();
+    return rows.filter((r) => {
+      if (cf && (r.categoryName ?? "").trim().toLowerCase() !== cf) return false;
+      if (!q) return true;
+      return (r.description ?? "").toLowerCase().includes(q) || (r.ean ?? "").toLowerCase().includes(q);
+    });
+  }, [rows, search, categoryFilter]);
 
   // Build the edit payload: only rows whose cost actually changed (or note changed).
   const editPayload = useMemo(() => {
@@ -270,6 +284,13 @@ export default function AdminCurrentCostsPage() {
               <Search className="h-4 w-4 text-muted-foreground" />
               <Input className="max-w-sm" placeholder="Search by product name or EAN"
                 value={search} onChange={(e) => setSearch(e.target.value)} />
+              {categoryFilter && (
+                <Badge variant="outline" className="border-emerald-400 text-emerald-700 dark:text-emerald-300 gap-1">
+                  Category: {categoryFilter}
+                  <button type="button" onClick={() => setCategoryFilter("")} title="Clear category filter"
+                    className="ml-1 rounded-full hover:bg-emerald-100 dark:hover:bg-emerald-900 px-1 leading-none">×</button>
+                </Badge>
+              )}
               <span className="text-xs text-muted-foreground">Showing {filtered.length} of {rows.length}</span>
               {isFetching && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
             </div>

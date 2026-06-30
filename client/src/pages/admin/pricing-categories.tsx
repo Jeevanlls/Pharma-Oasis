@@ -119,13 +119,21 @@ export default function PricingCategoriesPage() {
                           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                             <span className="text-[11px] text-muted-foreground mr-0.5">Suppliers:</span>
                             {sup.map((b) => (
-                              <button key={b.id} type="button"
-                                onClick={() => setLocation(`/admin/current-costs?brand=${b.id}`)}
-                                title={`Open ${b.name} current costs (${b.items} item(s) in this category)`}
-                                className="inline-flex items-center gap-1 rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-800 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
-                                {b.name}
-                                <span className="text-emerald-600/80 dark:text-emerald-400/80">{b.items}</span>
-                              </button>
+                              <span key={b.id}
+                                className="inline-flex items-center rounded-full border border-emerald-300 bg-emerald-50 text-[11px] font-medium text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 overflow-hidden">
+                                <button type="button"
+                                  onClick={() => setLocation(`/admin/current-costs?brand=${b.id}`)}
+                                  title={`Open ${b.name} — full cost list`}
+                                  className="px-2 py-0.5 hover:bg-emerald-100 dark:hover:bg-emerald-900">
+                                  {b.name}
+                                </button>
+                                <button type="button"
+                                  onClick={() => setLocation(`/admin/current-costs?brand=${b.id}&category=${encodeURIComponent(c.name)}`)}
+                                  title={`Open ${b.name} — only ${c.name} (${b.items} item(s))`}
+                                  className="border-l border-emerald-300 dark:border-emerald-800 px-1.5 py-0.5 text-emerald-600/90 dark:text-emerald-400/90 hover:bg-emerald-100 dark:hover:bg-emerald-900">
+                                  {b.items}
+                                </button>
+                              </span>
                             ))}
                           </div>
                         );
