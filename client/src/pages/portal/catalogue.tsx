@@ -15,7 +15,7 @@ interface Category { id: number; name: string; }
 interface PortalProductRow {
   itemId: number; brandId: number | null; brandName: string | null;
   description: string | null; ean: string | null; caseSize: string | null;
-  price: number | null; availability: string; availableQty: number | null;
+  price: number | null; availability: string; availableQty: number | null; imageUrl?: string | null;
 }
 interface PortalResponse { products: PortalProductRow[]; total: number; page: number; pageSize: number; hasPriceList: boolean; }
 
@@ -67,7 +67,7 @@ export default function PortalCataloguePage() {
 
   const add = (p: PortalProductRow) => {
     const q = qty[p.itemId] || 1;
-    addItem({ id: p.itemId, productName: p.description ?? "Item", sku: p.ean ?? "", imageUrl: null, price: p.price, availability: p.availability, availableQty: p.availableQty, caseSize: p.caseSize }, q);
+    addItem({ id: p.itemId, productName: p.description ?? "Item", sku: p.ean ?? "", imageUrl: p.imageUrl ?? null, price: p.price, availability: p.availability, availableQty: p.availableQty, caseSize: p.caseSize }, q);
     toast({ title: "Added to basket", description: `${q} × ${p.description ?? "item"}` });
   };
 
@@ -140,6 +140,18 @@ export default function PortalCataloguePage() {
           {products.map((p) => (
             <Card key={p.itemId} className="flex flex-col overflow-hidden">
               <CardContent className="p-3 flex flex-col gap-2 flex-1">
+                <div className="aspect-square w-full rounded-md bg-muted/40 overflow-hidden flex items-center justify-center">
+                  {p.imageUrl ? (
+                    <img
+                      src={p.imageUrl}
+                      alt={p.description ?? ""}
+                      loading="lazy"
+                      className="h-full w-full object-contain"
+                    />
+                  ) : (
+                    <span className="text-[11px] text-muted-foreground">Image coming soon</span>
+                  )}
+                </div>
                 <div className="text-sm font-medium line-clamp-2 min-h-[2.5rem]">{p.description}</div>
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <span>{p.brandName || p.caseSize || p.ean}</span>

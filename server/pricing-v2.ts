@@ -16,6 +16,7 @@ import {
   costUploads,
   costUploadRows,
   users,
+  products,
 } from "@shared/schema";
 import { eq, and, desc, asc, ne, inArray, sql, or, isNull, lte, gte, ilike } from "drizzle-orm";
 import type {
@@ -1179,6 +1180,7 @@ export interface PortalItem {
   price: number | null;
   availability: Availability;
   availableQty: number | null;
+  imageUrl?: string | null; // borrowed from the public-catalogue product by EAN
   onPromotion?: boolean; // price reflects a live promotion overriding the customer's list price
 }
 
@@ -1192,6 +1194,24 @@ export interface PortalFilter {
 
 /** Resolve the full priced catalogue a customer can see (only their nominated
  *  lists; one brand → one list, so no duplicates). Cost/margin NEVER included. */
+/** Borrow product images from the public catalogue (products table) by EAN so the
+ *  customer portal can show a picture for priced items. null when no image exists. */
+async function attachImagesByEan(items: PortalItem[]): Promise<void> {
+  const eans = Array.from(new Set(items.map((i) => i.ean).filter((e): e is string => !!e)));
+  if (!eans.length) return;
+  const rows = await db
+    .select({ ean: products.ean, imageUrl: products.imageUrl })
+    .from(products)
+    .where(inArray(products.ean, eans));
+  const map = new Map<string, string>();
+  for (const r of rows) {
+    if (r.ean && r.imageUrl && !map.has(r.ean)) map.set(r.ean, r.imageUrl);
+  }
+  for (const i of items) {
+    i.imageUrl = i.ean ? map.get(i.ean) ?? null : null;
+  }
+}
+
 export async function getCustomerCatalogue(customerId: number, filter: PortalFilter = {}): Promise<PortalItem[]> {
   const listIds = await customerListIds(customerId);
   if (!listIds.length) return [];
@@ -1255,6 +1275,7 @@ export async function getCustomerCatalogue(customerId: number, filter: PortalFil
     default:
       items.sort((a, b) => (a.description ?? "").localeCompare(b.description ?? ""));
   }
+  await attachImagesByEan(items);
   return items;
 }
 
@@ -1682,5 +1703,6 @@ export async function activePromotionsCatalogue(): Promise<PortalItem[]> {
     });
   }
   out.sort((a, b) => (a.description ?? "").localeCompare(b.description ?? ""));
+  await attachImagesByEan(out);
   return out;
 }

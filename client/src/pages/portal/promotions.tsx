@@ -10,7 +10,7 @@ import { ShoppingCart, Loader2, Megaphone, PackageX } from "lucide-react";
 
 interface PromoRow {
   itemId: number; description: string | null; ean: string | null; caseSize: string | null;
-  price: number | null; availability: string; availableQty: number | null; onPromotion?: boolean;
+  price: number | null; availability: string; availableQty: number | null; onPromotion?: boolean; imageUrl?: string | null;
 }
 
 export default function PortalPromotionsPage() {
@@ -32,7 +32,7 @@ export default function PortalPromotionsPage() {
 
   const add = (p: PromoRow) => {
     const q = qty[p.itemId] || 1;
-    addItem({ id: p.itemId, productName: p.description ?? "Item", sku: p.ean ?? "", imageUrl: null, price: p.price, availability: p.availability, availableQty: p.availableQty, caseSize: p.caseSize }, q);
+    addItem({ id: p.itemId, productName: p.description ?? "Item", sku: p.ean ?? "", imageUrl: p.imageUrl ?? null, price: p.price, availability: p.availability, availableQty: p.availableQty, caseSize: p.caseSize }, q);
     toast({ title: "Added to basket", description: `${q} × ${p.description ?? "item"}` });
   };
 
@@ -57,6 +57,13 @@ export default function PortalPromotionsPage() {
           {products.map((p) => (
             <Card key={p.itemId} className="flex flex-col overflow-hidden border-emerald-200">
               <CardContent className="p-3 flex flex-col gap-2 flex-1">
+                <div className="aspect-square w-full rounded-md bg-muted/40 overflow-hidden flex items-center justify-center">
+                  {p.imageUrl ? (
+                    <img src={p.imageUrl} alt={p.description ?? ""} loading="lazy" className="h-full w-full object-contain" />
+                  ) : (
+                    <span className="text-[11px] text-muted-foreground">Image coming soon</span>
+                  )}
+                </div>
                 <div className="flex items-center justify-between">
                   <Badge className="bg-emerald-100 text-emerald-800">Promotion</Badge>
                   {p.caseSize && <span className="text-xs text-muted-foreground">Case: {p.caseSize}</span>}
