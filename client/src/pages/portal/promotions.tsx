@@ -13,6 +13,12 @@ interface PromoRow {
   price: number | null; availability: string; availableQty: number | null; onPromotion?: boolean; imageUrl?: string | null;
 }
 
+const availabilityBadge = (a: string, qty: number | null) => {
+  if (a === "in_stock") return <Badge className="bg-green-100 text-green-800">{qty && qty < 20 ? `Low (${qty})` : "In stock"}</Badge>;
+  if (a === "out_of_stock") return <Badge className="bg-red-100 text-red-700">Out of stock</Badge>;
+  return <Badge variant="outline">On request</Badge>;
+};
+
 export default function PortalPromotionsPage() {
   const { toast } = useToast();
   const { addItem } = usePortalBasket();
@@ -64,10 +70,11 @@ export default function PortalPromotionsPage() {
                     <span className="text-[11px] text-muted-foreground">Image coming soon</span>
                   )}
                 </div>
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-1">
                   <Badge className="bg-emerald-100 text-emerald-800">Promotion</Badge>
-                  {p.caseSize && <span className="text-xs text-muted-foreground">Case: {p.caseSize}</span>}
+                  {availabilityBadge(p.availability, p.availableQty)}
                 </div>
+                {p.caseSize && <div className="text-xs text-muted-foreground">Case: {p.caseSize}</div>}
                 <div className="text-sm font-medium line-clamp-2 min-h-[2.5rem]">{p.description}</div>
                 <div className="text-xs text-muted-foreground font-mono">{p.ean}</div>
                 <div className="mt-auto">
@@ -80,8 +87,8 @@ export default function PortalPromotionsPage() {
                 <div className="flex gap-2">
                   <Input type="number" min={1} className="w-16 h-9" value={qty[p.itemId] ?? 1}
                     onChange={(e) => setQty({ ...qty, [p.itemId]: Math.max(1, Number(e.target.value)) })} />
-                  <Button size="sm" className="flex-1" onClick={() => add(p)}>
-                    <ShoppingCart className="h-4 w-4 mr-1" /> Add
+                  <Button size="sm" className="flex-1" onClick={() => add(p)} disabled={p.availability === "out_of_stock"}>
+                    <ShoppingCart className="h-4 w-4 mr-1" /> {p.price === null ? "Request price" : "Add"}
                   </Button>
                 </div>
               </CardContent>

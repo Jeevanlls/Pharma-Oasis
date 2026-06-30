@@ -27,7 +27,7 @@ function OrderRow({ order }: { order: Order }) {
   return (
     <Card>
       <CardContent className="p-4">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <div>
             <div className="font-semibold">Order #{order.id}</div>
             <div className="text-xs text-muted-foreground">{new Date(order.createdAt).toLocaleString()}</div>
@@ -45,10 +45,11 @@ function OrderRow({ order }: { order: Order }) {
         )}
         {open && data && (
           <div className="mt-3 border-t pt-3 space-y-1">
+            <div className="text-xs font-medium text-muted-foreground pb-1">{data.items.length} item{data.items.length === 1 ? "" : "s"}</div>
             {data.items.map((it) => (
-              <div key={it.id} className="flex justify-between text-sm">
-                <span>{it.quantity} × {it.productName ?? `#${it.productId}`}</span>
-                <span className="text-muted-foreground">{money(it.unitPrice)} ea · {money(it.lineTotal)}</span>
+              <div key={it.id} className="flex justify-between gap-3 text-sm">
+                <span className="min-w-0">{it.quantity} × {it.productName ?? `#${it.productId}`}</span>
+                <span className="text-muted-foreground whitespace-nowrap shrink-0">{money(it.unitPrice)} ea · {money(it.lineTotal)}</span>
               </div>
             ))}
             {order.customerNotes && <div className="text-xs text-muted-foreground pt-2">Your notes: {order.customerNotes}</div>}

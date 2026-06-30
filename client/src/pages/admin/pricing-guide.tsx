@@ -58,6 +58,7 @@ const steps: Step[] = [
       "Type a new cost / note on just the lines you need.",
       "Review & apply shows exactly which customer prices will change.",
       "Nothing changes until you press Confirm & apply — then it republishes and reprices automatically.",
+      "Add product: add a single new line by hand (EAN, description, cost, category). The EAN is checked live for duplicates — it blocks a repeat in the same brand and warns if it exists under another.",
     ],
     when: "When one or two costs are wrong and you don't want a full upload.",
   },
@@ -67,6 +68,8 @@ const steps: Step[] = [
     points: [
       "New Price List → choose Brand (one brand's products) or Category (the same category across every brand) → it auto-fills at your default margin.",
       "Set prices by Margin %, Fixed £, or Cost + £ — per line, all at once, or by cost bands.",
+      "Smart pricing: round every price to a tidy ending — .49/.99 (£5.74 → £5.99) or nearest .x9 (£5.74 → £5.79). Fixed prices are left exactly as typed.",
+      "No cost yet? The product still appears to customers as “Price on request” — they add it and request a quote (it never becomes a £0 price). Add a cost later and Check for cost changes to give it a live price.",
       "See live customer price, real margin, and a red “below cost!” warning. Save when happy.",
       "Assign to customers: a customer can hold one brand list AND one category list at once — where they overlap, the brand price wins. Use Preview impact in the Assign box to see exactly which prices change before you commit.",
       "When new costs are published, click Check for cost changes → review → Apply to list. Cost edits also flow through to any category list that includes those products.",
@@ -102,6 +105,7 @@ const rules = [
   "When a product sits on both a brand and a category list, the brand price wins. A live promotion beats both.",
   "Promotions are the same for everyone and switch on/off by their dates — you never assign or un-assign them.",
   "Costs must be Published before they reach a price list. Cost edits reprice brand and category lists alike.",
+  "A product with no cost is never sold at £0 — it shows as “Price on request” and the customer requests a quote, which you price and they accept.",
   "“Check for cost changes” always compares against the latest published costs, not a draft.",
   "Big cost jumps, customer-price impacts, and deletions all ask before they happen.",
 ];
@@ -119,6 +123,8 @@ const glossary: [string, string][] = [
   ["Preview impact", "In the Assign box: shows which products change price for the chosen customers before you commit."],
   ["Check for cost changes", "Compare a saved list to the latest published costs and review what moved."],
   ["Cost band", "A cost range with its own margin, for bulk pricing."],
+  ["Smart pricing", "Optional tidy price endings (.49/.99 or nearest .x9) applied when a list is built. Fixed prices are never changed."],
+  ["Price on request", "A product with no cost shown to customers without a price; they request a quote instead of buying directly. Never sold at £0."],
 ];
 
 export default function PricingGuidePage() {

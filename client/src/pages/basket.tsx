@@ -16,7 +16,7 @@ import { Trash2, ShoppingCart, ArrowLeft, Loader2, ClipboardCheck, FileText, Log
 // the portal. Order is only offered when every line has a known price; otherwise
 // the only action is "Request Quote" (the server prices on-request lines).
 export default function BasketPage() {
-  const { lines, setQty, remove, clear, total, allPriced } = useBasket();
+  const { lines, setQty, remove, clear, total, allPriced, itemCount } = useBasket();
   const { isAuthenticated } = useAuth();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
@@ -76,7 +76,7 @@ export default function BasketPage() {
                 {l.imageUrl ? <img src={l.imageUrl} alt="" className="object-contain h-full w-full" /> : <ShoppingCart className="h-5 w-5 text-muted-foreground/40" />}
               </div>
               <div className="flex-1 min-w-0">
-                <div className="font-medium truncate">{l.name}</div>
+                <div className="font-medium line-clamp-2" title={l.name}>{l.name}</div>
                 <div className="text-xs text-muted-foreground">{l.packSize || l.sku}</div>
               </div>
               <Input type="number" min={1} className="w-20" value={l.quantity} onChange={(e) => setQty(l.key, Math.max(1, Number(e.target.value)))} />
@@ -93,7 +93,7 @@ export default function BasketPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center justify-between text-lg">
-            <span>Estimated total</span>
+            <span>Estimated total <span className="text-sm font-normal text-muted-foreground">({itemCount} item{itemCount === 1 ? "" : "s"})</span></span>
             <span>{money(total)}{hasOnRequest && <span className="text-sm font-normal text-muted-foreground"> + items on request</span>}</span>
           </CardTitle>
         </CardHeader>

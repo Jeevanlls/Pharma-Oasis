@@ -331,7 +331,10 @@ export default function DashboardPage() {
                           <div className="flex items-start gap-3">
                             <MapPin className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
                             <p className="text-sm">
-                              {userData.billingCity}, {userData.billingPostcode}
+                              {userData.billingAddressLine1}
+                              {(userData.billingCity || userData.billingPostcode) && (
+                                <><br />{[userData.billingCity, userData.billingPostcode].filter(Boolean).join(", ")}</>
+                              )}
                             </p>
                           </div>
                         )}
