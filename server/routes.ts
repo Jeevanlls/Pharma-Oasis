@@ -4646,6 +4646,14 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
       res.status(500).json({ message: e.message || "Failed to load current costs" });
     }
   });
+  // Per-EAN dependency counts (how many price-list lines / customers rely on each cost).
+  app.get("/api/admin/current-costs/:brandId/dependencies", requireAdmin, async (req, res) => {
+    try {
+      res.json(await pricingV2.costDependenciesByBrand(parseInt(req.params.brandId, 10)));
+    } catch (e: any) {
+      res.status(500).json({ message: e.message || "Failed to load dependencies" });
+    }
+  });
   // Impact preview: which customer prices change if these cost edits are applied.
   app.post("/api/admin/current-costs/:brandId/preview", requireAdmin, async (req, res) => {
     try {

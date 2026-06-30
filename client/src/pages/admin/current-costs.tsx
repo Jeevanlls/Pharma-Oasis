@@ -62,6 +62,16 @@ export default function AdminCurrentCostsPage() {
     queryKey: ["/api/admin/current-costs", brandId],
     enabled: !!brandId,
   });
+  // Per-EAN dependency counts: how many price-list lines / customers rely on each cost.
+  const { data: deps = {} } = useQuery<Record<string, { lists: number; customers: number }>>({
+    queryKey: ["/api/admin/current-costs", brandId, "dependencies"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/admin/current-costs/${brandId}/dependencies`);
+      return res.json();
+    },
+    enabled: !!brandId,
+  });
+  const depKey = (ean: string | null) => (ean ?? "").replace(/[^0-9]/g, "");
 
   // Reset edits when switching brands.
   useEffect(() => { setEdits({}); setPreview(null); }, [brandId]);
@@ -130,6 +140,7 @@ export default function AdminCurrentCostsPage() {
       setEdits({});
       queryClient.invalidateQueries({ queryKey: ["/api/admin/current-costs", brandId] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/cost-uploads"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pricing-brands-cost-status"] });
     } catch (e: any) {
       toast({ title: "Apply failed", description: e.message, variant: "destructive" });
     } finally {
@@ -196,6 +207,22 @@ export default function AdminCurrentCostsPage() {
 
         {/* Right pane — live costs for the selected brand */}
         <div className="space-y-4 min-w-0">
+          {brandId && changedCount > 0 && (
+            <div className="sticky top-2 z-20 flex flex-wrap items-center gap-2 rounded-lg border border-amber-300 bg-amber-50/95 px-3 py-2 shadow-sm backdrop-blur dark:border-amber-700 dark:bg-amber-950/60">
+              <Badge className="bg-amber-200 text-amber-900 dark:bg-amber-900 dark:text-amber-100">{changedCount} edited</Badge>
+              <span className="text-xs text-amber-800 dark:text-amber-200">Unsaved cost change{changedCount === 1 ? "" : "s"}.</span>
+              <div className="ml-auto flex items-center gap-2">
+                <Button size="sm" variant="ghost" onClick={resetEdits} className="text-amber-800 hover:bg-amber-100 dark:text-amber-200">
+                  <RotateCcw className="h-4 w-4 mr-1.5" /> Discard
+                </Button>
+                <Button size="sm" onClick={openConfirm} disabled={loadingPreview}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                  {loadingPreview ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Save className="h-4 w-4 mr-1.5" />}
+                  Review &amp; apply ({changedCount})
+                </Button>
+              </div>
+            </div>
+          )}
           {!brandId && (
             <Card><CardContent className="p-6">
               <div className="rounded-lg border border-dashed py-16 text-center text-muted-foreground">
@@ -252,12 +279,13 @@ export default function AdminCurrentCostsPage() {
                     <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">Description</TableHead>
                     <TableHead className="text-right w-[110px] text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">Live cost</TableHead>
                     <TableHead className="text-right w-[150px] text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">New cost</TableHead>
-                    <TableHead className="w-[240px] text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">Notes</TableHead>
+                    <TableHead className="w-[130px] text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">Used by</TableHead>
+                    <TableHead className="w-[220px] text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">Notes</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filtered.length === 0 && (
-                    <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground text-sm py-8">No products match</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground text-sm py-8">No products match</TableCell></TableRow>
                   )}
                   {filtered.map((r) => {
                     const key = r.ean ?? "";
@@ -286,6 +314,21 @@ export default function AdminCurrentCostsPage() {
                               value={costStr}
                               onChange={(ev) => setCost(key, ev.target.value, r.comment ?? "")} />
                           </div>
+                        </TableCell>
+                        <TableCell>
+                          {(() => {
+                            const d = depKey(r.ean) ? deps[depKey(r.ean)] : undefined;
+                            if (!d || d.lists === 0) {
+                              return <span className="text-[11px] text-muted-foreground">Not on any list</span>;
+                            }
+                            const title = `${d.lists} price-list line(s) and ${d.customers} customer(s) use this cost — they reprice automatically when you change it.`;
+                            return (
+                              <span title={title} className={`inline-flex flex-col gap-0.5 text-[11px] leading-tight ${edited ? "font-medium text-amber-700 dark:text-amber-400" : "text-muted-foreground"}`}>
+                                <span>{d.lists} list{d.lists === 1 ? "" : "s"}</span>
+                                <span>{d.customers} cust{d.customers === 1 ? "" : "s"}</span>
+                              </span>
+                            );
+                          })()}
                         </TableCell>
                         <TableCell>
                           <Input className="h-9 text-sm" placeholder="Internal note" disabled={!r.ean}

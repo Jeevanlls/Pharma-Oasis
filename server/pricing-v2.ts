@@ -825,6 +825,41 @@ function effectiveEdits(edits: CostEdit[], curByEan: Map<string, CurrentCostRow>
 }
 
 /** Preview the customer-price impact of a set of cost edits, before applying. */
+export async function costDependenciesByBrand(
+  brandId: number,
+): Promise<Record<string, { lists: number; customers: number }>> {
+  // For each EAN in this brand's scope, how many customer price-list lines reference it
+  // and how many distinct customers would be affected if its cost changed. Mirrors the
+  // reprice scope: the brand's own lists PLUS category lists. Promotions are excluded.
+  const lists = await db
+    .select()
+    .from(priceLists)
+    .where(or(eq(priceLists.brandId, brandId), eq(priceLists.scope, "category")));
+  const acc: Record<string, { lists: Set<number>; customers: Set<number> }> = {};
+  for (const list of lists) {
+    const items = await db
+      .select({ ean: priceListItems.ean })
+      .from(priceListItems)
+      .where(eq(priceListItems.priceListId, list.id));
+    if (items.length === 0) continue;
+    const custRows = await db
+      .select({ customerId: customerPriceLists.customerId })
+      .from(customerPriceLists)
+      .where(eq(customerPriceLists.priceListId, list.id));
+    const custIds = custRows.map((c) => c.customerId).filter((x): x is number => x != null);
+    for (const it of items) {
+      const key = it.ean ? normEan(it.ean) : "";
+      if (!key) continue;
+      if (!acc[key]) acc[key] = { lists: new Set(), customers: new Set() };
+      acc[key].lists.add(list.id);
+      for (const cid of custIds) acc[key].customers.add(cid);
+    }
+  }
+  const out: Record<string, { lists: number; customers: number }> = {};
+  for (const [k, v] of Object.entries(acc)) out[k] = { lists: v.lists.size, customers: v.customers.size };
+  return out;
+}
+
 export async function previewCostEdits(brandId: number, edits: CostEdit[]): Promise<CostEditPreview> {
   const current = await getCurrentCosts(brandId);
   const curByEan = new Map<string, CurrentCostRow>();
