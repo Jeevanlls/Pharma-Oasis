@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Quote, User } from "@shared/schema";
 import { format, formatDistanceToNow } from "date-fns";
+import { InstallAppCard } from "@/components/install-app";
 import { 
   User as UserIcon, 
   FileText, 
@@ -198,6 +199,7 @@ export default function DashboardPage() {
             </TabsList>
 
             <TabsContent value="overview" className="space-y-6">
+              <InstallAppCard />
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <Card>
                   <CardHeader className="pb-2">

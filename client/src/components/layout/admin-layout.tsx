@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { InstallAppButton } from "@/components/install-app";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
@@ -359,6 +360,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
               <span className="text-sm text-muted-foreground hidden sm:inline">
                 {user?.primaryContactName || user?.email}
               </span>
+              <InstallAppButton className="hidden sm:inline-flex" />
               <ThemeToggle />
             </div>
           </header>

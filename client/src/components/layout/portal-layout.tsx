@@ -4,6 +4,7 @@ import { usePortalBasket } from "@/lib/portal-basket";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { InstallAppButton } from "@/components/install-app";
 import logoImage from "@assets/01_1772051902531.png";
 import { ShoppingCart, LogOut, LayoutGrid, FileText, Package, ClipboardList, Download, Megaphone } from "lucide-react";
 
@@ -61,6 +62,7 @@ export function PortalLayout({ children }: { children: React.ReactNode }) {
               <span className="hidden sm:inline text-sm text-muted-foreground max-w-[160px] truncate">
                 {user?.companyName || user?.email}
               </span>
+              <InstallAppButton className="hidden sm:inline-flex" />
               <ThemeToggle />
               <Button variant="ghost" size="sm" onClick={handleLogout} className="gap-2">
                 <LogOut className="h-4 w-4" />
