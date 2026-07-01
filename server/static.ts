@@ -10,6 +10,17 @@ export function serveStatic(app: Express) {
     );
   }
 
+  // PWA service worker must never be cached, so updates reach users immediately.
+  app.get("/sw.js", (_req, res) => {
+    res.set("Cache-Control", "no-cache, no-store, must-revalidate");
+    res.type("application/javascript");
+    res.sendFile(path.join(distPath, "sw.js"));
+  });
+  app.get("/manifest.webmanifest", (_req, res) => {
+    res.type("application/manifest+json");
+    res.sendFile(path.join(distPath, "manifest.webmanifest"));
+  });
+
   // Serve hashed assets with long-term caching (1 year)
   app.use("/assets", express.static(path.join(distPath, "assets"), {
     maxAge: "1y",
