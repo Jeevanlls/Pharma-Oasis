@@ -36,19 +36,20 @@ function OrderRow({ order }: { order: Order }) {
   return (
     <Card>
       <CardContent className="p-4">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-          <div>
-            <div className="font-semibold">Order #{order.id}</div>
-            <div className="text-xs text-muted-foreground">{new Date(order.createdAt).toLocaleString()}</div>
+        <button type="button" onClick={() => setOpen((o) => !o)} className="w-full flex items-center gap-3 text-left">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-bold text-base">Order #{order.id}</span>
+              <Badge className={statusColor[order.status] ?? ""}>{statusLabel[order.status] ?? order.status}</Badge>
+            </div>
+            <div className="text-xs text-muted-foreground mt-0.5">{new Date(order.createdAt).toLocaleString()}</div>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="font-semibold">{money(order.totalAmount)}</span>
-            <Badge className={statusColor[order.status] ?? ""}>{statusLabel[order.status] ?? order.status}</Badge>
-            <Button variant="ghost" size="icon" onClick={() => setOpen((o) => !o)}>
-              {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-            </Button>
+          <div className="text-right shrink-0">
+            <div className="font-bold text-lg leading-none">{money(order.totalAmount)}</div>
+            <div className="text-[10px] text-muted-foreground">ex VAT</div>
           </div>
-        </div>
+          {open ? <ChevronUp className="h-4 w-4 text-muted-foreground shrink-0" /> : <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />}
+        </button>
         {order.adminResponse && (
           <div className="mt-3 p-3 rounded text-sm bg-emerald-50 border border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-900"><span className="font-medium text-emerald-800 dark:text-emerald-300">Our reply: </span>{order.adminResponse}</div>
         )}

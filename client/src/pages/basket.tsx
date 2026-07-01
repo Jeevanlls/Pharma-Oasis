@@ -71,20 +71,25 @@ export default function BasketPage() {
       <Card>
         <CardContent className="p-0 divide-y">
           {lines.map((l) => (
-            <div key={l.key} className="flex items-center gap-4 p-4">
+            <div key={l.key} className="flex flex-wrap items-center gap-3 p-4">
               <div className="h-14 w-14 bg-muted/40 rounded flex items-center justify-center overflow-hidden shrink-0">
                 {l.imageUrl ? <img src={l.imageUrl} alt="" className="object-contain h-full w-full" /> : <ShoppingCart className="h-5 w-5 text-muted-foreground/40" />}
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="font-medium line-clamp-2" title={l.name}>{l.name}</div>
-                <div className="text-xs text-muted-foreground">{l.packSize || l.sku}</div>
+              <div className="flex-1 min-w-[45%]">
+                <div className="font-medium line-clamp-2 leading-snug" title={l.name}>{l.name}</div>
+                <div className="text-xs text-muted-foreground font-mono">{l.packSize || l.sku}</div>
               </div>
-              <Input type="number" min={1} className="w-20" value={l.quantity} onChange={(e) => setQty(l.key, Math.max(1, Number(e.target.value)))} />
-              <div className="w-28 text-right">
-                {l.price === null ? <Badge variant="outline">On request</Badge> : <div className="font-semibold">{money(l.price * l.quantity)}</div>}
-                {l.price !== null && <div className="text-xs text-muted-foreground">{money(l.price)} ea</div>}
+              <div className="flex items-center gap-3 ml-auto">
+                <div className="text-center">
+                  <label className="text-[10px] uppercase tracking-wide text-muted-foreground block">Qty</label>
+                  <Input type="number" min={1} inputMode="numeric" className="w-20 h-9 text-center" value={l.quantity} onChange={(e) => setQty(l.key, Math.max(1, Number(e.target.value)))} />
+                </div>
+                <div className="w-24 text-right">
+                  {l.price === null ? <Badge variant="outline">On request</Badge> : <div className="font-semibold">{money(l.price * l.quantity)}</div>}
+                  {l.price !== null && <div className="text-xs text-muted-foreground">{money(l.price)} ea</div>}
+                </div>
+                <Button variant="ghost" size="icon" onClick={() => remove(l.key)}><Trash2 className="h-4 w-4" /></Button>
               </div>
-              <Button variant="ghost" size="icon" onClick={() => remove(l.key)}><Trash2 className="h-4 w-4" /></Button>
             </div>
           ))}
         </CardContent>
@@ -92,10 +97,11 @@ export default function BasketPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center justify-between text-lg">
+          <CardTitle className="flex items-center justify-between text-lg gap-2">
             <span>Estimated total <span className="text-sm font-normal text-muted-foreground">({itemCount} item{itemCount === 1 ? "" : "s"})</span></span>
-            <span>{money(total)}{hasOnRequest && <span className="text-sm font-normal text-muted-foreground"> + items on request</span>}</span>
+            <span className="text-right">{money(total)}{hasOnRequest && <span className="text-sm font-normal text-muted-foreground"> + items on request</span>}</span>
           </CardTitle>
+          <p className="text-xs text-muted-foreground">Per unit, excludes VAT, duty, customs and delivery (ex-works).</p>
         </CardHeader>
         <CardContent className="space-y-4">
           {!isAuthenticated ? (

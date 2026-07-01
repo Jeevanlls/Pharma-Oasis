@@ -161,7 +161,50 @@ export default function PortalCataloguePage() {
           <PackageX className="h-10 w-10 mb-2" /> No products match your filters.
         </div>
       ) : (
-        <Card>
+        <>
+        {/* Mobile: stacked cards */}
+        <div className="md:hidden space-y-2">
+          {products.map((p) => {
+            const inLine = lines[p.itemId]?.qty ?? "";
+            return (
+              <Card key={p.itemId} className={inLine ? "border-emerald-300" : ""}>
+                <CardContent className="p-3 flex gap-3">
+                  <button type="button" onClick={() => p.imageUrl && setZoom({ url: p.imageUrl, name: p.description ?? "" })}
+                    className="h-16 w-16 rounded bg-muted/40 overflow-hidden flex items-center justify-center shrink-0"
+                    title={p.imageUrl ? "Tap to enlarge" : "No image yet"}>
+                    {p.imageUrl
+                      ? <img src={p.imageUrl} alt="" loading="lazy" className="h-full w-full object-contain" />
+                      : <ImageIcon className="h-5 w-5 text-muted-foreground/40" />}
+                  </button>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium text-sm leading-snug">{p.description || "—"}</div>
+                    <div className="text-xs text-muted-foreground">{[p.brandName, p.caseSize ? `Case ${p.caseSize}` : null].filter(Boolean).join(" · ")}</div>
+                    <div className="font-mono text-[11px] text-muted-foreground">{p.ean || "—"}</div>
+                    <div className="mt-2 flex items-end justify-between gap-2">
+                      <div>
+                        {p.price === null
+                          ? <Badge variant="outline">Request quote</Badge>
+                          : <div className="font-bold leading-none">{fmt(p.price)}<span className="text-[11px] font-normal text-muted-foreground"> /unit ex VAT</span></div>}
+                        <div className="mt-1"><StockBadge a={p.availability} qty={p.availableQty} /></div>
+                      </div>
+                      <div className="text-right">
+                        <label className="text-[10px] uppercase tracking-wide text-muted-foreground block">Qty</label>
+                        <Input type="number" min={0} placeholder="0" inputMode="numeric"
+                          className="h-9 w-20 text-center"
+                          disabled={p.availability === "out_of_stock"}
+                          value={inLine}
+                          onChange={(e) => setLine(p, e.target.value === "" ? 0 : Math.max(0, Number(e.target.value)))} />
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+
+        {/* Desktop: table */}
+        <Card className="hidden md:block">
           <div className="overflow-x-auto">
             <table className="w-full text-sm min-w-[860px]">
               <thead>
@@ -215,6 +258,7 @@ export default function PortalCataloguePage() {
             </table>
           </div>
         </Card>
+        </>
       )}
 
       {/* Pagination */}
