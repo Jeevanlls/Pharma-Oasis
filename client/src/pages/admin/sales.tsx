@@ -199,7 +199,7 @@ export default function AdminSalesPage() {
 
       <Card>
         <CardContent className="p-0">
-          <Table>
+          <Table className="min-w-[720px]">
             <TableHeader>
               <TableRow>
                 <TableHead className="w-10">
