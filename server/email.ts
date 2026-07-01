@@ -4,6 +4,9 @@ import nodemailer from 'nodemailer';
 const ZOHO_EMAIL = process.env.ZOHO_EMAIL || 'jeevan@pharmaoasis.com';
 const ZOHO_PASSWORD = process.env.ZOHO_EMAIL_PASSWORD;
 const NOTIFICATION_EMAIL = process.env.NOTIFICATION_EMAIL || 'jeevan@pharmaoasis.com';
+// Always-monitored trade inbox — order & quote notifications are also sent here.
+const TRADE_INBOX = process.env.TRADE_INBOX || 'trade@pharmaoasis.com';
+const ORDER_QUOTE_RECIPIENTS = Array.from(new Set([NOTIFICATION_EMAIL, TRADE_INBOX])).join(', ');
 
 // Create transporter for Zoho India
 const transporter = ZOHO_PASSWORD ? nodemailer.createTransport({
@@ -248,7 +251,7 @@ export async function sendQuoteSubmissionNotification(data: {
     </div>
   `;
 
-  return sendEmail(NOTIFICATION_EMAIL, subject, html);
+  return sendEmail(ORDER_QUOTE_RECIPIENTS, subject, html);
 }
 
 export async function sendAccountApprovalEmail(data: {
@@ -629,7 +632,7 @@ export async function sendOrderSubmissionNotification(data: {
       <div style="padding: 15px; background: #e2e8f0; text-align: center; font-size: 12px; color: #64748b;">Automated notification from Pharma Oasis B2B Platform</div>
     </div>
   `;
-  return sendEmail(NOTIFICATION_EMAIL, subject, html);
+  return sendEmail(ORDER_QUOTE_RECIPIENTS, subject, html);
 }
 
 export async function sendOrderConfirmationToCustomer(data: {

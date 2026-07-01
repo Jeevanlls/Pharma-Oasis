@@ -278,7 +278,7 @@ export default function DashboardPage() {
                                     {status.label}
                                   </Badge>
                                   {quote.status === "pending" && (
-                                    <a href={`mailto:sales@pharmaoasis.co.uk?subject=${encodeURIComponent(`Chasing Quote #${quote.id}`)}&body=${encodeURIComponent(`Hi,\n\nPlease could you update me on Quote #${quote.id}?\n\nThanks.`)}`}
+                                    <a href={`mailto:trade@pharmaoasis.com?subject=${encodeURIComponent(`Chasing Quote #${quote.id}`)}&body=${encodeURIComponent(`Hi,\n\nPlease could you update me on Quote #${quote.id}?\n\nThanks.`)}`}
                                       onClick={(e) => e.stopPropagation()}>
                                       <Button variant="outline" size="sm" className="h-7 text-xs">Chase</Button>
                                     </a>
