@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -28,7 +28,7 @@ export default function LoginPage({ adminMode = false }: { adminMode?: boolean }
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [secret, setSecret] = useState<string>("");
   const [backupCodes, setBackupCodes] = useState<string[] | null>(null);
-  const { login, refetch } = useAuth();
+  const { login, refetch, isAuthenticated, isAdmin, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
 
   const form = useForm<LoginData>({
@@ -36,11 +36,16 @@ export default function LoginPage({ adminMode = false }: { adminMode?: boolean }
     defaultValues: { email: "", password: "" },
   });
 
+  useEffect(() => {
+    if (authLoading || !isAuthenticated) return;
+    const redirect = new URLSearchParams(window.location.search).get("redirect");
+    setLocation(redirect || (isAdmin ? "/admin" : "/portal"));
+  }, [authLoading, isAuthenticated, isAdmin]);
+
   const finishLogin = async () => {
     await refetch();
     toast({ title: "Welcome back!", description: "You have successfully logged in." });
-    const redirect = new URLSearchParams(window.location.search).get("redirect");
-    setLocation(redirect || "/admin");
+    // The redirect effect fires once refetch() sets the authenticated user.
   };
 
   const startSetup = async () => {
@@ -63,8 +68,7 @@ export default function LoginPage({ adminMode = false }: { adminMode?: boolean }
 
     if (result.success) {
       toast({ title: "Welcome back!", description: "You have successfully logged in." });
-      const redirect = new URLSearchParams(window.location.search).get("redirect");
-      setLocation(redirect || (adminMode ? "/admin" : "/products"));
+      // Redirect is handled reactively by the effect above once auth state commits.
     } else if (result.twoFactorRequired) {
       setStep("code");
     } else if (result.twoFactorSetupRequired) {
@@ -128,6 +132,9 @@ export default function LoginPage({ adminMode = false }: { adminMode?: boolean }
       : step === "code"
       ? "Enter the 6-digit code from your authenticator app."
       : "Admin accounts must use an authenticator app.";
+
+  // Already signed in → don't flash the form; the effect redirects.
+  if (!authLoading && isAuthenticated) return null;
 
   return (
     <PublicLayout>
