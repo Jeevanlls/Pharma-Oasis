@@ -1,16 +1,11 @@
-// Pharma Oasis PWA service worker.
-// Safe for a live B2B app: API responses are NEVER cached (prices/orders always fresh).
-const VERSION = 'po-v1';
+// Pharma Oasis PWA service worker (v2).
+// Deliberately minimal + safe: it NEVER intercepts page navigations or /api requests,
+// so login, sessions and live data behave exactly as a normal browser. It only
+// speeds up static assets (JS/CSS/images/fonts/icons) via a cache.
+const VERSION = 'po-v2';
 const STATIC_CACHE = `po-static-${VERSION}`;
-const OFFLINE_URL = '/portal';
 
-self.addEventListener('install', (event) => {
-  event.waitUntil((async () => {
-    const cache = await caches.open(STATIC_CACHE);
-    try { await cache.addAll(['/portal', '/manifest.webmanifest', '/apple-touch-icon.png']); } catch (e) {}
-    self.skipWaiting();
-  })());
-});
+self.addEventListener('install', () => { self.skipWaiting(); });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
@@ -25,34 +20,23 @@ self.addEventListener('message', (e) => { if (e.data === 'skipWaiting') self.ski
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
+  if (req.mode === 'navigate') return;               // let the browser handle all page loads/auth
   const url = new URL(req.url);
-  if (url.origin !== self.location.origin) return;   // leave cross-origin alone
-  if (url.pathname.startsWith('/api/')) return;       // never cache live data
+  if (url.origin !== self.location.origin) return;    // ignore cross-origin
+  if (url.pathname.startsWith('/api/')) return;        // never touch live data
 
-  // Navigations: network-first so HTML is always fresh; fall back to shell offline.
-  if (req.mode === 'navigate') {
-    event.respondWith((async () => {
-      try { return await fetch(req); }
-      catch (e) {
-        const cache = await caches.open(STATIC_CACHE);
-        return (await cache.match(OFFLINE_URL)) || (await cache.match('/portal')) || Response.error();
-      }
-    })());
-    return;
-  }
-
-  // Static assets: cache-first for speed, then network (and store).
+  // Static assets only: cache-first for speed, fall back to network.
   if (url.pathname.startsWith('/assets/') || url.pathname.startsWith('/icons/') ||
       /\.(png|jpg|jpeg|svg|webp|ico|woff2?|css|js)$/.test(url.pathname)) {
     event.respondWith((async () => {
       const cache = await caches.open(STATIC_CACHE);
-      const cached = await cache.match(req);
-      if (cached) return cached;
+      const hit = await cache.match(req);
+      if (hit) return hit;
       try {
         const net = await fetch(req);
         if (net && net.ok) cache.put(req, net.clone());
         return net;
-      } catch (e) { return cached || Response.error(); }
+      } catch (e) { return hit || Response.error(); }
     })());
   }
 });
