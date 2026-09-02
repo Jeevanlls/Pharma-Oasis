@@ -404,6 +404,15 @@ async function initializeFullApplication() {
       log(`Import processor warning: ${err.message}`);
     }
 
+    // Daily sweep that gives new inventory customers a portal login.
+    // Dormant until switched on in Admin -> Customer Logins.
+    try {
+      const { startAutoInviteScheduler } = await import("./customer-auto-invite");
+      startAutoInviteScheduler();
+    } catch (err: any) {
+      log(`Auto-invite scheduler warning: ${err.message}`);
+    }
+
     log("Application fully initialized");
 
   } catch (error: any) {
