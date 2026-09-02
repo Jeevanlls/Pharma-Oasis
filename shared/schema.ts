@@ -64,6 +64,11 @@ export const users = pgTable("users", {
 
   priceListId: integer("price_list_id"), // assigned customer price list
 
+  // Link to the customer record in the inventory app (app.pharmaoasis.co.uk).
+  // The inventory app owns customer approval; this is the stable join key.
+  // Null for portal self-registrations that are not yet real customers.
+  inventoryCustomerId: integer("inventory_customer_id"),
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

@@ -174,6 +174,10 @@ pool.query(`
   ALTER TABLE products ADD COLUMN IF NOT EXISTS cost_status VARCHAR(20) DEFAULT 'none';
   ALTER TABLE products ADD COLUMN IF NOT EXISTS available_qty INTEGER;
   ALTER TABLE users ADD COLUMN IF NOT EXISTS price_list_id INTEGER;
+  -- Link a portal login to its inventory-app customer record
+  ALTER TABLE users ADD COLUMN IF NOT EXISTS inventory_customer_id INTEGER;
+  CREATE UNIQUE INDEX IF NOT EXISTS uniq_users_inventory_customer_id
+    ON users (inventory_customer_id) WHERE inventory_customer_id IS NOT NULL;
   -- Two-factor auth (TOTP) columns
   ALTER TABLE users ADD COLUMN IF NOT EXISTS two_factor_secret VARCHAR(64);
   ALTER TABLE users ADD COLUMN IF NOT EXISTS two_factor_enabled BOOLEAN NOT NULL DEFAULT false;
