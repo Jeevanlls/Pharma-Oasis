@@ -4,10 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import {
   Users, CheckCircle2, AlertTriangle, Loader2, Send, PlugZap, Search, Mail, Link2,
+  Clock,
 } from "lucide-react";
 
 /**
@@ -16,7 +19,7 @@ import {
  * customer sets their own.
  */
 
-type State = "ready" | "linked" | "link_only" | "no_email" | "duplicate_email";
+type State = "ready" | "linked" | "link_only" | "no_email" | "duplicate_email" | "not_approved";
 
 interface Row {
   inventoryCustomerId: number;
@@ -24,6 +27,7 @@ interface Row {
   contact: string | null;
   email: string | null;
   customerNumber: string | null;
+  createdAt: string | null;
   state: State;
   portalUserId?: number;
   note?: string;
@@ -37,6 +41,7 @@ interface Preview {
   linkOnly: number;
   noEmail: number;
   duplicateEmail: number;
+  notApproved: number;
   rows: Row[];
 }
 
@@ -54,6 +59,26 @@ interface InviteResult {
   results: { company: string | null; email: string | null; result: string; detail?: string }[];
 }
 
+interface AutoConfig {
+  enabled: boolean;
+  since: string | null;
+  hour: number;
+  lastRunDay: string | null;
+  lastResult: AutoResult | null;
+}
+
+interface AutoResult {
+  ranAt: string;
+  dryRun: boolean;
+  candidates: number;
+  invited: number;
+  linked: number;
+  failed: number;
+  invitedList: { company: string | null; email: string | null }[];
+  skipped: { company: string | null; email: string | null; reason: string }[];
+  note?: string;
+}
+
 const BATCH = 10;
 
 const LABEL: Record<State, string> = {
@@ -62,6 +87,7 @@ const LABEL: Record<State, string> = {
   link_only: "Account exists — link only",
   no_email: "No email address",
   duplicate_email: "Duplicate email",
+  not_approved: "Awaiting approval in the inventory app",
 };
 
 function Stat({ label, value, tone }: { label: string; value: number; tone?: "good" | "warn" }) {
@@ -115,6 +141,49 @@ export default function AdminCustomerSyncPage() {
     onError: (e: any) => toast({ title: "Invites failed", description: e.message, variant: "destructive" }),
   });
 
+  const { data: auto } = useQuery<AutoConfig>({
+    queryKey: ["/api/admin/customer-sync/auto"],
+  });
+
+  const saveAuto = useMutation({
+    mutationFn: async (patch: { enabled?: boolean; hour?: number }) => {
+      const r = await fetch("/api/admin/customer-sync/auto", {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message || "Could not save");
+      return (await r.json()) as AutoConfig;
+    },
+    onSuccess: async (cfg) => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/admin/customer-sync/auto"] });
+      toast({
+        title: cfg.enabled ? "Automatic invites are on" : "Automatic invites are off",
+        description: cfg.enabled
+          ? "Customers added to the inventory app from now on will be invited on the next daily run."
+          : "Nothing will be sent automatically.",
+      });
+    },
+    onError: (e: any) => toast({ title: "Could not save", description: e.message, variant: "destructive" }),
+  });
+
+  const [dryRun, setDryRun] = useState<AutoResult | null>(null);
+  const previewAuto = useMutation({
+    mutationFn: async () => {
+      const r = await fetch("/api/admin/customer-sync/auto/run", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dryRun: true }),
+      });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message || "Preview failed");
+      return (await r.json()) as AutoResult;
+    },
+    onSuccess: (res) => setDryRun(res),
+    onError: (e: any) => toast({ title: "Preview failed", description: e.message, variant: "destructive" }),
+  });
+
   const rows = preview?.rows ?? [];
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -128,7 +197,9 @@ export default function AdminCustomerSyncPage() {
   }, [rows, search]);
 
   const actionable = filtered.filter((r) => r.state === "ready" || r.state === "link_only");
-  const blocked = filtered.filter((r) => r.state === "no_email" || r.state === "duplicate_email");
+  const blocked = filtered.filter(
+    (r) => r.state === "no_email" || r.state === "duplicate_email" || r.state === "not_approved",
+  );
   const done = filtered.filter((r) => r.state === "linked");
 
   function toggle(id: number) {
@@ -193,13 +264,104 @@ export default function AdminCustomerSyncPage() {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Clock className="h-4 w-4" /> Automatic invites
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-1">
+              <Label htmlFor="auto-toggle" className="text-sm font-medium">
+                Invite new customers automatically
+              </Label>
+              <p className="text-sm text-muted-foreground max-w-2xl">
+                Once a day, any customer <strong>added to the inventory app after you switch this on</strong> gets
+                their login without anyone having to remember. The customers already waiting stay manual &mdash; you
+                and I send those in batches, so nobody gets a surprise burst of email. Internal and test-looking
+                addresses are skipped, and you get a summary of every run that did something.
+              </p>
+            </div>
+            <Switch
+              id="auto-toggle"
+              checked={!!auto?.enabled}
+              disabled={saveAuto.isPending}
+              onCheckedChange={(v) => saveAuto.mutate({ enabled: v })}
+            />
+          </div>
+
+          {auto?.enabled ? (
+            <div className="flex flex-wrap items-center gap-3 text-sm">
+              <span className="text-muted-foreground">Runs daily at</span>
+              <select
+                className="h-9 rounded-md border bg-background px-2 text-sm"
+                value={auto.hour}
+                onChange={(e) => saveAuto.mutate({ hour: Number(e.target.value) })}
+              >
+                {Array.from({ length: 24 }, (_, h) => (
+                  <option key={h} value={h}>
+                    {String(h).padStart(2, "0")}:00 UTC
+                  </option>
+                ))}
+              </select>
+              {auto.since ? (
+                <span className="text-muted-foreground">
+                  &middot; only customers created after {new Date(auto.since).toLocaleDateString("en-GB")}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+
+          <div className="flex flex-wrap items-center gap-3">
+            <Button variant="outline" size="sm" onClick={() => previewAuto.mutate()} disabled={previewAuto.isPending}>
+              {previewAuto.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
+              Show what the next run would do
+            </Button>
+            {auto?.lastResult ? (
+              <span className="text-xs text-muted-foreground">
+                Last run {new Date(auto.lastResult.ranAt).toLocaleString("en-GB")} &mdash;{" "}
+                {auto.lastResult.invited} invited, {auto.lastResult.linked} linked
+                {auto.lastResult.failed ? `, ${auto.lastResult.failed} failed` : ""}
+              </span>
+            ) : (
+              <span className="text-xs text-muted-foreground">Has not run yet.</span>
+            )}
+          </div>
+
+          {dryRun ? (
+            <div className="rounded-md border bg-muted/40 p-3 text-sm space-y-2">
+              <p className="font-medium">
+                {dryRun.note
+                  ? dryRun.note
+                  : `${dryRun.invited + dryRun.linked} customer(s) would be actioned, out of ${dryRun.candidates} new since the cutoff.`}
+              </p>
+              {dryRun.invitedList.map((r, i) => (
+                <div key={i} className="flex justify-between gap-3">
+                  <span>{r.company ?? r.email}</span>
+                  <span className="text-muted-foreground text-xs">{r.email}</span>
+                </div>
+              ))}
+              {dryRun.skipped.map((r, i) => (
+                <div key={`s${i}`} className="flex justify-between gap-3">
+                  <span className="text-muted-foreground">{r.company ?? r.email}</span>
+                  <span className="text-amber-700 text-xs text-right">{r.reason}</span>
+                </div>
+              ))}
+              <p className="text-xs text-muted-foreground">Nothing was sent &mdash; this was a preview.</p>
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+
       {preview ? (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
           <Stat label="Ready to invite" value={preview.ready} tone="good" />
           <Stat label="Already have a login" value={preview.linked} />
           <Stat label="Account exists — link only" value={preview.linkOnly} />
           <Stat label="No email address" value={preview.noEmail} tone={preview.noEmail ? "warn" : undefined} />
           <Stat label="Duplicate email" value={preview.duplicateEmail} tone={preview.duplicateEmail ? "warn" : undefined} />
+          <Stat label="Awaiting approval" value={preview.notApproved ?? 0} tone={preview.notApproved ? "warn" : undefined} />
         </div>
       ) : null}
 

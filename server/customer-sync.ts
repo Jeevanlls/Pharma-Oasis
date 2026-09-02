@@ -57,18 +57,38 @@ export interface InventoryCustomer {
   phone: string | null;
   contact_person: string | null;
   customer_number: string | null;
+  /** when the customer was created in the inventory app — the automation uses
+   *  this to tell a genuinely new customer from the existing backlog */
+  created_at: Date | string | null;
+  /** pending | approved | rejected. Older databases may not have the column,
+   *  in which case everything reads as approved. */
+  approval_status: string | null;
 }
+
+const FULL_SELECT = `select id, name, email, phone, contact_person, customer_number,
+                            created_at, coalesce(approval_status, 'approved') as approval_status
+                       from customers
+                      where is_active is true
+                      order by name`;
+
+/** Same query without the newer columns, for a database that predates them. */
+const LEGACY_SELECT = `select id, name, email, phone, contact_person, customer_number,
+                              null::timestamp as created_at, 'approved' as approval_status
+                         from customers
+                        where is_active is true
+                        order by name`;
 
 export async function readInventoryCustomers(): Promise<InventoryCustomer[]> {
   const client = await getInventoryPool().connect();
   try {
-    const r = await client.query<InventoryCustomer>(
-      `select id, name, email, phone, contact_person, customer_number
-         from customers
-        where is_active is true
-        order by name`,
-    );
-    return r.rows;
+    try {
+      const r = await client.query<InventoryCustomer>(FULL_SELECT);
+      return r.rows;
+    } catch {
+      // Missing column, most likely. Fall back rather than fail the whole page.
+      const r = await client.query<InventoryCustomer>(LEGACY_SELECT);
+      return r.rows;
+    }
   } finally {
     client.release();
   }
@@ -100,6 +120,8 @@ export type CustomerSyncState =
   | "link_only"
   /** no email in the inventory app — nothing we can do from here */
   | "no_email"
+  /** still awaiting approval in the inventory app — approval belongs there, not here */
+  | "not_approved"
   /** this email is on more than one inventory customer — must be fixed at source */
   | "duplicate_email";
 
@@ -109,6 +131,8 @@ export interface CustomerSyncRow {
   contact: string | null;
   email: string | null;
   customerNumber: string | null;
+  /** ISO date the customer was created in the inventory app, when known */
+  createdAt: string | null;
   state: CustomerSyncState;
   /** the portal user this maps to, when there is one */
   portalUserId?: number;
@@ -123,6 +147,7 @@ export interface CustomerSyncPreview {
   linkOnly: number;
   noEmail: number;
   duplicateEmail: number;
+  notApproved: number;
   rows: CustomerSyncRow[];
 }
 
@@ -163,11 +188,21 @@ export async function customerSyncPreview(): Promise<CustomerSyncPreview> {
       contact: c.contact_person,
       email: email || null,
       customerNumber: c.customer_number,
+      createdAt: c.created_at ? new Date(c.created_at).toISOString() : null,
     };
 
     const linkedUserId = userByInvId.get(c.id);
     if (linkedUserId) {
       return { ...base, state: "linked" as const, portalUserId: linkedUserId };
+    }
+    // Approval lives in the inventory app. A record still waiting there must not
+    // get a login here, however complete the rest of it looks.
+    if (norm(c.approval_status) && norm(c.approval_status) !== "approved") {
+      return {
+        ...base,
+        state: "not_approved" as const,
+        note: `awaiting approval in the inventory app (${c.approval_status})`,
+      };
     }
     if (!email) {
       return { ...base, state: "no_email" as const, note: "no email in the inventory app" };
@@ -203,6 +238,7 @@ export async function customerSyncPreview(): Promise<CustomerSyncPreview> {
     linkOnly: count("link_only"),
     noEmail: count("no_email"),
     duplicateEmail: count("duplicate_email"),
+    notApproved: count("not_approved"),
     rows,
   };
 }

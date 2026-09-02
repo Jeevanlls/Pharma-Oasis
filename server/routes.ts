@@ -58,6 +58,7 @@ import * as pricingStore from "./pricing-store";
 import * as pricingV2 from "./pricing-v2";
 import * as pmSync from "./pm-sync";
 import * as customerSync from "./customer-sync";
+import * as autoInvite from "./customer-auto-invite";
 import { resolveForList, toCustomerPrice } from "./pricing";
 import { buildPriceListData, buildCustomerPriceListData, buildPriceListXlsx, buildPriceListPdf } from "./price-export";
 import { buildOrderXlsx, buildOrderPdf } from "./order-document";
@@ -5001,6 +5002,38 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
       res.json(await customerSync.inviteCustomers(ids, { linkOnly: !!req.body?.linkOnly }));
     } catch (e: any) {
       res.status(500).json({ message: e?.message || "Invites failed" });
+    }
+  });
+
+  // ---- Automatic invites: the daily sweep for newly created customers ----
+
+  app.get("/api/admin/customer-sync/auto", requireAdmin, async (_req, res) => {
+    try {
+      res.json(await autoInvite.getAutoInviteConfig());
+    } catch (e: any) {
+      res.status(500).json({ message: e?.message || "Could not read the automation settings" });
+    }
+  });
+
+  app.put("/api/admin/customer-sync/auto", requireAdmin, async (req, res) => {
+    try {
+      const enabled = typeof req.body?.enabled === "boolean" ? req.body.enabled : undefined;
+      const hour = req.body?.hour === undefined ? undefined : Number(req.body.hour);
+      if (hour !== undefined && !Number.isFinite(hour)) {
+        return res.status(400).json({ message: "hour must be a number between 0 and 23" });
+      }
+      res.json(await autoInvite.setAutoInvite({ enabled, hour }));
+    } catch (e: any) {
+      res.status(500).json({ message: e?.message || "Could not save the automation settings" });
+    }
+  });
+
+  // Dry run by default: shows what the next sweep would do without sending.
+  app.post("/api/admin/customer-sync/auto/run", requireAdmin, async (req, res) => {
+    try {
+      res.json(await autoInvite.runAutoInvite({ dryRun: req.body?.dryRun !== false }));
+    } catch (e: any) {
+      res.status(500).json({ message: e?.message || "Run failed" });
     }
   });
 

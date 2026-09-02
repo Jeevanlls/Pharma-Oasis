@@ -595,6 +595,83 @@ export async function sendCustomerInviteEmail(data: {
   return sendEmail(data.email, subject, html);
 }
 
+/**
+ * Daily digest of the automatic customer invites. Goes to the internal
+ * notification inbox, not to a customer. Only sent when a run actually did
+ * something — the point is that "automatic" never means "invisible".
+ */
+export async function sendCustomerInviteSummary(result: {
+  ranAt: string;
+  invited: number;
+  linked: number;
+  failed: number;
+  invitedList: { company: string | null; email: string | null }[];
+  skipped: { company: string | null; email: string | null; reason: string }[];
+}): Promise<EmailResult> {
+  const notificationEmail = process.env.NOTIFICATION_EMAIL;
+  if (!notificationEmail) {
+    return { success: false, error: "No notification email configured" };
+  }
+
+  const when = new Date(result.ranAt).toLocaleString("en-GB", { timeZone: "Europe/London" });
+  const subject =
+    result.failed > 0
+      ? `Customer invites: ${result.invited} sent, ${result.failed} FAILED`
+      : `Customer invites: ${result.invited} sent`;
+
+  const rows = (list: { company: string | null; email: string | null; reason?: string }[]) =>
+    list
+      .map(
+        (r) => `<tr>
+          <td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;">${r.company || "&mdash;"}</td>
+          <td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;">${r.email || "&mdash;"}</td>
+          ${r.reason ? `<td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;color:#92400e;">${r.reason}</td>` : ""}
+        </tr>`,
+      )
+      .join("");
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto;">
+      <div style="background:#047857;color:#fff;padding:18px 20px;">
+        <h2 style="margin:0;font-size:18px;">New customers invited to the portal</h2>
+        <p style="margin:6px 0 0;font-size:13px;opacity:.9;">${when}</p>
+      </div>
+      <div style="padding:20px;background:#f8fafc;">
+        <p style="font-size:15px;margin-top:0;">
+          <strong>${result.invited}</strong> invited &middot;
+          <strong>${result.linked}</strong> linked to an existing account &middot;
+          <strong>${result.failed}</strong> failed
+        </p>
+
+        ${
+          result.invitedList.length
+            ? `<h3 style="font-size:14px;margin:20px 0 6px;">Invited</h3>
+               <table style="width:100%;border-collapse:collapse;font-size:13px;background:#fff;">
+                 ${rows(result.invitedList)}
+               </table>`
+            : ""
+        }
+
+        ${
+          result.skipped.length
+            ? `<h3 style="font-size:14px;margin:20px 0 6px;">Skipped &mdash; worth a look</h3>
+               <table style="width:100%;border-collapse:collapse;font-size:13px;background:#fff;">
+                 ${rows(result.skipped)}
+               </table>`
+            : ""
+        }
+
+        <p style="font-size:13px;color:#6b7280;margin-top:20px;">
+          Each person was sent a link to set their own password. No password was emailed.
+          Manage this in Admin &rarr; Users &amp; Security &rarr; Customer Logins.
+        </p>
+      </div>
+    </div>
+  `;
+
+  return sendEmail(notificationEmail, subject, html);
+}
+
 export async function sendChatLeadNotification(data: {
   name?: string;
   email?: string;
