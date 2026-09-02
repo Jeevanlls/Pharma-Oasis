@@ -42,6 +42,7 @@ import {
   Percent,
   FileUp,
   RefreshCw,
+  UserPlus,
   Coins,
   ShoppingCart,
   PoundSterling,
@@ -110,6 +111,7 @@ const navGroups: NavGroup[] = [
     icon: UserCog,
     items: [
       { title: "Users", href: "/admin/users", icon: Users, staffAccess: false },
+      { title: "Customer Logins", href: "/admin/customer-sync", icon: UserPlus, staffAccess: false },
       { title: "Staff", href: "/admin/staff", icon: UserCog, staffAccess: false },
       { title: "Security (2FA)", href: "/admin/security", icon: ShieldCheck, staffAccess: false },
     ],

@@ -57,6 +57,7 @@ import type { ParsedCostRow } from "./cost-importer";
 import * as pricingStore from "./pricing-store";
 import * as pricingV2 from "./pricing-v2";
 import * as pmSync from "./pm-sync";
+import * as customerSync from "./customer-sync";
 import { resolveForList, toCustomerPrice } from "./pricing";
 import { buildPriceListData, buildCustomerPriceListData, buildPriceListXlsx, buildPriceListPdf } from "./price-export";
 import { buildOrderXlsx, buildOrderPdf } from "./order-document";
@@ -4969,6 +4970,46 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
       res.json({ brands: await pmSync.pmNoEanReport() });
     } catch (e: any) {
       res.status(500).json({ message: e?.message || "Could not read Price Manager" });
+    }
+  });
+
+  // ============ CUSTOMER SYNC (inventory app -> portal logins) ============
+  // The inventory app owns customer approval. This gives an approved customer a
+  // portal login and emails them a link to set their own password. No password
+  // is ever emailed, and nothing is written back to the inventory database.
+
+  app.get("/api/admin/customer-sync/health", requireAdmin, async (_req, res) => {
+    res.json(await customerSync.customerSyncHealth());
+  });
+
+  // Read-only: who would be invited, who is already linked, who cannot be.
+  app.get("/api/admin/customer-sync/preview", requireAdmin, async (_req, res) => {
+    try {
+      res.json(await customerSync.customerSyncPreview());
+    } catch (e: any) {
+      res.status(500).json({ message: e?.message || "Customer preview failed" });
+    }
+  });
+
+  // Send invites to the selected customers, in a capped batch.
+  app.post("/api/admin/customer-sync/invite", requireAdmin, async (req, res) => {
+    try {
+      const ids = Array.isArray(req.body?.inventoryCustomerIds)
+        ? req.body.inventoryCustomerIds.map(Number).filter((n: number) => Number.isFinite(n))
+        : [];
+      if (!ids.length) return res.status(400).json({ message: "Select at least one customer" });
+      res.json(await customerSync.inviteCustomers(ids, { linkOnly: !!req.body?.linkOnly }));
+    } catch (e: any) {
+      res.status(500).json({ message: e?.message || "Invites failed" });
+    }
+  });
+
+  // Re-send to someone who never set their password.
+  app.post("/api/admin/customer-sync/resend/:userId", requireAdmin, async (req, res) => {
+    try {
+      res.json(await customerSync.resendInvite(parseInt(req.params.userId, 10)));
+    } catch (e: any) {
+      res.status(500).json({ message: e?.message || "Resend failed" });
     }
   });
 
