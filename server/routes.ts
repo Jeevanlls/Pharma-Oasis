@@ -56,6 +56,7 @@ import { parseCostFile, buildPreview, analyzeRows, buildTemplateWorkbook } from 
 import type { ParsedCostRow } from "./cost-importer";
 import * as pricingStore from "./pricing-store";
 import * as pricingV2 from "./pricing-v2";
+import * as pmSync from "./pm-sync";
 import { resolveForList, toCustomerPrice } from "./pricing";
 import { buildPriceListData, buildCustomerPriceListData, buildPriceListXlsx, buildPriceListPdf } from "./price-export";
 import { buildOrderXlsx, buildOrderPdf } from "./order-document";
@@ -4930,6 +4931,45 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
   // Every assignment (which customers are on which list, per brand) — admin Assignments overview.
   app.get("/api/admin/v2/assignments", requireAdmin, async (_req, res) => {
     res.json(await pricingV2.allAssignments());
+  });
+
+  // ============ PRICE MANAGER SYNC (supplier COST in; never a customer price) ============
+  // Reads RD's Price Manager and raises DRAFT cost uploads for whatever moved.
+  // Nothing reaches a customer until a human publishes the draft and the Price
+  // Builder applies a margin.
+
+  // Is the connection configured and reachable, and how much is on the other side?
+  app.get("/api/admin/v2/pm-sync/health", requireAdmin, async (_req, res) => {
+    res.json(await pmSync.pmSyncHealth());
+  });
+
+  // Dry run: report exactly what a real run would do, writing nothing.
+  app.get("/api/admin/v2/pm-sync/preview", requireAdmin, async (req, res) => {
+    try {
+      const thresholdPct = req.query.threshold ? Number(req.query.threshold) : undefined;
+      res.json(await pmSync.runPmSync({ dryRun: true, thresholdPct }));
+    } catch (e: any) {
+      res.status(500).json({ message: e?.message || "Price Manager preview failed" });
+    }
+  });
+
+  // Real run: creates the drafts. Still no customer-visible change.
+  app.post("/api/admin/v2/pm-sync/run", requireAdmin, async (req: any, res) => {
+    try {
+      const thresholdPct = req.body?.threshold ? Number(req.body.threshold) : undefined;
+      res.json(await pmSync.runPmSync({ dryRun: false, uploadedBy: req.user?.id ?? null, thresholdPct }));
+    } catch (e: any) {
+      res.status(500).json({ message: e?.message || "Price Manager sync failed" });
+    }
+  });
+
+  // Lines Price Manager holds with no EAN, grouped by brand — the fix-list for RD.
+  app.get("/api/admin/v2/pm-sync/no-ean", requireAdmin, async (_req, res) => {
+    try {
+      res.json({ brands: await pmSync.pmNoEanReport() });
+    } catch (e: any) {
+      res.status(500).json({ message: e?.message || "Could not read Price Manager" });
+    }
   });
 
   // ==================== MONTHLY PROMOTIONS (global, time-bound) ====================
