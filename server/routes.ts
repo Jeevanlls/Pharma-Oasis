@@ -5018,6 +5018,37 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
     }
   });
 
+  app.get("/api/admin/product-count", requireAdmin, async (_req, res) => {
+    try {
+      res.json(await brandReport.productCount());
+    } catch (e: any) {
+      res.status(500).json({ message: e?.message || "Product count failed" });
+    }
+  });
+
+  // The full product list. Streamed in pages: this table runs to six figures
+  // and building it as one string would take the service out with it.
+  app.get("/api/admin/product-export.csv", requireAdmin, async (_req, res) => {
+    const stamp = new Date().toISOString().slice(0, 10);
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="pharma-oasis-products-${stamp}.csv"`,
+    );
+    try {
+      await brandReport.streamProductCsv((chunk) => {
+        res.write(chunk);
+      });
+      res.end();
+    } catch (e: any) {
+      // Headers are already out, so there is no way to send a clean error.
+      // End the response: a truncated file with no trailing newline is more
+      // honest than a file that looks complete but isn't.
+      console.error("[product-export] failed:", e?.message || e);
+      res.end();
+    }
+  });
+
   app.get("/api/admin/brand-report.csv", requireAdmin, async (_req, res) => {
     try {
       const { rows } = await brandReport.readBrandReport();

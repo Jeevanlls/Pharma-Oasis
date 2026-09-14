@@ -197,3 +197,99 @@ export async function brandReportSummary(): Promise<BrandReportSummary> {
     spellingsUnder60Products: rows.filter((r) => r.product_count < 60).length,
   };
 }
+
+// ---------------------------------------------------------------------------
+// FULL PRODUCT EXPORT
+// ---------------------------------------------------------------------------
+// RD asked for every product, not just the brand summary, so he can map
+// products to brands himself while cleaning up.
+//
+// Deliberately NOT the whole table. Trade price, RRP and average selling price
+// stay here: they are our commercial numbers, Price Manager holds supplier cost
+// already, and nothing in a brand clean-up needs them. Weights, HS codes and
+// warehouse fields are left out for the same reason - they are not part of this
+// job.
+//
+// `is_archived` IS included so RD can decide whether to count archived lines
+// rather than having that decision made for him by a WHERE clause he cannot see.
+//
+// Written in pages and streamed to the response. The table runs to six figures;
+// building the whole file as one string first would be a good way to run the
+// web service out of memory.
+
+export const PRODUCT_EXPORT_COLUMNS = [
+  "id",
+  "ean",
+  "name",
+  "brand",
+  "category",
+  "pack_size",
+  "status",
+  "is_archived",
+  "created_at",
+  "updated_at",
+] as const;
+
+const PRODUCT_PAGE_SIZE = 5000;
+
+/**
+ * Stream every product as CSV, oldest id first, paging by id so a long export
+ * never holds a large result set open or in memory.
+ *
+ * Returns the number of rows written.
+ */
+export async function streamProductCsv(write: (chunk: string) => void): Promise<number> {
+  const client = await getInventoryPool().connect();
+  try {
+    // BOM first, so Excel reads it as UTF-8 and accented product names survive.
+    write("\ufeff" + PRODUCT_EXPORT_COLUMNS.map(csvCell).join(",") + "\r\n");
+
+    let lastId = 0;
+    let total = 0;
+
+    for (;;) {
+      const page = await client.query<Record<string, unknown>>(
+        `select id, ean, name, brand, category, pack_size, status, is_archived,
+                created_at, updated_at
+           from products
+          where id > $1
+          order by id
+          limit $2`,
+        [lastId, PRODUCT_PAGE_SIZE],
+      );
+      if (!page.rows.length) break;
+
+      const lines: string[] = [];
+      for (const r of page.rows) {
+        lines.push(PRODUCT_EXPORT_COLUMNS.map((c) => csvCell(r[c])).join(","));
+        lastId = Number(r.id);
+      }
+      write(lines.join("\r\n") + "\r\n");
+      total += page.rows.length;
+
+      if (page.rows.length < PRODUCT_PAGE_SIZE) break;
+    }
+
+    return total;
+  } finally {
+    client.release();
+  }
+}
+
+/** How many rows the export will contain, for the screen. */
+export async function productCount(): Promise<{ total: number; archived: number }> {
+  const client = await getInventoryPool().connect();
+  try {
+    const r = await client.query<{ total: string; archived: string }>(
+      `select count(*)::text as total,
+              count(*) filter (where is_archived is true)::text as archived
+         from products`,
+    );
+    return {
+      total: Number(r.rows[0]?.total ?? 0),
+      archived: Number(r.rows[0]?.archived ?? 0),
+    };
+  } finally {
+    client.release();
+  }
+}
