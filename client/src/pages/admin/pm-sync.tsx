@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import {
   RefreshCw, CheckCircle2, AlertTriangle, Loader2, Eye, Download,
-  ArrowRight, Barcode, PlugZap,
+  ArrowRight, Barcode, PlugZap, FileSpreadsheet, Tags,
 } from "lucide-react";
 
 /**
@@ -24,6 +24,24 @@ interface Health {
   brands?: number;
   products?: number;
   error?: string;
+}
+
+interface BrandFlag {
+  brand: string;
+  productCount: number;
+  hex: string;
+  reason: string;
+}
+
+interface BrandReport {
+  ranAt: string;
+  distinctSpellings: number;
+  productsWithABrand: number;
+  productsWithNoBrand: number;
+  nonAscii: BrandFlag[];
+  corrupted: BrandFlag[];
+  nearDuplicates: { normalised: string; spellings: { brand: string; productCount: number }[]; totalProducts: number }[];
+  spellingsUnder60Products: number;
 }
 
 interface BrandResult {
@@ -80,6 +98,12 @@ function Stat({ label, value, tone }: { label: string; value: number | string; t
 export default function AdminPmSyncPage() {
   const { toast } = useToast();
   const [result, setResult] = useState<SyncResult | null>(null);
+  const [showBrands, setShowBrands] = useState(false);
+  const { data: brandReport, isFetching: brandsLoading } = useQuery<BrandReport>({
+    queryKey: ["/api/admin/brand-report/summary"],
+    enabled: showBrands,
+  });
+
   const [showNoEan, setShowNoEan] = useState(false);
 
   const { data: health, isLoading: healthLoading } = useQuery<Health>({
@@ -201,6 +225,109 @@ export default function AdminPmSyncPage() {
       <p className="text-xs text-muted-foreground -mt-3">
         Preview writes nothing at all. Sync now only creates drafts — no customer price moves until you publish one.
       </p>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Tags className="h-4 w-4" /> Brand list for the Price Manager clean-up
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground max-w-3xl">
+            Every distinct brand spelling in the inventory app, with its product count and the exact bytes
+            of each name. RD had been reading brands through a search endpoint that only returns the top 25
+            matches, so smaller brands never reached him. This reads the database directly, in one pass.
+            Nothing is renamed or merged here &mdash; it is a report.
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setShowBrands(true)} disabled={brandsLoading}>
+              {brandsLoading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Eye className="h-4 w-4 mr-1" />}
+              Check the brand list
+            </Button>
+            <a href="/api/admin/brand-report.csv" download>
+              <Button variant="outline" size="sm">
+                <FileSpreadsheet className="h-4 w-4 mr-1" /> Download CSV for RD
+              </Button>
+            </a>
+          </div>
+
+          {brandReport ? (
+            <div className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-lg border bg-card p-3">
+                  <div className="text-xl font-semibold tabular-nums">{brandReport.distinctSpellings}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">Distinct brand spellings</div>
+                </div>
+                <div className="rounded-lg border bg-card p-3">
+                  <div className="text-xl font-semibold tabular-nums">{brandReport.spellingsUnder60Products}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">Below RD&rsquo;s search cut-off</div>
+                </div>
+                <div className="rounded-lg border bg-card p-3">
+                  <div className="text-xl font-semibold tabular-nums text-amber-600">
+                    {brandReport.nearDuplicates.length}
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-0.5">Same name, different spelling</div>
+                </div>
+                <div className="rounded-lg border bg-card p-3">
+                  <div className="text-xl font-semibold tabular-nums">{brandReport.productsWithNoBrand}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">Products with no brand at all</div>
+                </div>
+              </div>
+
+              {brandReport.corrupted.length ? (
+                <div>
+                  <h4 className="text-sm font-medium mb-1">
+                    {brandReport.corrupted.length} name(s) genuinely corrupted
+                  </h4>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    These hold the Unicode replacement character &mdash; the original letter was already lost
+                    before it reached the database, so it has to be retyped.
+                  </p>
+                  <div className="divide-y text-sm">
+                    {brandReport.corrupted.map((b) => (
+                      <div key={b.brand} className="flex justify-between gap-3 py-1">
+                        <span>{b.brand}</span>
+                        <span className="text-muted-foreground text-xs">{b.productCount} products</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600 inline mr-1 -mt-0.5" />
+                  No corrupted characters. {brandReport.nonAscii.length} name(s) hold real accented letters,
+                  stored correctly &mdash; anything that looked broken was broken in transit, not in the database.
+                </p>
+              )}
+
+              {brandReport.nearDuplicates.length ? (
+                <div>
+                  <h4 className="text-sm font-medium mb-1">Spellings that look like the same brand</h4>
+                  <div className="divide-y text-sm">
+                    {brandReport.nearDuplicates.slice(0, 40).map((g) => (
+                      <div key={g.normalised} className="py-1.5">
+                        <div className="flex flex-wrap gap-x-3 gap-y-1">
+                          {g.spellings.map((sp) => (
+                            <span key={sp.brand}>
+                              {sp.brand}{" "}
+                              <span className="text-muted-foreground text-xs">({sp.productCount})</span>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {brandReport.nearDuplicates.length > 40 ? (
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Showing the 40 largest. The CSV has them all.
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
 
       {showNoEan && noEan?.brands?.length ? (
         <Card>
