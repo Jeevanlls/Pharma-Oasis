@@ -174,6 +174,12 @@ pool.query(`
   ALTER TABLE products ADD COLUMN IF NOT EXISTS cost_status VARCHAR(20) DEFAULT 'none';
   ALTER TABLE products ADD COLUMN IF NOT EXISTS available_qty INTEGER;
   ALTER TABLE users ADD COLUMN IF NOT EXISTS price_list_id INTEGER;
+  -- Key a pricing brand to its Price Manager brand, so a rename upstream
+  -- cannot orphan the brand's price list and customers.
+  ALTER TABLE pricing_brands ADD COLUMN IF NOT EXISTS pm_brand_id INTEGER;
+  CREATE UNIQUE INDEX IF NOT EXISTS uniq_pricing_brands_pm_brand_id
+    ON pricing_brands (pm_brand_id) WHERE pm_brand_id IS NOT NULL;
+
   -- Link a portal login to its inventory-app customer record
   ALTER TABLE users ADD COLUMN IF NOT EXISTS inventory_customer_id INTEGER;
   CREATE UNIQUE INDEX IF NOT EXISTS uniq_users_inventory_customer_id
