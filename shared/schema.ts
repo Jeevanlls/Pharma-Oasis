@@ -1459,6 +1459,11 @@ export type DealEvent = typeof dealEvents.$inferSelect;
 export const pricingBrands = pgTable("pricing_brands", {
   id: serial("id").primaryKey(),
   name: varchar("name", { length: 255 }).notNull().unique(),
+  // The brand's id in RD's Price Manager. This, not the name, is what the sync
+  // matches on: RD renames brands during clean-up, and a name match would
+  // quietly create a second brand and strand the first one's price list and
+  // its customers. Null for brands that did not come from Price Manager.
+  pmBrandId: integer("pm_brand_id"),
   slug: varchar("slug", { length: 255 }),
   logoUrl: text("logo_url"),
   isActive: boolean("is_active").default(true),

@@ -60,6 +60,7 @@ import * as pmSync from "./pm-sync";
 import * as customerSync from "./customer-sync";
 import * as autoInvite from "./customer-auto-invite";
 import * as brandReport from "./brand-report";
+import * as pricingBulk from "./pricing-bulk";
 import { resolveForList, toCustomerPrice } from "./pricing";
 import { buildPriceListData, buildCustomerPriceListData, buildPriceListXlsx, buildPriceListPdf } from "./price-export";
 import { buildOrderXlsx, buildOrderPdf } from "./order-document";
@@ -4629,6 +4630,89 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
       res.json({ success: true, ...result });
     } catch (error: any) {
       res.status(500).json({ message: error.message || "Failed to publish" });
+    }
+  });
+
+  // ---- Bulk pricing: the same per-brand actions, in a loop ----
+  // Each has a preview that writes nothing, because a bulk action is not
+  // something you can easily unpick one row at a time.
+
+  app.get("/api/admin/bulk/publish-preview", requireAdmin, async (_req, res) => {
+    try {
+      res.json(await pricingBulk.publishPreview());
+    } catch (e: any) {
+      res.status(500).json({ message: e?.message || "Preview failed" });
+    }
+  });
+
+  app.post("/api/admin/bulk/publish", requireAdmin, async (req, res) => {
+    try {
+      const uploadIds = Array.isArray(req.body?.uploadIds)
+        ? req.body.uploadIds.map(Number).filter((n: number) => Number.isFinite(n))
+        : undefined;
+      res.json(
+        await pricingBulk.publishAllDrafts({
+          priceManagerOnly: !!req.body?.priceManagerOnly,
+          uploadIds,
+        }),
+      );
+    } catch (e: any) {
+      res.status(500).json({ message: e?.message || "Bulk publish failed" });
+    }
+  });
+
+  app.get("/api/admin/bulk/build-preview", requireAdmin, async (_req, res) => {
+    try {
+      res.json(await pricingBulk.buildPreview());
+    } catch (e: any) {
+      res.status(500).json({ message: e?.message || "Preview failed" });
+    }
+  });
+
+  app.post("/api/admin/bulk/build-price-lists", requireAdmin, async (req, res) => {
+    try {
+      const marginPercent = Number(req.body?.marginPercent);
+      if (!Number.isFinite(marginPercent)) {
+        return res.status(400).json({ message: "marginPercent is required" });
+      }
+      const brandIds = Array.isArray(req.body?.brandIds)
+        ? req.body.brandIds.map(Number).filter((n: number) => Number.isFinite(n))
+        : undefined;
+      res.json(
+        await pricingBulk.buildAllPriceLists({
+          marginPercent,
+          roundingMode: parseRounding(req.body?.roundingMode),
+          nameTemplate: req.body?.nameTemplate,
+          publish: !!req.body?.publish,
+          brandIds,
+        }),
+      );
+    } catch (e: any) {
+      res.status(500).json({ message: e?.message || "Bulk build failed" });
+    }
+  });
+
+  app.post("/api/admin/bulk/assign", requireAdmin, async (req: any, res) => {
+    try {
+      const priceListIds = Array.isArray(req.body?.priceListIds)
+        ? req.body.priceListIds.map(Number).filter((n: number) => Number.isFinite(n))
+        : [];
+      const customerIds = Array.isArray(req.body?.customerIds)
+        ? req.body.customerIds.map(Number).filter((n: number) => Number.isFinite(n))
+        : [];
+      if (!priceListIds.length || !customerIds.length) {
+        return res.status(400).json({ message: "Pick at least one list and one customer" });
+      }
+      res.json(
+        await pricingBulk.assignListsToCustomers({
+          priceListIds,
+          customerIds,
+          replace: !!req.body?.replace,
+          assignedBy: req.session?.userId ?? null,
+        }),
+      );
+    } catch (e: any) {
+      res.status(500).json({ message: e?.message || "Bulk assign failed" });
     }
   });
 

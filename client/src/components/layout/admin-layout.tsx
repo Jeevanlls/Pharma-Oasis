@@ -43,6 +43,7 @@ import {
   FileUp,
   RefreshCw,
   UserPlus,
+  Rocket,
   Coins,
   ShoppingCart,
   PoundSterling,
@@ -103,6 +104,7 @@ const navGroups: NavGroup[] = [
       { title: "5. Price Lists", href: "/admin/price-builder", icon: Coins, staffAccess: false },
       { title: "6. Who Sees What", href: "/admin/assignments", icon: Users, staffAccess: false },
       { title: "7. Promotions", href: "/admin/promotions", icon: Megaphone, staffAccess: false },
+      { title: "Go live (bulk setup)", href: "/admin/bulk-setup", icon: Rocket, staffAccess: false },
     ],
   },
   {

@@ -125,26 +125,80 @@ const numOrNull = (v: string | number | null | undefined): number | null => {
   return Number.isFinite(n) ? n : null;
 };
 
-/** Find this brand in our pricing_brands by name (case-insensitive), creating it
- *  if it is one Price Manager has never sent before. Matching on name is safe
- *  here because pricing_brands.name is unique; a future PR keys on the Price
- *  Manager brand id so a rename cannot orphan a brand. */
-async function findPricingBrandByName(name: string): Promise<number | null> {
-  const existing = await db.select().from(pricingBrands);
-  const hit = existing.find((b) => norm(b.name) === norm(name));
-  return hit ? hit.id : null;
+/**
+ * Resolve a Price Manager brand to one of our pricing brands.
+ *
+ * Matching is by Price Manager brand id FIRST and name only as a fallback.
+ * That ordering is the whole point: RD renames brands during his clean-up, and
+ * a name-only match would quietly create a second brand, leaving the first one
+ * holding the price list and the customers while the new costs landed in the
+ * new one. Nothing would error; the two would just drift apart.
+ *
+ * Three cases:
+ *   - known id     -> that brand, and its name is corrected if RD renamed it
+ *   - known name   -> that brand, and it ADOPTS the id so this is the last time
+ *                     we ever have to match it by name
+ *   - neither      -> a new brand, stamped with the id
+ *
+ * `write` is false on a dry run, where the answer is reported but nothing is
+ * created, adopted or renamed.
+ */
+interface BrandResolution {
+  id: number | null;
+  created: boolean;
+  /** RD renamed it upstream and we followed */
+  renamedFrom?: string;
+  /** matched by name and took the id for the first time */
+  adopted?: boolean;
+  /** the rename could not be applied because another brand already has that name */
+  renameBlocked?: string;
 }
 
-async function ensurePricingBrandByName(name: string): Promise<{ id: number; created: boolean }> {
-  const clean = name.trim();
-  const existing = await db.select().from(pricingBrands);
-  const hit = existing.find((b) => norm(b.name) === norm(clean));
-  if (hit) return { id: hit.id, created: false };
+async function resolvePricingBrand(
+  pm: PmBrandRow,
+  existing: (typeof pricingBrands.$inferSelect)[],
+  write: boolean,
+): Promise<BrandResolution> {
+  const clean = pm.name.trim();
+
+  const byId = existing.find((b) => b.pmBrandId === pm.id);
+  if (byId) {
+    if (norm(byId.name) === norm(clean)) return { id: byId.id, created: false };
+    // Renamed upstream. Follow it — unless the new name is already taken here,
+    // in which case renaming would violate the unique name and, worse, silently
+    // merge two brands. Leave it alone and say so.
+    const clash = existing.find((b) => b.id !== byId.id && norm(b.name) === norm(clean));
+    if (clash) {
+      return { id: byId.id, created: false, renameBlocked: `${byId.name} -> ${clean}` };
+    }
+    if (write) {
+      await db
+        .update(pricingBrands)
+        .set({ name: clean, updatedAt: new Date() })
+        .where(eq(pricingBrands.id, byId.id));
+    }
+    return { id: byId.id, created: false, renamedFrom: byId.name };
+  }
+
+  const byName = existing.find((b) => norm(b.name) === norm(clean));
+  if (byName) {
+    if (write && byName.pmBrandId == null) {
+      await db
+        .update(pricingBrands)
+        .set({ pmBrandId: pm.id, updatedAt: new Date() })
+        .where(eq(pricingBrands.id, byName.id));
+    }
+    return { id: byName.id, created: false, adopted: byName.pmBrandId == null };
+  }
+
+  if (!write) return { id: null, created: true };
+
   const [made] = await db
     .insert(pricingBrands)
     .values({
       name: clean,
       slug: clean.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""),
+      pmBrandId: pm.id,
       isActive: true,
     })
     .returning();
@@ -165,6 +219,12 @@ export interface PmSyncBrandResult {
   removedCount: number;
   unchangedCount: number;
   duplicateCount: number;
+  /** RD renamed this brand upstream and we followed */
+  renamedFrom?: string;
+  /** matched by name and took the Price Manager id for the first time */
+  adopted?: boolean;
+  /** the upstream rename could not be applied - another brand already has that name */
+  renameBlocked?: string;
   /** a draft was raised for this brand (or would be, on a dry run) */
   draftRaised: boolean;
   draftUploadId?: number;
@@ -184,6 +244,8 @@ export interface PmSyncResult {
   totalRemoved: number;
   totalNoEan: number;
   brandsCreated: string[];
+  /** brands RD renamed upstream that we followed, "old -> new" */
+  brandsRenamed: string[];
   categoriesSeen: string[];
   results: PmSyncBrandResult[];
 }
@@ -218,8 +280,13 @@ export async function runPmSync(opts: {
     else byBrand.set(p.brand_id, [p]);
   }
 
+  // Read our brands once. The loop does up to a few hundred lookups and this
+  // table is small; re-selecting per brand was pure waste.
+  const existingBrands = await db.select().from(pricingBrands);
+
   const results: PmSyncBrandResult[] = [];
   const brandsCreated: string[] = [];
+  const renamed: string[] = [];
   const categoriesSeen = new Set<string>();
 
   for (const b of brands) {
@@ -238,18 +305,12 @@ export async function runPmSync(opts: {
     // brand does not exist here yet then it has no prior costs and no open
     // draft, so a null id answers both of those questions correctly and we can
     // still report exactly what a real run would do.
-    let pricingBrandId: number | null = await findPricingBrandByName(b.name);
-    let created = false;
-    if (dryRun) {
-      created = pricingBrandId === null;
-      if (created) brandsCreated.push(b.name);
-    } else {
-      const ensured = await ensurePricingBrandByName(b.name);
-      pricingBrandId = ensured.id;
-      created = ensured.created;
-      if (created) brandsCreated.push(b.name);
-      if (b.category) await ensurePricingCategory(b.category);
-    }
+    const resolved = await resolvePricingBrand(b, existingBrands, !dryRun);
+    const pricingBrandId = resolved.id;
+    const created = resolved.created;
+    if (created) brandsCreated.push(b.name);
+    if (resolved.renamedFrom) renamed.push(`${resolved.renamedFrom} -> ${b.name}`);
+    if (!dryRun && b.category) await ensurePricingCategory(b.category);
     if (b.category) categoriesSeen.add(b.category);
 
     const rows: ParsedCostRow[] = items.map((p) => ({
@@ -273,6 +334,9 @@ export async function runPmSync(opts: {
       category: b.category,
       pricingBrandId,
       brandCreated: created,
+      renamedFrom: resolved.renamedFrom,
+      adopted: resolved.adopted,
+      renameBlocked: resolved.renameBlocked,
       lines: rows.length,
       noEan,
       newCount: summary.newCount,
@@ -323,6 +387,7 @@ export async function runPmSync(opts: {
     totalRemoved: results.reduce((s, r) => s + r.removedCount, 0),
     totalNoEan: results.reduce((s, r) => s + r.noEan, 0),
     brandsCreated,
+    brandsRenamed: renamed,
     categoriesSeen: Array.from(categoriesSeen).sort(),
     results: results.sort((a, b) => b.lines - a.lines),
   };
