@@ -30,7 +30,7 @@ export const MAX_INVITES_PER_RUN = 25;
 
 let invPool: pg.Pool | null = null;
 
-function getInventoryPool(): pg.Pool {
+export function getInventoryPool(): pg.Pool {
   if (invPool) return invPool;
   let url = process.env.INVENTORY_DATABASE_URL;
   if (!url) {

@@ -59,6 +59,7 @@ import * as pricingV2 from "./pricing-v2";
 import * as pmSync from "./pm-sync";
 import * as customerSync from "./customer-sync";
 import * as autoInvite from "./customer-auto-invite";
+import * as brandReport from "./brand-report";
 import { resolveForList, toCustomerPrice } from "./pricing";
 import { buildPriceListData, buildCustomerPriceListData, buildPriceListXlsx, buildPriceListPdf } from "./price-export";
 import { buildOrderXlsx, buildOrderPdf } from "./order-document";
@@ -5002,6 +5003,33 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
       res.json(await customerSync.inviteCustomers(ids, { linkOnly: !!req.body?.linkOnly }));
     } catch (e: any) {
       res.status(500).json({ message: e?.message || "Invites failed" });
+    }
+  });
+
+  // ---- Brand report: the complete brand list from the inventory database ----
+  // Read-only. Feeds RD's brand clean-up before brands are loaded into Price
+  // Manager; nothing here renames or merges anything.
+
+  app.get("/api/admin/brand-report/summary", requireAdmin, async (_req, res) => {
+    try {
+      res.json(await brandReport.brandReportSummary());
+    } catch (e: any) {
+      res.status(500).json({ message: e?.message || "Brand report failed" });
+    }
+  });
+
+  app.get("/api/admin/brand-report.csv", requireAdmin, async (_req, res) => {
+    try {
+      const { rows } = await brandReport.readBrandReport();
+      const stamp = new Date().toISOString().slice(0, 10);
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="pharma-oasis-brands-${stamp}.csv"`,
+      );
+      res.send(brandReport.brandReportCsv(rows));
+    } catch (e: any) {
+      res.status(500).json({ message: e?.message || "Brand report failed" });
     }
   });
 

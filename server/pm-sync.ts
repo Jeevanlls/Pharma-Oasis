@@ -129,6 +129,12 @@ const numOrNull = (v: string | number | null | undefined): number | null => {
  *  if it is one Price Manager has never sent before. Matching on name is safe
  *  here because pricing_brands.name is unique; a future PR keys on the Price
  *  Manager brand id so a rename cannot orphan a brand. */
+async function findPricingBrandByName(name: string): Promise<number | null> {
+  const existing = await db.select().from(pricingBrands);
+  const hit = existing.find((b) => norm(b.name) === norm(name));
+  return hit ? hit.id : null;
+}
+
 async function ensurePricingBrandByName(name: string): Promise<{ id: number; created: boolean }> {
   const clean = name.trim();
   const existing = await db.select().from(pricingBrands);
@@ -228,12 +234,23 @@ export async function runPmSync(opts: {
       continue;
     }
 
-    const { id: pricingBrandId, created } = await ensurePricingBrandByName(b.name);
-    if (created) brandsCreated.push(b.name);
-    if (b.category) {
-      categoriesSeen.add(b.category);
-      await ensurePricingCategory(b.category);
+    // A dry run must write NOTHING — not even a brand or category row. If the
+    // brand does not exist here yet then it has no prior costs and no open
+    // draft, so a null id answers both of those questions correctly and we can
+    // still report exactly what a real run would do.
+    let pricingBrandId: number | null = await findPricingBrandByName(b.name);
+    let created = false;
+    if (dryRun) {
+      created = pricingBrandId === null;
+      if (created) brandsCreated.push(b.name);
+    } else {
+      const ensured = await ensurePricingBrandByName(b.name);
+      pricingBrandId = ensured.id;
+      created = ensured.created;
+      if (created) brandsCreated.push(b.name);
+      if (b.category) await ensurePricingCategory(b.category);
     }
+    if (b.category) categoriesSeen.add(b.category);
 
     const rows: ParsedCostRow[] = items.map((p) => ({
       ean: (p.ean ?? "").trim(),
@@ -246,7 +263,7 @@ export async function runPmSync(opts: {
     }));
 
     const noEan = rows.filter((r) => !r.ean).length;
-    const prior = await getBaseCostForBrand(pricingBrandId);
+    const prior = pricingBrandId === null ? null : await getBaseCostForBrand(pricingBrandId);
     const summary = analyzeRows(rows, prior?.rows ?? [], threshold);
 
     const moved = summary.newCount + summary.changedCount + summary.removedCount;
@@ -266,7 +283,7 @@ export async function runPmSync(opts: {
       draftRaised: false,
     };
 
-    if (brandsWithOpenDraft.has(pricingBrandId)) {
+    if (pricingBrandId !== null && brandsWithOpenDraft.has(pricingBrandId)) {
       results.push({ ...base, skipped: "a sync draft for this brand is already awaiting review" });
       continue;
     }
@@ -280,7 +297,7 @@ export async function runPmSync(opts: {
     }
 
     const upload = await createDraftUpload({
-      brandId: pricingBrandId,
+      brandId: pricingBrandId as number,
       supplierName: PM_SUPPLIER_NAME,
       comment:
         `Automatic sync from Price Manager — ${summary.newCount} new, ` +
