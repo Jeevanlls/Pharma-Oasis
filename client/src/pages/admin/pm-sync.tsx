@@ -44,6 +44,11 @@ interface BrandReport {
   spellingsUnder60Products: number;
 }
 
+interface ProductCount {
+  total: number;
+  archived: number;
+}
+
 interface BrandResult {
   pmBrandId: number;
   brand: string;
@@ -98,6 +103,10 @@ function Stat({ label, value, tone }: { label: string; value: number | string; t
 export default function AdminPmSyncPage() {
   const { toast } = useToast();
   const [result, setResult] = useState<SyncResult | null>(null);
+  const { data: productCount } = useQuery<ProductCount>({
+    queryKey: ["/api/admin/product-count"],
+  });
+
   const [showBrands, setShowBrands] = useState(false);
   const { data: brandReport, isFetching: brandsLoading } = useQuery<BrandReport>({
     queryKey: ["/api/admin/brand-report/summary"],
@@ -246,10 +255,28 @@ export default function AdminPmSyncPage() {
             </Button>
             <a href="/api/admin/brand-report.csv" download>
               <Button variant="outline" size="sm">
-                <FileSpreadsheet className="h-4 w-4 mr-1" /> Download CSV for RD
+                <FileSpreadsheet className="h-4 w-4 mr-1" /> Download brand CSV
+              </Button>
+            </a>
+            <a href="/api/admin/product-export.csv" download>
+              <Button variant="outline" size="sm">
+                <FileSpreadsheet className="h-4 w-4 mr-1" /> Download full product CSV
               </Button>
             </a>
           </div>
+          <p className="text-xs text-muted-foreground">
+            The product CSV lists every product with its brand, category, pack size, status and
+            archived flag &mdash; enough to map products to brands. Trade price, RRP and selling
+            price are deliberately left out.
+            {productCount ? (
+              <>
+                {" "}
+                <strong>{productCount.total.toLocaleString()}</strong> rows
+                {productCount.archived ? <> ({productCount.archived.toLocaleString()} archived)</> : null}.
+                It is a large file and takes a moment to start.
+              </>
+            ) : null}
+          </p>
 
           {brandReport ? (
             <div className="space-y-4">
