@@ -742,6 +742,8 @@ export interface RefreshOutcome {
   name: string;
   ok: boolean;
   updated?: number;
+  /** products in the supplier file that were not on the list, now added */
+  added?: number;
   /** hand-set prices whose cost moved — margin unchanged, worth a look */
   fixedToReview?: number;
   error?: string;
@@ -755,20 +757,46 @@ export interface RefreshOutcome {
  * reported; a line whose cost vanished becomes "price on request" rather than
  * disappearing, so the customer can still ask.
  */
-export async function refreshAllLists(opts: { listIds?: number[] } = {}): Promise<{
+export async function refreshAllLists(opts: {
+  listIds?: number[];
+  /** false to leave products the list does not yet carry alone (default: add them) */
+  addNew?: boolean;
+} = {}): Promise<{
   lists: number;
   updated: number;
+  added: number;
   fixedToReview: number;
   failed: number;
   results: RefreshOutcome[];
 }> {
   const stale = await findStaleLists(opts.listIds);
+  const addNew = opts.addNew !== false;
   const results: RefreshOutcome[] = [];
 
   for (const s of stale) {
     try {
+      // Two passes, each using the function that is right for its half.
+      // refreshFromBaseCost handles existing lines, including the case where a
+      // cost has vanished (the line becomes "price on request" rather than
+      // disappearing). reconcileApply is the only thing that can add a product
+      // the list does not carry yet, so new lines go through that — and only
+      // new lines: nothing is deleted here, a line that has left the supplier
+      // file keeps its last price until someone decides otherwise.
       const r = await pricingV2.refreshFromBaseCost(s.listId);
-      results.push({ listId: s.listId, name: s.name, ok: true, ...r });
+      let added = 0;
+      if (addNew) {
+        const pre = await pricingV2.reconcilePreview(s.listId);
+        const eans = pre.newProducts.map((n) => n.ean).filter((e): e is string => !!e);
+        if (eans.length) {
+          const applied = await pricingV2.reconcileApply(s.listId, {
+            applyChangedItemIds: [],
+            addNewEans: eans,
+            removeMissingItemIds: [],
+          });
+          added = applied.added;
+        }
+      }
+      results.push({ listId: s.listId, name: s.name, ok: true, added, ...r });
     } catch (e: any) {
       results.push({ listId: s.listId, name: s.name, ok: false, error: e?.message || String(e) });
     }
@@ -777,6 +805,7 @@ export async function refreshAllLists(opts: { listIds?: number[] } = {}): Promis
   return {
     lists: results.filter((r) => r.ok).length,
     updated: results.reduce((n, r) => n + (r.updated ?? 0), 0),
+    added: results.reduce((n, r) => n + (r.added ?? 0), 0),
     fixedToReview: results.reduce((n, r) => n + (r.fixedToReview ?? 0), 0),
     failed: results.filter((r) => !r.ok).length,
     results,
@@ -880,13 +909,21 @@ export async function goLiveState(): Promise<GoLiveState> {
 
   const todo: GoLiveTodo[] = [];
 
-  if (refresh.stale > 0) {
+  const moving = refresh.changed + refresh.newProducts;
+  if (refresh.stale > 0 && moving > 0) {
+    const bits: string[] = [];
+    if (refresh.changed) bits.push(`${refresh.changed} price${refresh.changed === 1 ? "" : "s"} changed`);
+    if (refresh.newProducts) bits.push(`${refresh.newProducts} new product${refresh.newProducts === 1 ? "" : "s"}`);
     todo.push({
       key: "costs_not_applied",
-      count: refresh.changed,
+      count: moving,
       severity: "todo",
-      text: `${refresh.changed} price${refresh.changed === 1 ? "" : "s"} across ${refresh.stale} brand${refresh.stale === 1 ? "" : "s"} ${refresh.changed === 1 ? "is" : "are"} out of date`,
-      detail: `New buying prices are published but customers are still seeing the old ones. ${refresh.up} up, ${refresh.down} down${refresh.bigMovers ? `, ${refresh.bigMovers} moved more than 25%` : ""}.`,
+      text: `${bits.join(" and ")} across ${refresh.stale} brand${refresh.stale === 1 ? "" : "s"}, not yet sent to customers`,
+      detail: [
+        refresh.changed ? `${refresh.up} up, ${refresh.down} down` : "",
+        refresh.bigMovers ? `${refresh.bigMovers} moved more than 25%` : "",
+        refresh.missing ? `${refresh.missing} line(s) have left the supplier file and will keep their last price` : "",
+      ].filter(Boolean).join(" · "),
     });
   }
 
@@ -965,7 +1002,7 @@ export async function goLiveState(): Promise<GoLiveState> {
 
   const dailyBlock = {
     staleLists: refresh.stale,
-    pricesWaiting: refresh.changed,
+    pricesWaiting: refresh.changed + refresh.newProducts,
     bigMovers: refresh.bigMovers,
   };
 
@@ -973,8 +1010,8 @@ export async function goLiveState(): Promise<GoLiveState> {
     ? "Nothing is priced yet."
     : !customersSeeing
       ? `${brandsPriced} brands are priced, but no customer has been given a list yet.`
-      : refresh.stale > 0
-        ? `Live, with ${refresh.changed} price${refresh.changed === 1 ? "" : "s"} waiting to go out.`
+      : refresh.changed + refresh.newProducts > 0
+        ? `Live, with ${(refresh.changed + refresh.newProducts).toLocaleString()} update${refresh.changed + refresh.newProducts === 1 ? "" : "s"} waiting to go out.`
         : `Live and up to date.`;
 
   return {
