@@ -728,12 +728,21 @@ export async function reconcileApply(listId: number, d: ReconcileDecisions): Pro
   }
 
   // 2) New products — add at the chosen margin.
+  //
+  // The rounding comes from the LIST, not from some other line's item. This
+  // used to read `it.roundingMode`, which is the loop variable from step 1 and
+  // is out of scope here — adding a new product threw a ReferenceError every
+  // time. It never surfaced because nobody had added one yet.
   if (addEans.size) {
+    const listRounding = (list.roundingMode as RoundingMode) ?? "none";
     const toAdd = base.rows.filter((r) => r.ean && addEans.has(r.ean));
     if (toAdd.length) {
       await db.insert(priceListItems).values(
         toAdd.map((row) => {
           const cost = num(row.costPrice);
+          // No usable cost — carry the line but show it as "price on request"
+          // rather than inventing a price of zero.
+          const usable = cost !== null && cost > 0;
           return {
             priceListId: listId,
             costRowId: row.id,
@@ -746,7 +755,9 @@ export async function reconcileApply(listId: number, d: ReconcileDecisions): Pro
             marginPercent: toStr(newMargin),
             fixedPrice: null,
             plusAmount: null,
-            preparedPrice: toStr(computePrepared("margin", cost, newMargin, null, null, (it.roundingMode as RoundingMode))),
+            preparedPrice: usable
+              ? toStr(computePrepared("margin", cost, newMargin, null, null, listRounding))
+              : null,
             supplierQty: row.supplierQty ?? null,
             isActive: true,
           };

@@ -252,7 +252,7 @@ export default function BulkSetupPage() {
       setRefreshResult(res);
       await reloadEverything();
       toast({
-        title: `${res.updated} customer price(s) updated`,
+        title: `${res.updated} price(s) updated${res.added ? `, ${res.added} added` : ""}`,
         description: res.fixedToReview
           ? `${res.fixedToReview} hand-set price(s) had their cost move — worth a look.`
           : `Across ${res.lists} brand(s).`,
@@ -406,7 +406,7 @@ export default function BulkSetupPage() {
             leaving hand-set prices alone.
           </p>
 
-          {refresh && refresh.stale === 0 ? (
+          {refresh && refresh.changed + refresh.newProducts === 0 ? (
             <p className="text-sm text-emerald-700 flex items-center gap-1.5">
               <CheckCircle2 className="h-4 w-4" />
               Every customer price matches the latest published cost.
@@ -414,20 +414,16 @@ export default function BulkSetupPage() {
           ) : refresh ? (
             <>
               <div className="grid gap-3 sm:grid-cols-4">
-                <Stat label="Prices moving" value={refresh.changed} tone="good" />
+                <Stat label="Prices changing" value={refresh.changed} tone="good" />
                 <Stat label="Up" value={refresh.up} />
                 <Stat label="Down" value={refresh.down} />
-                <Stat
-                  label="Moved over 25%"
-                  value={refresh.bigMovers}
-                  tone={refresh.bigMovers ? "warn" : undefined}
-                />
+                <Stat label="New products to add" value={refresh.newProducts} tone={refresh.newProducts ? "good" : undefined} />
               </div>
 
-              {refresh.newProducts || refresh.missing || refresh.handSet ? (
+              {refresh.bigMovers || refresh.missing || refresh.handSet ? (
                 <p className="text-xs text-muted-foreground">
-                  {refresh.newProducts ? `${refresh.newProducts} new product(s) in the supplier file. ` : ""}
-                  {refresh.missing ? `${refresh.missing} line(s) no longer in it. ` : ""}
+                  {refresh.bigMovers ? `${refresh.bigMovers} cost(s) moved more than 25%. ` : ""}
+                  {refresh.missing ? `${refresh.missing} line(s) have left the supplier file — they keep their last price rather than vanishing. ` : ""}
                   {refresh.handSet ? `${refresh.handSet} hand-set price(s) had their cost move and will not change on their own.` : ""}
                 </p>
               ) : null}
@@ -489,7 +485,11 @@ export default function BulkSetupPage() {
                 className="bg-emerald-600 hover:bg-emerald-700 text-white"
               >
                 {doRefresh.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
-                Send {refresh.changed} new price{refresh.changed === 1 ? "" : "s"} to customers
+                {refresh.changed && refresh.newProducts
+                  ? `Update ${refresh.changed} price(s) and add ${refresh.newProducts} product(s)`
+                  : refresh.newProducts
+                    ? `Add ${refresh.newProducts} new product(s) to the lists`
+                    : `Send ${refresh.changed} new price(s) to customers`}
               </Button>
             </>
           ) : (
@@ -499,7 +499,9 @@ export default function BulkSetupPage() {
           {refreshResult ? (
             <div className="rounded-md border bg-muted/40 p-3 text-sm">
               <p className="font-medium">
-                {refreshResult.updated} price(s) updated across {refreshResult.lists} brand(s)
+                {refreshResult.updated} price(s) updated
+                {refreshResult.added ? `, ${refreshResult.added} product(s) added` : ""} across{" "}
+                {refreshResult.lists} brand(s)
                 {refreshResult.failed ? `, ${refreshResult.failed} failed` : ""}
               </p>
               {refreshResult.fixedToReview ? (
