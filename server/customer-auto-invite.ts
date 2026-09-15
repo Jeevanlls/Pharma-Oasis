@@ -25,7 +25,12 @@
  * Nothing here writes to the inventory database.
  */
 import { storage } from "./storage";
-import { customerSyncPreview, inviteCustomers, type CustomerSyncRow } from "./customer-sync";
+import {
+  customerSyncPreview,
+  internalOrTestReason,
+  inviteCustomers,
+  type CustomerSyncRow,
+} from "./customer-sync";
 
 /** Settings keys, stored in site_settings so they survive deploys. */
 const KEY_ENABLED = "customer_autoinvite_enabled";
@@ -36,12 +41,6 @@ const KEY_LAST_RESULT = "customer_autoinvite_last_result";
 
 /** Most invites one automatic run will send. A normal day is a handful. */
 export const MAX_AUTO_INVITES_PER_RUN = 15;
-
-/** Addresses that must never receive an automatic invite. */
-const INTERNAL_DOMAINS = ["pharmaoasis.com", "pharmaoasis.co.uk"];
-const TEST_MARKERS = ["test", "dummy", "sample", "example"];
-
-const norm = (s: string | null | undefined) => (s ?? "").trim().toLowerCase();
 
 const log = (msg: string) => console.log(`[auto-invite] ${msg}`);
 
@@ -142,18 +141,8 @@ export interface AutoInviteResult {
   note?: string;
 }
 
-function isInternalOrTest(row: CustomerSyncRow): string | null {
-  const email = norm(row.email);
-  const domain = email.split("@")[1] ?? "";
-  if (INTERNAL_DOMAINS.includes(domain)) {
-    return "internal address — invite it by hand if that is really intended";
-  }
-  const haystack = `${norm(row.company)} ${email}`;
-  if (TEST_MARKERS.some((m) => haystack.includes(m))) {
-    return "looks like a test record";
-  }
-  return null;
-}
+/** Shared with the manual Customer Logins screen, so the two never disagree. */
+const isInternalOrTest = (row: CustomerSyncRow): string | null => internalOrTestReason(row);
 
 /**
  * One sweep. Safe to call at any time: with dryRun it reports what would happen

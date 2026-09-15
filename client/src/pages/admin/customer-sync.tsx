@@ -31,12 +31,15 @@ interface Row {
   state: State;
   portalUserId?: number;
   note?: string;
+  testReason?: string;
 }
 
 interface Preview {
   ranAt: string;
   inventoryCustomers: number;
   ready: number;
+  readyReal?: number;
+  testLike?: number;
   linked: number;
   linkOnly: number;
   noEmail: number;
@@ -56,6 +59,7 @@ interface InviteResult {
   sent: number;
   linked: number;
   failed: number;
+  listsGranted?: number;
   results: { company: string | null; email: string | null; result: string; detail?: string }[];
 }
 
@@ -211,10 +215,13 @@ export default function AdminCustomerSyncPage() {
     });
   }
 
+  /** Test and internal records are never picked for you — tick them by hand if
+   *  you really mean to invite one. */
   function selectNextBatch() {
     const next = new Set<number>();
     for (const r of actionable) {
       if (next.size >= BATCH) break;
+      if (r.testReason) continue;
       next.add(r.inventoryCustomerId);
     }
     setSelected(next);
@@ -356,12 +363,13 @@ export default function AdminCustomerSyncPage() {
 
       {preview ? (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
-          <Stat label="Ready to invite" value={preview.ready} tone="good" />
+          <Stat label="Ready to invite" value={preview.readyReal ?? preview.ready} tone="good" />
           <Stat label="Already have a login" value={preview.linked} />
           <Stat label="Account exists — link only" value={preview.linkOnly} />
           <Stat label="No email address" value={preview.noEmail} tone={preview.noEmail ? "warn" : undefined} />
           <Stat label="Duplicate email" value={preview.duplicateEmail} tone={preview.duplicateEmail ? "warn" : undefined} />
           <Stat label="Awaiting approval" value={preview.notApproved ?? 0} tone={preview.notApproved ? "warn" : undefined} />
+          <Stat label="Test / internal" value={preview.testLike ?? 0} tone={preview.testLike ? "warn" : undefined} />
         </div>
       ) : null}
 
@@ -396,6 +404,7 @@ export default function AdminCustomerSyncPage() {
             <CardTitle className="text-base">
               Last run — {lastRun.sent} invited, {lastRun.linked} linked
               {lastRun.failed ? `, ${lastRun.failed} failed` : ""}
+              {lastRun.listsGranted ? `, ${lastRun.listsGranted} price-list assignment(s) made` : ""}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-1">
@@ -455,6 +464,11 @@ export default function AdminCustomerSyncPage() {
                           <Link2 className="h-3 w-3 mr-1" /> Link only
                         </Badge>
                       )}
+                      {r.testReason ? (
+                        <Badge variant="outline" className="ml-1 text-amber-700 border-amber-500">
+                          {r.testReason}
+                        </Badge>
+                      ) : null}
                       {r.note ? <span className="block text-xs text-muted-foreground mt-0.5">{r.note}</span> : null}
                     </td>
                   </tr>

@@ -111,6 +111,33 @@ export async function customerSyncHealth(): Promise<{
 
 const norm = (s: string | null | undefined) => (s ?? "").trim().toLowerCase();
 
+/** Our own addresses. A login for one of these is almost always a leftover. */
+const INTERNAL_DOMAINS = ["pharmaoasis.com", "pharmaoasis.co.uk"];
+const TEST_MARKERS = ["test", "dummy", "sample", "example"];
+
+/**
+ * Why this record should not be invited without someone looking at it first,
+ * or null if it is an ordinary customer.
+ *
+ * The automatic sweep and the manual screen both use this, so they can never
+ * disagree about what counts as a test record.
+ */
+export function internalOrTestReason(row: {
+  company: string | null;
+  email: string | null;
+}): string | null {
+  const email = norm(row.email);
+  const domain = email.split("@")[1] ?? "";
+  if (INTERNAL_DOMAINS.includes(domain)) {
+    return "internal address — invite it by hand if that is really intended";
+  }
+  const haystack = `${norm(row.company)} ${email}`;
+  if (TEST_MARKERS.some((m) => haystack.includes(m))) {
+    return "looks like a test record";
+  }
+  return null;
+}
+
 export type CustomerSyncState =
   /** has an email, no portal account yet — an invite can go out */
   | "ready"
@@ -137,12 +164,18 @@ export interface CustomerSyncRow {
   /** the portal user this maps to, when there is one */
   portalUserId?: number;
   note?: string;
+  /** set when the record looks like a test or one of our own addresses */
+  testReason?: string;
 }
 
 export interface CustomerSyncPreview {
   ranAt: string;
   inventoryCustomers: number;
   ready: number;
+  /** ready, minus anything that looks like a test or internal record */
+  readyReal: number;
+  /** records flagged as test/internal, whatever their state */
+  testLike: number;
   linked: number;
   linkOnly: number;
   noEmail: number;
@@ -227,6 +260,9 @@ export async function customerSyncPreview(): Promise<CustomerSyncPreview> {
       };
     }
     return { ...base, state: "ready" as const };
+  }).map((r) => {
+    const testReason = internalOrTestReason(r);
+    return testReason ? { ...r, testReason } : r;
   });
 
   const count = (s: CustomerSyncState) => rows.filter((r) => r.state === s).length;
@@ -234,6 +270,8 @@ export async function customerSyncPreview(): Promise<CustomerSyncPreview> {
     ranAt: new Date().toISOString(),
     inventoryCustomers: customers.length,
     ready: count("ready"),
+    readyReal: rows.filter((r) => r.state === "ready" && !r.testReason).length,
+    testLike: rows.filter((r) => !!r.testReason).length,
     linked: count("linked"),
     linkOnly: count("link_only"),
     noEmail: count("no_email"),
@@ -263,7 +301,7 @@ export interface InviteOutcome {
 export async function inviteCustomers(
   inventoryCustomerIds: number[],
   opts: { linkOnly?: boolean } = {},
-): Promise<{ sent: number; linked: number; failed: number; results: InviteOutcome[] }> {
+): Promise<{ sent: number; linked: number; failed: number; listsGranted: number; results: InviteOutcome[] }> {
   const preview = await customerSyncPreview();
   const wanted = new Set(inventoryCustomerIds);
   const targets = preview.rows
@@ -276,6 +314,10 @@ export async function inviteCustomers(
   const SITE_URL = process.env.SITE_URL || "https://pharmaoasis.co.uk";
 
   const results: InviteOutcome[] = [];
+  // Every account this run touches, so it can be put on the standard price
+  // lists before anyone follows the link. A login with no assignments shows an
+  // empty catalogue, which is a worse first impression than no invite at all.
+  const needLists: number[] = [];
 
   for (const row of targets) {
     const head = {
@@ -293,6 +335,7 @@ export async function inviteCustomers(
             .set({ inventoryCustomerId: row.inventoryCustomerId, updatedAt: new Date() })
             .where(eq(users.id, row.portalUserId));
         }
+        if (row.portalUserId) needLists.push(row.portalUserId);
         results.push({ ...head, result: "linked", portalUserId: row.portalUserId, detail: "existing account linked" });
         continue;
       }
@@ -326,6 +369,7 @@ export async function inviteCustomers(
         inviteUrl: `${SITE_URL}/reset-password?token=${token}`,
       });
 
+      needLists.push(user.id);
       results.push({
         ...head,
         result: emailResult.success ? "invited" : "failed",
@@ -339,7 +383,20 @@ export async function inviteCustomers(
     }
   }
 
+  let listsGranted = 0;
+  if (needLists.length) {
+    try {
+      const { grantStandardLists } = await import("./pricing-bulk");
+      listsGranted = (await grantStandardLists(needLists)).assigned;
+    } catch (e) {
+      // Pricing must never take an invite down with it — the accounts exist and
+      // the emails went; the lists can be granted again from the Go live screen.
+      console.error("[customer-sync] could not grant standard price lists:", e);
+    }
+  }
+
   return {
+    listsGranted,
     sent: results.filter((r) => r.result === "invited").length,
     linked: results.filter((r) => r.result === "linked").length,
     failed: results.filter((r) => r.result === "failed").length,
