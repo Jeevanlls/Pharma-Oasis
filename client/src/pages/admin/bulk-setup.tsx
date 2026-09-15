@@ -307,14 +307,14 @@ export default function BulkSetupPage() {
               standard margin {state.margins.join(" / ")}%
             </span>
           ) : null}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="ml-auto"
-            onClick={() => reloadEverything()}
-          >
-            Re-check
-          </Button>
+          <span className="ml-auto flex items-center gap-1">
+            <Link href="/admin/pricing-guide">
+              <Button variant="ghost" size="sm">How it works</Button>
+            </Link>
+            <Button variant="ghost" size="sm" onClick={() => reloadEverything()}>
+              Re-check
+            </Button>
+          </span>
         </div>
 
         <div className="grid gap-px bg-border sm:grid-cols-3">
