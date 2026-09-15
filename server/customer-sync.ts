@@ -122,6 +122,30 @@ const TEST_MARKERS = ["test", "dummy", "sample", "example"];
  * The automatic sweep and the manual screen both use this, so they can never
  * disagree about what counts as a test record.
  */
+/**
+ * Where an invite got to, from the account itself.
+ *
+ * No extra bookkeeping: a reset token that is still there means the link was
+ * sent and never used, and a sign-in stamp means they got in. Between them
+ * they answer "did it arrive and did they use it" without a delivery receipt.
+ */
+function inviteProgress(acct?: {
+  lastLoginAt: Date | null;
+  passwordResetToken: string | null;
+  passwordResetExpiry: Date | null;
+}): { inviteState?: "invited" | "expired" | "active"; lastLoginAt?: string | null } {
+  if (!acct) return {};
+  if (acct.lastLoginAt) {
+    return { inviteState: "active", lastLoginAt: acct.lastLoginAt.toISOString() };
+  }
+  if (acct.passwordResetToken) {
+    const expired = !!acct.passwordResetExpiry && acct.passwordResetExpiry.getTime() < Date.now();
+    return { inviteState: expired ? "expired" : "invited", lastLoginAt: null };
+  }
+  // Password set but never signed in — rare, but not "invited" any more.
+  return { inviteState: "invited", lastLoginAt: null };
+}
+
 export function internalOrTestReason(row: {
   company: string | null;
   email: string | null;
@@ -166,6 +190,15 @@ export interface CustomerSyncRow {
   note?: string;
   /** set when the record looks like a test or one of our own addresses */
   testReason?: string;
+  /**
+   * How far an invite got. Only meaningful once a login exists.
+   *   invited   — emailed, link still valid, nobody has used it
+   *   expired   — the link ran out; they need a fresh one
+   *   active    — they set a password and have signed in
+   */
+  inviteState?: "invited" | "expired" | "active";
+  /** ISO date of their most recent sign-in, when they have signed in */
+  lastLoginAt?: string | null;
 }
 
 export interface CustomerSyncPreview {
@@ -195,13 +228,19 @@ export async function customerSyncPreview(): Promise<CustomerSyncPreview> {
       email: users.email,
       inventoryCustomerId: users.inventoryCustomerId,
       role: users.role,
+      lastLoginAt: users.lastLoginAt,
+      passwordResetToken: users.passwordResetToken,
+      passwordResetExpiry: users.passwordResetExpiry,
     })
     .from(users);
 
-  const userByEmail = new Map<string, { id: number; role: string }>();
+  type PortalAccount = (typeof portalUsers)[number];
+  const userByEmail = new Map<string, PortalAccount>();
   const userByInvId = new Map<number, number>();
+  const byId = new Map<number, PortalAccount>();
   for (const u of portalUsers) {
-    if (u.email) userByEmail.set(norm(u.email), { id: u.id, role: u.role });
+    byId.set(u.id, u);
+    if (u.email) userByEmail.set(norm(u.email), u);
     if (u.inventoryCustomerId != null) userByInvId.set(u.inventoryCustomerId, u.id);
   }
 
@@ -226,7 +265,13 @@ export async function customerSyncPreview(): Promise<CustomerSyncPreview> {
 
     const linkedUserId = userByInvId.get(c.id);
     if (linkedUserId) {
-      return { ...base, state: "linked" as const, portalUserId: linkedUserId };
+      const acct = byId.get(linkedUserId);
+      return {
+        ...base,
+        state: "linked" as const,
+        portalUserId: linkedUserId,
+        ...inviteProgress(acct),
+      };
     }
     // Approval lives in the inventory app. A record still waiting there must not
     // get a login here, however complete the rest of it looks.
@@ -252,6 +297,7 @@ export async function customerSyncPreview(): Promise<CustomerSyncPreview> {
       return {
         ...base,
         state: "link_only" as const,
+        ...inviteProgress(existing),
         portalUserId: existing.id,
         note:
           existing.role === "customer"

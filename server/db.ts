@@ -234,6 +234,8 @@ pool.query(`
   ALTER TABLE price_lists ADD COLUMN IF NOT EXISTS exception_customer_id INTEGER;
   CREATE INDEX IF NOT EXISTS idx_price_lists_rate_card ON price_lists (rate_card_id);
 
+  ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMP;
+
   -- Link a portal login to its inventory-app customer record
   ALTER TABLE users ADD COLUMN IF NOT EXISTS inventory_customer_id INTEGER;
   CREATE UNIQUE INDEX IF NOT EXISTS uniq_users_inventory_customer_id

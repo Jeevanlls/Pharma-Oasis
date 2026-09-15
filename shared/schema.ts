@@ -54,6 +54,9 @@ export const users = pgTable("users", {
   notes: text("notes"),
   marketingConsent: boolean("marketing_consent").default(false),
 
+  /** Set on every successful sign-in. Null means they have never been in —
+   *  which is how an invite that was sent but never taken up is visible. */
+  lastLoginAt: timestamp("last_login_at"),
   passwordResetToken: varchar("password_reset_token", { length: 128 }),
   passwordResetExpiry: timestamp("password_reset_expiry"),
 

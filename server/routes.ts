@@ -335,6 +335,11 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
             console.error("Session save error:", saveErr);
             return res.status(500).json({ message: "Login failed" });
           }
+          // Stamp the sign-in. Not awaited: a failure here must never cost
+          // someone their login, and the only thing it feeds is a report.
+          storage
+            .updateUser(user.id, { lastLoginAt: new Date() } as any)
+            .catch((e: any) => console.error("could not stamp last login:", e));
           res.json({ user: publicUser(user) });
         });
       });
