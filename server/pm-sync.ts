@@ -63,15 +63,16 @@ function getPmPool(): pg.Pool {
 }
 
 export interface PmBrandRow {
-  id: number;
+  /** Price Manager is a Supabase project — its ids are UUID strings, not numbers. */
+  id: string;
   name: string;
   category: string | null;
   active: boolean | null;
 }
 
 export interface PmProductRow {
-  id: number;
-  brand_id: number;
+  id: string;
+  brand_id: string;
   name: string | null;
   ean: string | null;
   case_size: string | null;
@@ -206,7 +207,7 @@ async function resolvePricingBrand(
 }
 
 export interface PmSyncBrandResult {
-  pmBrandId: number;
+  pmBrandId: string;
   brand: string;
   category: string | null;
   pricingBrandId: number | null;
@@ -273,7 +274,7 @@ export async function runPmSync(opts: {
     .where(and(eq(costUploads.status, "draft"), like(costUploads.fileName, `${PM_SYNC_FILE_NAME}%`)));
   const brandsWithOpenDraft = new Set(openDrafts.map((d) => d.brandId));
 
-  const byBrand = new Map<number, PmProductRow[]>();
+  const byBrand = new Map<string, PmProductRow[]>();
   for (const p of products) {
     const list = byBrand.get(p.brand_id);
     if (list) list.push(p);

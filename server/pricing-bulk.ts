@@ -15,9 +15,9 @@
  * Every action has a preview that writes nothing, because the whole point of a
  * bulk button is that you cannot easily undo it one row at a time.
  */
-import { and, eq, inArray, like, isNotNull } from "drizzle-orm";
+import { and, eq, inArray, like, isNotNull, sql } from "drizzle-orm";
 import { db } from "./db";
-import { costUploads, customerPriceLists, priceLists, pricingBrands } from "@shared/schema";
+import { costUploads, customerPriceLists, priceListItems, priceLists, pricingBrands } from "@shared/schema";
 import * as pricingStore from "./pricing-store";
 import * as pricingV2 from "./pricing-v2";
 import { PM_SYNC_FILE_NAME } from "./pm-sync";
@@ -388,6 +388,194 @@ export async function buildAllPriceLists(opts: {
 
   return {
     built: results.filter((r) => r.ok).length,
+    failed: results.filter((r) => !r.ok).length,
+    results,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 2b. CHANGE THE MARGIN ON LISTS THAT ALREADY EXIST
+// ---------------------------------------------------------------------------
+
+export interface RepriceTarget {
+  listId: number;
+  name: string;
+  brand: string | null;
+  status: string;
+  currentMargin: string | null;
+  /** lines priced off the margin — these move */
+  onMargin: number;
+  /** lines set by hand (a fixed price or cost-plus) — these do NOT move */
+  handSet: number;
+  /** lines with no usable cost — nothing to reprice from */
+  noCost: number;
+}
+
+/**
+ * What a margin change would touch. Writes nothing.
+ *
+ * Step 2 deliberately refuses to rebuild a brand that already has a list,
+ * because rebuilding throws away hand-set prices. Changing the margin is the
+ * other thing people actually want, and it is a different operation: every
+ * line still priced off the margin is recalculated, and every line someone
+ * typed a price into is left exactly as it is.
+ */
+export async function repricePreview(opts: { listIds?: number[] } = {}): Promise<{
+  targets: RepriceTarget[];
+  lists: number;
+  onMargin: number;
+  handSet: number;
+}> {
+  const where = opts.listIds?.length
+    ? and(isNotNull(priceLists.brandId), inArray(priceLists.id, opts.listIds))
+    : and(isNotNull(priceLists.brandId), eq(priceLists.scope, "brand"));
+
+  const lists = await db
+    .select({
+      id: priceLists.id,
+      name: priceLists.name,
+      status: priceLists.status,
+      margin: priceLists.defaultMarginPercent,
+      archivedAt: priceLists.archivedAt,
+      brand: pricingBrands.name,
+    })
+    .from(priceLists)
+    .leftJoin(pricingBrands, eq(pricingBrands.id, priceLists.brandId))
+    .where(where);
+
+  const live = lists.filter((l) => l.archivedAt == null);
+  if (!live.length) return { targets: [], lists: 0, onMargin: 0, handSet: 0 };
+
+  const rows = await db
+    .select({
+      listId: priceListItems.priceListId,
+      method: priceListItems.method,
+      costPrice: priceListItems.costPrice,
+    })
+    .from(priceListItems)
+    .where(inArray(priceListItems.priceListId, live.map((l) => l.id)));
+
+  const byList = new Map<number, { onMargin: number; handSet: number; noCost: number }>();
+  for (const l of live) byList.set(l.id, { onMargin: 0, handSet: 0, noCost: 0 });
+  for (const r of rows) {
+    const bucket = byList.get(r.listId);
+    if (!bucket) continue;
+    if (r.method !== "margin") bucket.handSet++;
+    else if (r.costPrice === null || Number(r.costPrice) <= 0) bucket.noCost++;
+    else bucket.onMargin++;
+  }
+
+  const targets: RepriceTarget[] = live
+    .map((l) => ({
+      listId: l.id,
+      name: l.name,
+      brand: l.brand,
+      status: l.status,
+      currentMargin: l.margin,
+      ...(byList.get(l.id) ?? { onMargin: 0, handSet: 0, noCost: 0 }),
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  return {
+    targets,
+    lists: targets.length,
+    onMargin: targets.reduce((n, t) => n + t.onMargin, 0),
+    handSet: targets.reduce((n, t) => n + t.handSet, 0),
+  };
+}
+
+export interface RepriceOutcome {
+  listId: number;
+  name: string;
+  ok: boolean;
+  repriced?: number;
+  untouched?: number;
+  error?: string;
+}
+
+/**
+ * Put a new margin on lists that already exist.
+ *
+ * Prices are computed by pricingV2.computePrepared — the same function the
+ * builder and the per-line editor use, so a bulk change can never disagree
+ * with a single-line one. Only the WRITE is batched: one statement per list
+ * rather than one per line, because three thousand round trips is a request
+ * that times out halfway and leaves half the catalogue on the old margin.
+ */
+export async function repriceLists(opts: {
+  marginPercent: number;
+  roundingMode?: RoundingMode;
+  listIds?: number[];
+}): Promise<{ lists: number; repriced: number; untouched: number; failed: number; results: RepriceOutcome[] }> {
+  const margin = Number(opts.marginPercent);
+  if (!Number.isFinite(margin) || margin < 0 || margin > 1000) {
+    throw new Error("Margin must be a number between 0 and 1000.");
+  }
+
+  const { targets } = await repricePreview({ listIds: opts.listIds });
+  const results: RepriceOutcome[] = [];
+
+  for (const t of targets) {
+    try {
+      const items = await db
+        .select({
+          id: priceListItems.id,
+          method: priceListItems.method,
+          costPrice: priceListItems.costPrice,
+          roundingMode: priceListItems.roundingMode,
+        })
+        .from(priceListItems)
+        .where(eq(priceListItems.priceListId, t.listId));
+
+      const moves: { id: number; price: number }[] = [];
+      let untouched = 0;
+      for (const it of items) {
+        if (it.method !== "margin") {
+          untouched++;
+          continue;
+        }
+        const cost = it.costPrice === null ? null : Number(it.costPrice);
+        const mode = (opts.roundingMode ?? (it.roundingMode as RoundingMode)) ?? "none";
+        const price = pricingV2.computePrepared("margin", cost, margin, null, null, mode);
+        if (price === null) {
+          untouched++;
+          continue;
+        }
+        moves.push({ id: it.id, price });
+      }
+
+      const modeSql = opts.roundingMode
+        ? sql`${opts.roundingMode}`
+        : sql`pli.rounding_mode`;
+
+      for (let i = 0; i < moves.length; i += 500) {
+        const chunk = moves.slice(i, i + 500);
+        const values = sql.join(
+          chunk.map((r) => sql`(${r.id}::int, ${r.price.toFixed(2)}::numeric)`),
+          sql`, `,
+        );
+        await db.execute(sql`
+          UPDATE price_list_items AS pli
+             SET prepared_price = v.price,
+                 margin_percent = ${margin.toFixed(2)}::numeric,
+                 rounding_mode  = ${modeSql},
+                 updated_at     = NOW()
+            FROM (VALUES ${values}) AS v(id, price)
+           WHERE pli.id = v.id
+        `);
+      }
+
+      await pricingV2.updatePriceListMeta(t.listId, { defaultMarginPercent: margin });
+      results.push({ listId: t.listId, name: t.name, ok: true, repriced: moves.length, untouched });
+    } catch (e: any) {
+      results.push({ listId: t.listId, name: t.name, ok: false, error: e?.message || String(e) });
+    }
+  }
+
+  return {
+    lists: results.filter((r) => r.ok).length,
+    repriced: results.reduce((n, r) => n + (r.repriced ?? 0), 0),
+    untouched: results.reduce((n, r) => n + (r.untouched ?? 0), 0),
     failed: results.filter((r) => !r.ok).length,
     results,
   };

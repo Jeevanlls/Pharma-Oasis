@@ -1463,7 +1463,9 @@ export const pricingBrands = pgTable("pricing_brands", {
   // matches on: RD renames brands during clean-up, and a name match would
   // quietly create a second brand and strand the first one's price list and
   // its customers. Null for brands that did not come from Price Manager.
-  pmBrandId: integer("pm_brand_id"),
+  // Price Manager's own brand id. It is a Supabase UUID, so this is text, not
+  // an integer — getting that wrong made every sync fail.
+  pmBrandId: varchar("pm_brand_id", { length: 64 }),
   slug: varchar("slug", { length: 255 }),
   logoUrl: text("logo_url"),
   isActive: boolean("is_active").default(true),
