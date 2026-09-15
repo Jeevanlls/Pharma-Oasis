@@ -369,6 +369,110 @@ export default function PricingGuidePage() {
           </CardContent>
         </Card>
 
+        {/* ---- 3b. EXACTLY WHAT TO PRESS ---------------------------------- */}
+        <Card className="border-emerald-200 dark:border-emerald-900/50">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Coins className="h-4 w-4 text-emerald-600" /> Changing a price — exactly what to press
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <p className="text-sm text-muted-foreground">
+              Four jobs, from "everybody" down to "this one line". Pick the smallest one that does
+              what you need &mdash; the bigger the change, the more customers feel it.
+            </p>
+
+            {/* A */}
+            <div className="rounded-md border p-4 space-y-2">
+              <div className="flex flex-wrap items-baseline gap-2">
+                <Badge className="bg-emerald-600 hover:bg-emerald-600">A</Badge>
+                <span className="font-semibold text-sm">Change the % everybody pays</span>
+                <span className="text-xs text-muted-foreground">e.g. 20% &rarr; 22% for all 28 customers</span>
+              </div>
+              <ol className="text-sm space-y-1.5 list-decimal pl-5 text-muted-foreground">
+                <li>Go to <b>Customer Pricing &rarr; Rates &mdash; what we charge</b>.</li>
+                <li>In <b>What we charge</b>, find the row <b>Standard</b> with the <i>house rate</i> badge. Its % is on the right.</li>
+                <li>Press <b>Change</b> next to it. The % turns into a box.</li>
+                <li>Clear it, type <b>22</b>, press <b>Apply</b>.</li>
+                <li>You'll get "<i>4,547 price(s) changed &mdash; across 58 list(s)</i>". That's it &mdash; live.</li>
+              </ol>
+              <p className="text-xs text-muted-foreground">
+                A £10 cost now sells at £12.20 instead of £12.00. Negotiated brands (C below) do not move.
+              </p>
+            </div>
+
+            {/* B */}
+            <div className="rounded-md border p-4 space-y-2">
+              <div className="flex flex-wrap items-baseline gap-2">
+                <Badge className="bg-emerald-600 hover:bg-emerald-600">B</Badge>
+                <span className="font-semibold text-sm">Give one customer a different % on everything</span>
+                <span className="text-xs text-muted-foreground">a bigger account on 15% across all brands</span>
+              </div>
+              <ol className="text-sm space-y-1.5 list-decimal pl-5 text-muted-foreground">
+                <li>On <b>Rates</b>, go to the bottom of the first card: <b>New rate card</b>.</li>
+                <li>Type a name &mdash; <b>Key account</b>. In <b>Margin %</b> type <b>15</b>.</li>
+                <li>Press <b>Create and build its 58 brand lists</b>. Give it a few seconds; it builds one list per brand at 15%.</li>
+                <li>Scroll to <b>Put customers on a rate</b>. Search their name and tick the box.</li>
+                <li>In <b>Move to which rate?</b> choose <b>Key account &mdash; 15%</b>, then press <b>Move</b>.</li>
+                <li>The card now reads <i>Key account &mdash; 1 customer &mdash; 58 brand lists</i>.</li>
+              </ol>
+              <p className="text-xs text-muted-foreground">
+                Do this once. The next customer who negotiates the same deal just gets ticked and Moved &mdash; no rebuilding.
+              </p>
+            </div>
+
+            {/* C */}
+            <div className="rounded-md border p-4 space-y-2">
+              <div className="flex flex-wrap items-baseline gap-2">
+                <Badge className="bg-emerald-600 hover:bg-emerald-600">C</Badge>
+                <span className="font-semibold text-sm">Give one customer their own price on one brand</span>
+                <span className="text-xs text-muted-foreground">the handshake deal &mdash; their own price list for that brand</span>
+              </div>
+              <ol className="text-sm space-y-1.5 list-decimal pl-5 text-muted-foreground">
+                <li>On <b>Rates</b>, scroll to <b>Negotiated brands</b> (the last card).</li>
+                <li><b>Customer</b> &mdash; pick them from the list.</li>
+                <li><b>Brand</b> &mdash; pick the brand.</li>
+                <li><b>Margin %</b> &mdash; type their rate, e.g. <b>12</b>.</li>
+                <li><b>Note</b> &mdash; why, e.g. "agreed Sept, review in 6 months". This is the bit you'll want later.</li>
+                <li>Press <b>Save this rate</b>.</li>
+              </ol>
+              <p className="text-xs text-muted-foreground">
+                It appears as <i>ICANLO &middot; BALEGA &middot; 12% instead of 20% (Standard)</i>. Behind the scenes it builds
+                a price list for that brand used by that one customer &mdash; that <b>is</b> the customer-specific price list.
+                To end it, press the <b>&times;</b> and they go back to 20% on that brand.
+              </p>
+            </div>
+
+            {/* D */}
+            <div className="rounded-md border p-4 space-y-2">
+              <div className="flex flex-wrap items-baseline gap-2">
+                <Badge variant="secondary">D</Badge>
+                <span className="font-semibold text-sm">Set one single product to an exact price</span>
+                <span className="text-xs text-muted-foreground">when the % doesn't work for one line</span>
+              </div>
+              <ol className="text-sm space-y-1.5 list-decimal pl-5 text-muted-foreground">
+                <li>Go to <b>5. Price Lists</b> and open the brand's list on the left.</li>
+                <li>Find the line &mdash; search by barcode or name.</li>
+                <li>In <b>Pricing method</b> change <b>Margin %</b> to <b>Fixed £</b>.</li>
+                <li>Type the exact selling price.</li>
+                <li>Press <b>Save</b>.</li>
+              </ol>
+              <p className="text-xs text-muted-foreground">
+                A Fixed £ line is yours from then on: the daily run and a rate change both leave it alone
+                and report it rather than recalculating it. Switch it back to <b>Margin %</b> to hand it back to the rate card.
+              </p>
+            </div>
+
+            <div className="flex items-start gap-2 text-sm rounded-md bg-muted/50 p-3">
+              <Lightbulb className="h-4 w-4 mt-0.5 text-emerald-600 shrink-0" />
+              <span>
+                <b>Which one?</b> Everyone &rarr; <b>A</b>. One customer, all brands &rarr; <b>B</b>.
+                One customer, one brand &rarr; <b>C</b>. One product &rarr; <b>D</b>.
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* ---- 4. GETTING CUSTOMERS IN ------------------------------------ */}
         <Card>
           <CardHeader className="pb-2">
