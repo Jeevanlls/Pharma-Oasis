@@ -4637,6 +4637,14 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
   // Each has a preview that writes nothing, because a bulk action is not
   // something you can easily unpick one row at a time.
 
+  app.get("/api/admin/bulk/state", requireAdmin, async (_req, res) => {
+    try {
+      res.json(await pricingBulk.goLiveState());
+    } catch (e: any) {
+      res.status(500).json({ message: e?.message || "Could not read the current state" });
+    }
+  });
+
   app.get("/api/admin/bulk/publish-preview", requireAdmin, async (_req, res) => {
     try {
       res.json(await pricingBulk.publishPreview());
@@ -4697,6 +4705,25 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
       );
     } catch (e: any) {
       res.status(500).json({ message: e?.message || "Bulk build failed" });
+    }
+  });
+
+  app.get("/api/admin/bulk/refresh-preview", requireAdmin, async (_req, res) => {
+    try {
+      res.json(await pricingBulk.refreshPreview());
+    } catch (e: any) {
+      res.status(500).json({ message: e?.message || "Preview failed" });
+    }
+  });
+
+  app.post("/api/admin/bulk/refresh", requireAdmin, async (req, res) => {
+    try {
+      const listIds = Array.isArray(req.body?.listIds)
+        ? req.body.listIds.map(Number).filter((n: number) => Number.isFinite(n))
+        : undefined;
+      res.json(await pricingBulk.refreshAllLists({ listIds }));
+    } catch (e: any) {
+      res.status(500).json({ message: e?.message || "Refresh failed" });
     }
   });
 

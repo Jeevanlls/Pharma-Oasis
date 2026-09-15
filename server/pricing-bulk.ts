@@ -15,7 +15,7 @@
  * Every action has a preview that writes nothing, because the whole point of a
  * bulk button is that you cannot easily undo it one row at a time.
  */
-import { and, eq, inArray, like, isNotNull, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, like, isNotNull, sql } from "drizzle-orm";
 import { db } from "./db";
 import { costUploads, customerPriceLists, priceListItems, priceLists, pricingBrands } from "@shared/schema";
 import * as pricingStore from "./pricing-store";
@@ -578,6 +578,424 @@ export async function repriceLists(opts: {
     untouched: results.reduce((n, r) => n + (r.untouched ?? 0), 0),
     failed: results.filter((r) => !r.ok).length,
     results,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 0b. THE DAILY RUN — CARRY NEW SUPPLIER COSTS THROUGH TO CUSTOMER PRICES
+// ---------------------------------------------------------------------------
+
+/**
+ * A price list stores the cost it was built from. That snapshot is deliberate:
+ * a customer's price must not move because someone was mid-edit in Price
+ * Manager. It also means a published cost does NOT reach a customer by itself —
+ * something has to carry it across, and that something is this.
+ *
+ * A list is stale when its stored base cost is not the brand's newest published
+ * one. Only stale lists are looked at or touched, which is what keeps a daily
+ * run proportional to what actually changed rather than to the catalogue.
+ */
+export interface StaleList {
+  listId: number;
+  name: string;
+  brandId: number;
+  brand: string | null;
+  fromUploadId: number | null;
+  toUploadId: number;
+}
+
+async function findStaleLists(listIds?: number[]): Promise<StaleList[]> {
+  const lists = await db
+    .select({
+      id: priceLists.id,
+      name: priceLists.name,
+      brandId: priceLists.brandId,
+      baseCostUploadId: priceLists.baseCostUploadId,
+      brand: pricingBrands.name,
+    })
+    .from(priceLists)
+    .leftJoin(pricingBrands, eq(pricingBrands.id, priceLists.brandId))
+    .where(
+      and(
+        eq(priceLists.scope, "brand"),
+        eq(priceLists.status, "published"),
+        isNotNull(priceLists.brandId),
+        isNull(priceLists.archivedAt),
+      ),
+    );
+
+  const wanted = listIds?.length ? new Set(listIds) : null;
+  const uploads = await db
+    .select({ id: costUploads.id, brandId: costUploads.brandId, publishedAt: costUploads.publishedAt })
+    .from(costUploads)
+    .where(eq(costUploads.status, "published"))
+    .orderBy(desc(costUploads.publishedAt));
+
+  const latestByBrand = new Map<number, number>();
+  for (const u of uploads) {
+    if (u.brandId != null && !latestByBrand.has(u.brandId)) latestByBrand.set(u.brandId, u.id);
+  }
+
+  const stale: StaleList[] = [];
+  for (const l of lists) {
+    if (wanted && !wanted.has(l.id)) continue;
+    if (l.brandId == null) continue;
+    const latest = latestByBrand.get(l.brandId);
+    if (latest == null || latest === l.baseCostUploadId) continue;
+    stale.push({
+      listId: l.id,
+      name: l.name,
+      brandId: l.brandId,
+      brand: l.brand,
+      fromUploadId: l.baseCostUploadId,
+      toUploadId: latest,
+    });
+  }
+  stale.sort((a, b) => a.name.localeCompare(b.name));
+  return stale;
+}
+
+export interface RefreshBrandPreview {
+  listId: number;
+  name: string;
+  brand: string | null;
+  changed: number;
+  up: number;
+  down: number;
+  unchanged: number;
+  newProducts: number;
+  missing: number;
+  /** hand-set prices that will NOT move — the cost moved under them */
+  handSet: number;
+  /** cost moves beyond BIG_CHANGE_PCT, worth a look before applying */
+  bigMovers: {
+    ean: string | null;
+    description: string | null;
+    oldCost: number | null;
+    newCost: number | null;
+    changePercent: number | null;
+  }[];
+}
+
+/**
+ * What today's costs would do to customer prices. Writes nothing.
+ *
+ * Reuses pricingV2.reconcilePreview per list, the same comparison the
+ * single-brand review screen shows, so the bulk number and the per-brand
+ * detail can never tell different stories.
+ */
+export async function refreshPreview(opts: { listIds?: number[] } = {}): Promise<{
+  stale: number;
+  changed: number;
+  up: number;
+  down: number;
+  newProducts: number;
+  missing: number;
+  handSet: number;
+  bigMovers: number;
+  brands: RefreshBrandPreview[];
+}> {
+  const stale = await findStaleLists(opts.listIds);
+  const brands: RefreshBrandPreview[] = [];
+
+  for (const s of stale) {
+    const r = await pricingV2.reconcilePreview(s.listId);
+    if (!r.hasBaseCost) continue;
+    const movers = r.changed.filter((c) => c.big);
+    brands.push({
+      listId: s.listId,
+      name: s.name,
+      brand: s.brand,
+      changed: r.changed.length,
+      up: r.changed.filter((c) => (c.changePercent ?? 0) > 0).length,
+      down: r.changed.filter((c) => (c.changePercent ?? 0) < 0).length,
+      unchanged: r.unchangedCount,
+      newProducts: r.newProducts.length,
+      missing: r.missing.length,
+      handSet: r.changed.filter((c) => c.method === "fixed").length,
+      bigMovers: movers.slice(0, 10).map((c) => ({
+        ean: c.ean,
+        description: c.description,
+        oldCost: c.oldCost,
+        newCost: c.newCost,
+        changePercent: c.changePercent,
+      })),
+    });
+  }
+
+  const sum = (f: (b: RefreshBrandPreview) => number) => brands.reduce((n, b) => n + f(b), 0);
+  return {
+    stale: brands.length,
+    changed: sum((b) => b.changed),
+    up: sum((b) => b.up),
+    down: sum((b) => b.down),
+    newProducts: sum((b) => b.newProducts),
+    missing: sum((b) => b.missing),
+    handSet: sum((b) => b.handSet),
+    bigMovers: sum((b) => b.bigMovers.length),
+    brands,
+  };
+}
+
+export interface RefreshOutcome {
+  listId: number;
+  name: string;
+  ok: boolean;
+  updated?: number;
+  /** hand-set prices whose cost moved — margin unchanged, worth a look */
+  fixedToReview?: number;
+  error?: string;
+}
+
+/**
+ * Carry the new costs into customer prices, one stale list at a time.
+ *
+ * Each list goes through pricingV2.refreshFromBaseCost — the same function the
+ * per-brand refresh button calls. A hand-set price keeps its value and is only
+ * reported; a line whose cost vanished becomes "price on request" rather than
+ * disappearing, so the customer can still ask.
+ */
+export async function refreshAllLists(opts: { listIds?: number[] } = {}): Promise<{
+  lists: number;
+  updated: number;
+  fixedToReview: number;
+  failed: number;
+  results: RefreshOutcome[];
+}> {
+  const stale = await findStaleLists(opts.listIds);
+  const results: RefreshOutcome[] = [];
+
+  for (const s of stale) {
+    try {
+      const r = await pricingV2.refreshFromBaseCost(s.listId);
+      results.push({ listId: s.listId, name: s.name, ok: true, ...r });
+    } catch (e: any) {
+      results.push({ listId: s.listId, name: s.name, ok: false, error: e?.message || String(e) });
+    }
+  }
+
+  return {
+    lists: results.filter((r) => r.ok).length,
+    updated: results.reduce((n, r) => n + (r.updated ?? 0), 0),
+    fixedToReview: results.reduce((n, r) => n + (r.fixedToReview ?? 0), 0),
+    failed: results.filter((r) => !r.ok).length,
+    results,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 0. WHERE DOES THE WHOLE THING STAND?
+// ---------------------------------------------------------------------------
+
+export interface GoLiveTodo {
+  /** stable key so the page can attach the right button */
+  key:
+    | "blocked_costs"
+    | "no_costs"
+    | "drafts_waiting"
+    | "lists_to_build"
+    | "customers_unassigned"
+    | "customers_no_login"
+    | "customers_no_email"
+    | "customers_duplicate_email"
+    | "costs_not_applied";
+  /** one sentence, already counted, written for someone who did not build this */
+  text: string;
+  detail?: string;
+  count: number;
+  severity: "blocked" | "waiting" | "todo";
+}
+
+export interface GoLiveState {
+  /** true when at least one customer can see at least one price */
+  live: boolean;
+  headline: string;
+  brandsPriced: number;
+  pricesLive: number;
+  customersSeeing: number;
+  margins: string[];
+  steps: {
+    costs: { done: number; total: number; blocked: number; drafts: number };
+    lists: { built: number; toBuild: number; noCosts: number };
+    customers: { withLists: number; total: number };
+  };
+  /** the daily loop: costs that have moved but have not reached customers yet */
+  daily: { staleLists: number; pricesWaiting: number; bigMovers: number };
+  todo: GoLiveTodo[];
+}
+
+/**
+ * Everything the Go live page needs, in one call, as sentences rather than
+ * numbers waiting to be interpreted.
+ *
+ * The page used to show four equal cards of dense prose whether or not there
+ * was anything to do in them, so "am I live?" and "what is stuck?" — the only
+ * two questions anyone actually opens this page with — were the two things it
+ * did not answer. This answers them first and lets the steps collapse.
+ *
+ * Writes nothing.
+ */
+export async function goLiveState(): Promise<GoLiveState> {
+  const [drafts, blockers, build, reprice, refresh] = await Promise.all([
+    publishPreview(),
+    publishBlockers(),
+    buildPreview(),
+    repricePreview(),
+    refreshPreview(),
+  ]);
+
+  const assigned = await db
+    .selectDistinct({ customerId: customerPriceLists.customerId })
+    .from(customerPriceLists);
+
+  let invites: {
+    readyReal: number;
+    testLike: number;
+    noEmail: number;
+    duplicateEmail: number;
+  } | null = null;
+  try {
+    const { customerSyncPreview } = await import("./customer-sync");
+    const p = await customerSyncPreview();
+    invites = {
+      readyReal: p.readyReal,
+      testLike: p.testLike,
+      noEmail: p.noEmail,
+      duplicateEmail: p.duplicateEmail,
+    };
+  } catch {
+    // The inventory database is optional here — the pricing half of this page
+    // must still work when it cannot be reached.
+    invites = null;
+  }
+
+  const margins = Array.from(
+    new Set(reprice.targets.map((t) => t.currentMargin ?? "—")),
+  ).sort();
+
+  const brandsPriced = reprice.lists;
+  const pricesLive = reprice.onMargin + reprice.handSet;
+  const customersSeeing = assigned.length;
+  const live = brandsPriced > 0 && customersSeeing > 0;
+
+  const todo: GoLiveTodo[] = [];
+
+  if (refresh.stale > 0) {
+    todo.push({
+      key: "costs_not_applied",
+      count: refresh.changed,
+      severity: "todo",
+      text: `${refresh.changed} price${refresh.changed === 1 ? "" : "s"} across ${refresh.stale} brand${refresh.stale === 1 ? "" : "s"} ${refresh.changed === 1 ? "is" : "are"} out of date`,
+      detail: `New buying prices are published but customers are still seeing the old ones. ${refresh.up} up, ${refresh.down} down${refresh.bigMovers ? `, ${refresh.bigMovers} moved more than 25%` : ""}.`,
+    });
+  }
+
+  if (blockers.blocked.length) {
+    todo.push({
+      key: "blocked_costs",
+      count: blockers.blocked.length,
+      severity: "blocked",
+      text: `${blockers.blocked.length} brand${blockers.blocked.length === 1 ? "" : "s"} cannot be priced`,
+      detail:
+        blockers.blocked.map((b) => b.brand).join(" and ") +
+        ` — the cost file lists the same barcode twice at two different prices, so there is no way to tell which is right. This has to be fixed in Price Manager.`,
+    });
+  }
+
+  const plainDrafts = drafts.drafts.length - blockers.blocked.length;
+  if (plainDrafts > 0) {
+    todo.push({
+      key: "drafts_waiting",
+      count: plainDrafts,
+      severity: "todo",
+      text: `${plainDrafts} brand${plainDrafts === 1 ? "" : "s"} ha${plainDrafts === 1 ? "s" : "ve"} new costs waiting`,
+      detail: "New buying prices came in from Price Manager. Publishing makes them the live cost; no customer price changes until a list is built from them.",
+    });
+  }
+
+  if (build.toBuild > 0) {
+    todo.push({
+      key: "lists_to_build",
+      count: build.toBuild,
+      severity: "todo",
+      text: `${build.toBuild} brand${build.toBuild === 1 ? "" : "s"} ha${build.toBuild === 1 ? "s" : "ve"} costs but no price list`,
+      detail: "Customers cannot see a brand until it has a price list.",
+    });
+  }
+
+  if (build.noCosts > 0) {
+    todo.push({
+      key: "no_costs",
+      count: build.noCosts,
+      severity: "waiting",
+      text: `${build.noCosts} brands are waiting on a buying price`,
+      detail: "Nothing to do here until Price Manager has a cost for them. Usually these are the lines with no barcode.",
+    });
+  }
+
+  if (invites) {
+    if (invites.readyReal > 0) {
+      todo.push({
+        key: "customers_no_login",
+        count: invites.readyReal,
+        severity: "todo",
+        text: `${invites.readyReal} customers have no login yet`,
+        detail: "They are approved in the inventory app but cannot sign in here. Inviting emails them a link to set their own password.",
+      });
+    }
+    if (invites.noEmail > 0) {
+      todo.push({
+        key: "customers_no_email",
+        count: invites.noEmail,
+        severity: "waiting",
+        text: `${invites.noEmail} customers have no email address`,
+        detail: "Add one in the inventory app and they will appear here on the next check.",
+      });
+    }
+    if (invites.duplicateEmail > 0) {
+      todo.push({
+        key: "customers_duplicate_email",
+        count: invites.duplicateEmail,
+        severity: "waiting",
+        text: `${invites.duplicateEmail} customers share an email address with another customer`,
+        detail: "One address cannot be two logins. Fix it in the inventory app.",
+      });
+    }
+  }
+
+  const dailyBlock = {
+    staleLists: refresh.stale,
+    pricesWaiting: refresh.changed,
+    bigMovers: refresh.bigMovers,
+  };
+
+  const headline = !brandsPriced
+    ? "Nothing is priced yet."
+    : !customersSeeing
+      ? `${brandsPriced} brands are priced, but no customer has been given a list yet.`
+      : refresh.stale > 0
+        ? `Live, with ${refresh.changed} price${refresh.changed === 1 ? "" : "s"} waiting to go out.`
+        : `Live and up to date.`;
+
+  return {
+    live,
+    headline,
+    brandsPriced,
+    pricesLive,
+    customersSeeing,
+    margins,
+    steps: {
+      costs: {
+        done: build.alreadyHaveList + build.toBuild,
+        total: build.rows.length,
+        blocked: blockers.blocked.length,
+        drafts: drafts.drafts.length,
+      },
+      lists: { built: build.alreadyHaveList, toBuild: build.toBuild, noCosts: build.noCosts },
+      customers: { withLists: customersSeeing, total: customersSeeing },
+    },
+    daily: dailyBlock,
+    todo,
   };
 }
 
