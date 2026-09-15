@@ -1332,6 +1332,11 @@ export const priceLists = pgTable("price_lists", {
   status: varchar("status", { length: 20 }).notNull().default("draft"), // draft | published | archived
   publishedAt: timestamp("published_at"), // when the list last went live (status -> published)
   archivedAt: timestamp("archived_at"), // when the list was archived (soft-delete)
+  // Where this list's margin came from. A list generated from a rate card
+  // follows that card; a list generated for one customer's negotiated brand
+  // follows nothing and is never touched by a house-wide rate change.
+  rateCardId: integer("rate_card_id"), // FK -> rate_cards
+  exceptionCustomerId: integer("exception_customer_id"), // FK -> users, set on a deal list
   // --- legacy v1 fields (kept for backward compatibility / migration) ---
   type: varchar("type", { length: 20 }).notNull().default("tier"), // tier | customer
   isActive: boolean("is_active").default(true),
@@ -1539,6 +1544,76 @@ export const insertPriceListItemSchema = createInsertSchema(priceListItems).omit
 });
 export type InsertPriceListItem = z.infer<typeof insertPriceListItemSchema>;
 export type PriceListItem = typeof priceListItems.$inferSelect;
+
+// ============================================
+// RATE CARDS — what we actually charge, and to whom
+//
+// A margin lives on a price list, and there is one list per brand. That is fine
+// while everyone pays the same and useless the moment they do not: sixty lists
+// hold sixty copies of one commercial decision, and a customer on a negotiated
+// rate across the range would need sixty lists of their own.
+//
+// A rate card is the decision itself, held once. "Standard 20%". "Key account
+// 15%". Each customer sits on exactly one. The lists are then generated from
+// the card rather than being the place the number lives, so changing a rate is
+// one edit in one place and the lists follow.
+//
+// An exception is one brand, for one customer, at a rate of its own — the
+// genuinely negotiated line. It sits on top of the card and nothing else moves
+// it, which is the property that matters: a house-wide rate change must never
+// quietly undo a deal.
+// ============================================
+export const rateCards = pgTable("rate_cards", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 100 }).notNull().unique(),
+  marginPercent: decimal("margin_percent", { precision: 6, scale: 2 }).notNull(),
+  roundingMode: varchar("rounding_mode", { length: 20 }).notNull().default("none"),
+  /** the house rate — new customers land here. Exactly one card carries it. */
+  isDefault: boolean("is_default").default(false),
+  notes: text("notes"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertRateCardSchema = createInsertSchema(rateCards).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertRateCard = z.infer<typeof insertRateCardSchema>;
+export type RateCard = typeof rateCards.$inferSelect;
+
+/** Which card a customer is on. One each — the unique constraint says so. */
+export const customerRates = pgTable("customer_rates", {
+  id: serial("id").primaryKey(),
+  customerId: integer("customer_id").notNull().unique(),
+  rateCardId: integer("rate_card_id").notNull(),
+  assignedBy: integer("assigned_by"),
+  assignedAt: timestamp("assigned_at").defaultNow().notNull(),
+});
+
+export type CustomerRate = typeof customerRates.$inferSelect;
+
+/** One brand, one customer, a rate of its own. Beats the card for that brand. */
+export const customerBrandRates = pgTable(
+  "customer_brand_rates",
+  {
+    id: serial("id").primaryKey(),
+    customerId: integer("customer_id").notNull(),
+    brandId: integer("brand_id").notNull(),
+    marginPercent: decimal("margin_percent", { precision: 6, scale: 2 }).notNull(),
+    note: varchar("note", { length: 255 }),
+    createdBy: integer("created_by"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    uniqCustomerBrandRate: unique("uniq_customer_brand_rate").on(t.customerId, t.brandId),
+  }),
+);
+
+export type CustomerBrandRate = typeof customerBrandRates.$inferSelect;
 
 // ============================================
 // CUSTOMER PRICING v2 — CUSTOMER ⇄ PRICE LIST ASSIGNMENTS

@@ -60,6 +60,7 @@ import * as pmSync from "./pm-sync";
 import * as customerSync from "./customer-sync";
 import * as autoInvite from "./customer-auto-invite";
 import * as brandReport from "./brand-report";
+import * as rateCards from "./rate-cards";
 import * as pricingBulk from "./pricing-bulk";
 import { resolveForList, toCustomerPrice } from "./pricing";
 import { buildPriceListData, buildCustomerPriceListData, buildPriceListXlsx, buildPriceListPdf } from "./price-export";
@@ -4636,6 +4637,111 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
   // ---- Bulk pricing: the same per-brand actions, in a loop ----
   // Each has a preview that writes nothing, because a bulk action is not
   // something you can easily unpick one row at a time.
+
+  // ---- Rate cards: what we charge, and to whom -------------------------
+  app.get("/api/admin/rates/summary", requireAdmin, async (_req, res) => {
+    try {
+      res.json(await rateCards.pricingSummary());
+    } catch (e: any) {
+      res.status(500).json({ message: e?.message || "Could not read the rates" });
+    }
+  });
+
+  app.post("/api/admin/rates/adopt", requireAdmin, async (_req, res) => {
+    try {
+      res.json(await rateCards.adoptExistingLists());
+    } catch (e: any) {
+      res.status(500).json({ message: e?.message || "Could not set up the house rate" });
+    }
+  });
+
+  app.post("/api/admin/rates/cards", requireAdmin, async (req, res) => {
+    try {
+      const card = await rateCards.createRateCard({
+        name: String(req.body?.name ?? ""),
+        marginPercent: Number(req.body?.marginPercent),
+        roundingMode: req.body?.roundingMode,
+        notes: req.body?.notes ?? null,
+      });
+      const synced = await rateCards.syncRateCard(card.id);
+      res.json({ card, ...synced });
+    } catch (e: any) {
+      res.status(400).json({ message: e?.message || "Could not create the rate card" });
+    }
+  });
+
+  app.patch("/api/admin/rates/cards/:id", requireAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (typeof req.body?.name === "string" && req.body.name.trim()) {
+        await rateCards.renameRateCard(id, req.body.name);
+      }
+      if (req.body?.marginPercent !== undefined) {
+        const r = await rateCards.setCardMargin(id, Number(req.body.marginPercent));
+        return res.json(r);
+      }
+      res.json({ ok: true });
+    } catch (e: any) {
+      res.status(400).json({ message: e?.message || "Could not update the rate card" });
+    }
+  });
+
+  app.post("/api/admin/rates/cards/:id/sync", requireAdmin, async (req, res) => {
+    try {
+      res.json(await rateCards.syncRateCard(parseInt(req.params.id, 10)));
+    } catch (e: any) {
+      res.status(400).json({ message: e?.message || "Sync failed" });
+    }
+  });
+
+  app.delete("/api/admin/rates/cards/:id", requireAdmin, async (req, res) => {
+    try {
+      const moveTo = req.query.moveTo ? parseInt(String(req.query.moveTo), 10) : undefined;
+      res.json(await rateCards.deleteRateCard(parseInt(req.params.id, 10), moveTo));
+    } catch (e: any) {
+      res.status(400).json({ message: e?.message || "Could not delete the rate card" });
+    }
+  });
+
+  app.post("/api/admin/rates/customers", requireAdmin, async (req: any, res) => {
+    try {
+      const cardId = Number(req.body?.rateCardId);
+      const ids = Array.isArray(req.body?.customerIds)
+        ? req.body.customerIds.map(Number).filter((n: number) => Number.isFinite(n))
+        : [];
+      for (const id of ids) await rateCards.assignCustomerToCard(id, cardId, req.user?.id ?? null);
+      res.json({ moved: ids.length });
+    } catch (e: any) {
+      res.status(400).json({ message: e?.message || "Could not move those customers" });
+    }
+  });
+
+  app.post("/api/admin/rates/exceptions", requireAdmin, async (req: any, res) => {
+    try {
+      await rateCards.setBrandException({
+        customerId: Number(req.body?.customerId),
+        brandId: Number(req.body?.brandId),
+        marginPercent: Number(req.body?.marginPercent),
+        note: req.body?.note ?? null,
+        createdBy: req.user?.id ?? null,
+      });
+      res.json({ ok: true });
+    } catch (e: any) {
+      res.status(400).json({ message: e?.message || "Could not save that rate" });
+    }
+  });
+
+  app.delete("/api/admin/rates/exceptions", requireAdmin, async (req, res) => {
+    try {
+      await rateCards.removeBrandException(
+        parseInt(String(req.query.customerId), 10),
+        parseInt(String(req.query.brandId), 10),
+      );
+      res.json({ ok: true });
+    } catch (e: any) {
+      res.status(400).json({ message: e?.message || "Could not remove that rate" });
+    }
+  });
 
   app.get("/api/admin/bulk/state", requireAdmin, async (_req, res) => {
     try {

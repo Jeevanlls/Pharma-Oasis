@@ -194,6 +194,46 @@ pool.query(`
   CREATE UNIQUE INDEX IF NOT EXISTS uniq_pricing_brands_pm_brand_id
     ON pricing_brands (pm_brand_id) WHERE pm_brand_id IS NOT NULL;
 
+  -- Rate cards: the commercial decision, held once instead of once per list.
+  CREATE TABLE IF NOT EXISTS rate_cards (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    margin_percent DECIMAL(6,2) NOT NULL,
+    rounding_mode VARCHAR(20) NOT NULL DEFAULT 'none',
+    is_default BOOLEAN DEFAULT FALSE,
+    notes TEXT,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+  );
+  -- Exactly one house rate.
+  CREATE UNIQUE INDEX IF NOT EXISTS uniq_rate_cards_default
+    ON rate_cards (is_default) WHERE is_default IS TRUE;
+
+  CREATE TABLE IF NOT EXISTS customer_rates (
+    id SERIAL PRIMARY KEY,
+    customer_id INTEGER NOT NULL UNIQUE,
+    rate_card_id INTEGER NOT NULL,
+    assigned_by INTEGER,
+    assigned_at TIMESTAMP NOT NULL DEFAULT NOW()
+  );
+
+  CREATE TABLE IF NOT EXISTS customer_brand_rates (
+    id SERIAL PRIMARY KEY,
+    customer_id INTEGER NOT NULL,
+    brand_id INTEGER NOT NULL,
+    margin_percent DECIMAL(6,2) NOT NULL,
+    note VARCHAR(255),
+    created_by INTEGER,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT uniq_customer_brand_rate UNIQUE (customer_id, brand_id)
+  );
+
+  ALTER TABLE price_lists ADD COLUMN IF NOT EXISTS rate_card_id INTEGER;
+  ALTER TABLE price_lists ADD COLUMN IF NOT EXISTS exception_customer_id INTEGER;
+  CREATE INDEX IF NOT EXISTS idx_price_lists_rate_card ON price_lists (rate_card_id);
+
   -- Link a portal login to its inventory-app customer record
   ALTER TABLE users ADD COLUMN IF NOT EXISTS inventory_customer_id INTEGER;
   CREATE UNIQUE INDEX IF NOT EXISTS uniq_users_inventory_customer_id
