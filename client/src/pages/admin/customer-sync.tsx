@@ -32,6 +32,8 @@ interface Row {
   portalUserId?: number;
   note?: string;
   testReason?: string;
+  inviteState?: "invited" | "expired" | "active";
+  lastLoginAt?: string | null;
 }
 
 interface Preview {
@@ -119,6 +121,23 @@ export default function AdminCustomerSyncPage() {
   const { data: preview, isLoading: previewLoading, refetch } = useQuery<Preview>({
     queryKey: ["/api/admin/customer-sync/preview"],
     enabled: !!health?.reachable,
+  });
+
+  /** Send the set-your-password link again. Same account, fresh token. */
+  const resend = useMutation({
+    mutationFn: async (userId: number) => {
+      const r = await fetch(`/api/admin/customer-sync/resend/${userId}`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message || "Could not send it again");
+      return r.json();
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/admin/customer-sync/preview"] });
+      toast({ title: "Invite sent again" });
+    },
+    onError: (e: any) => toast({ title: "Could not send it", description: e.message, variant: "destructive" }),
   });
 
   const invite = useMutation({
@@ -506,13 +525,41 @@ export default function AdminCustomerSyncPage() {
       {done.length ? (
         <details className="text-sm">
           <summary className="cursor-pointer text-muted-foreground">
-            {done.length} customer(s) already have a login
+            {done.length} customer(s) already have a login —{" "}
+            {done.filter((r) => r.inviteState === "active").length} signed in,{" "}
+            {done.filter((r) => r.inviteState === "invited").length} invited and waiting,{" "}
+            {done.filter((r) => r.inviteState === "expired").length} link expired
           </summary>
           <div className="mt-2 divide-y">
             {done.map((r) => (
-              <div key={r.inventoryCustomerId} className="flex items-center justify-between py-1.5">
+              <div key={r.inventoryCustomerId} className="flex flex-wrap items-center gap-x-3 py-1.5">
                 <span>{r.company ?? "—"}</span>
                 <span className="text-muted-foreground text-xs">{r.email}</span>
+                <span className="ml-auto flex items-center gap-2">
+                  {r.inviteState === "active" ? (
+                    <Badge variant="outline" className="text-emerald-700 border-emerald-600">
+                      signed in{r.lastLoginAt ? ` ${new Date(r.lastLoginAt).toLocaleDateString()}` : ""}
+                    </Badge>
+                  ) : r.inviteState === "expired" ? (
+                    <>
+                      <Badge variant="outline" className="text-red-700 border-red-500">link expired</Badge>
+                      {r.portalUserId ? (
+                        <Button size="sm" variant="ghost" onClick={() => resend.mutate(r.portalUserId!)}>
+                          Send again
+                        </Button>
+                      ) : null}
+                    </>
+                  ) : (
+                    <>
+                      <Badge variant="outline" className="text-amber-700 border-amber-500">invited, waiting</Badge>
+                      {r.portalUserId ? (
+                        <Button size="sm" variant="ghost" onClick={() => resend.mutate(r.portalUserId!)}>
+                          Send again
+                        </Button>
+                      ) : null}
+                    </>
+                  )}
+                </span>
               </div>
             ))}
           </div>
