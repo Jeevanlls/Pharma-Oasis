@@ -232,15 +232,68 @@ export async function syncRateCard(cardId: number): Promise<{
  * same brand.
  *
  * Replacing is right HERE and nowhere else: a customer's card is the statement
- * of what they pay, so moving them to a card must actually move them. Brand
- * exceptions are re-applied afterwards by syncExceptions, which is what keeps a
- * deal from being lost to a card change.
+ * of what they pay, so moving them to a card must actually move them.
+ *
+ * A brand the customer has negotiated is skipped outright rather than replaced
+ * and restored. Doing it the other way — clear everything, then put the deals
+ * back — leaves a window where a customer is on the house rate for a brand they
+ * pay a different price for, and if the second half fails they stay there.
+ *
+ * Set-based on purpose. One statement per few hundred rows rather than one per
+ * customer per list: placing twenty-eight customers across fifty-eight brands
+ * is sixteen hundred round trips done the obvious way, which is a request that
+ * times out rather than a page that loads.
  */
 async function assignMembersToLists(customerIds: number[], listIds: number[]): Promise<number> {
+  if (!customerIds.length || !listIds.length) return 0;
+
+  const lists = await db
+    .select({ id: priceLists.id, brandId: priceLists.brandId })
+    .from(priceLists)
+    .where(and(inArray(priceLists.id, listIds), isNotNull(priceLists.brandId)));
+  if (!lists.length) return 0;
+
+  const deals = await db
+    .select({ customerId: customerBrandRates.customerId, brandId: customerBrandRates.brandId })
+    .from(customerBrandRates)
+    .where(inArray(customerBrandRates.customerId, customerIds));
+  const negotiated = new Set(deals.map((d) => `${d.customerId}:${d.brandId}`));
+
+  const pairs: { customerId: number; brandId: number; priceListId: number }[] = [];
+  for (const c of customerIds) {
+    for (const l of lists) {
+      if (l.brandId == null) continue;
+      if (negotiated.has(`${c}:${l.brandId}`)) continue;
+      pairs.push({ customerId: c, brandId: l.brandId, priceListId: l.id });
+    }
+  }
+  if (!pairs.length) return 0;
+
+  const brandIds = Array.from(new Set(pairs.map((p) => p.brandId)));
+  await db
+    .delete(customerPriceLists)
+    .where(
+      and(
+        eq(customerPriceLists.scope, "brand"),
+        inArray(customerPriceLists.customerId, customerIds),
+        inArray(customerPriceLists.scopeId, brandIds),
+      ),
+    );
+
   let n = 0;
-  for (const listId of listIds) {
-    const r = await pricingV2.assignCustomers(listId, customerIds, { replace: true });
-    n += r.assigned;
+  for (let i = 0; i < pairs.length; i += 400) {
+    const chunk = pairs.slice(i, i + 400);
+    await db.insert(customerPriceLists).values(
+      chunk.map((p) => ({
+        customerId: p.customerId,
+        priceListId: p.priceListId,
+        scope: "brand",
+        scopeId: p.brandId,
+        brandId: p.brandId,
+        assignedBy: null,
+      })),
+    ).onConflictDoNothing();
+    n += chunk.length;
   }
   return n;
 }
@@ -271,7 +324,8 @@ export async function assignCustomerToCard(
     .where(and(eq(priceLists.rateCardId, cardId), isNull(priceLists.archivedAt)));
   if (lists.length) await assignMembersToLists([customerId], lists.map((l) => l.id));
 
-  // Their negotiated brands go back on top.
+  // Negotiated brands were never touched above, but a deal may not have a list
+  // built yet — this is where a new customer's exceptions get one.
   await syncExceptions(customerId);
 }
 
@@ -285,13 +339,20 @@ export async function placeUnassignedCustomers(): Promise<number> {
     .where(and(eq(users.role, "customer"), eq(users.status, "active")));
   const placed = await db.select({ customerId: customerRates.customerId }).from(customerRates);
   const have = new Set(placed.map((p) => p.customerId));
-  let n = 0;
-  for (const u of all) {
-    if (have.has(u.id)) continue;
-    await assignCustomerToCard(u.id, house.id);
-    n++;
-  }
-  return n;
+  const missing = all.filter((u) => !have.has(u.id)).map((u) => u.id);
+  if (!missing.length) return 0;
+
+  await db.insert(customerRates).values(
+    missing.map((customerId) => ({ customerId, rateCardId: house.id, assignedBy: null })),
+  ).onConflictDoNothing();
+
+  const lists = await db
+    .select({ id: priceLists.id })
+    .from(priceLists)
+    .where(and(eq(priceLists.rateCardId, house.id), isNull(priceLists.archivedAt)));
+  if (lists.length) await assignMembersToLists(missing, lists.map((l) => l.id));
+  await syncExceptions();
+  return missing.length;
 }
 
 // ---------------------------------------------------------------------------
