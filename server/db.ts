@@ -176,7 +176,21 @@ pool.query(`
   ALTER TABLE users ADD COLUMN IF NOT EXISTS price_list_id INTEGER;
   -- Key a pricing brand to its Price Manager brand, so a rename upstream
   -- cannot orphan the brand's price list and customers.
-  ALTER TABLE pricing_brands ADD COLUMN IF NOT EXISTS pm_brand_id INTEGER;
+  ALTER TABLE pricing_brands ADD COLUMN IF NOT EXISTS pm_brand_id VARCHAR(64);
+  -- It shipped as INTEGER before anyone noticed Price Manager's ids are UUIDs.
+  -- Widen it in place where that happened; harmless everywhere else.
+  DO $$
+  BEGIN
+    IF EXISTS (
+      SELECT 1 FROM information_schema.columns
+       WHERE table_name = 'pricing_brands'
+         AND column_name = 'pm_brand_id'
+         AND data_type = 'integer'
+    ) THEN
+      ALTER TABLE pricing_brands
+        ALTER COLUMN pm_brand_id TYPE VARCHAR(64) USING pm_brand_id::VARCHAR;
+    END IF;
+  END $$;
   CREATE UNIQUE INDEX IF NOT EXISTS uniq_pricing_brands_pm_brand_id
     ON pricing_brands (pm_brand_id) WHERE pm_brand_id IS NOT NULL;
 

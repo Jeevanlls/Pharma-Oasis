@@ -4700,6 +4700,31 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
     }
   });
 
+  app.get("/api/admin/bulk/reprice-preview", requireAdmin, async (_req, res) => {
+    try {
+      res.json(await pricingBulk.repricePreview());
+    } catch (e: any) {
+      res.status(500).json({ message: e?.message || "Preview failed" });
+    }
+  });
+
+  app.post("/api/admin/bulk/reprice", requireAdmin, async (req, res) => {
+    try {
+      const listIds = Array.isArray(req.body?.listIds)
+        ? req.body.listIds.map(Number).filter((n: number) => Number.isFinite(n))
+        : undefined;
+      res.json(
+        await pricingBulk.repriceLists({
+          marginPercent: Number(req.body?.marginPercent),
+          roundingMode: req.body?.roundingMode || undefined,
+          listIds,
+        }),
+      );
+    } catch (e: any) {
+      res.status(400).json({ message: e?.message || "Reprice failed" });
+    }
+  });
+
   app.post("/api/admin/bulk/assign", requireAdmin, async (req: any, res) => {
     try {
       const priceListIds = Array.isArray(req.body?.priceListIds)

@@ -50,7 +50,7 @@ interface ProductCount {
 }
 
 interface BrandResult {
-  pmBrandId: number;
+  pmBrandId: string;
   brand: string;
   category: string | null;
   brandCreated: boolean;
