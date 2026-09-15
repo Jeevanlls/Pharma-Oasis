@@ -94,10 +94,11 @@ const navGroups: NavGroup[] = [
     icon: PoundSterling,
     accent: "emerald",
     items: [
+      { title: "How it all works", href: "/admin/pricing-guide", icon: BookOpen, staffAccess: true },
       { title: "Daily price run", href: "/admin/bulk-setup", icon: Rocket, staffAccess: false },
       { title: "Rates — what we charge", href: "/admin/rates", icon: PoundSterling, staffAccess: false },
       { title: "Overview", href: "/admin/pricing", icon: Layers, staffAccess: true },
-      { title: "How this works (guide)", href: "/admin/pricing-guide", icon: BookOpen, staffAccess: true },
+
       { title: "1. Brands", href: "/admin/pricing-brands", icon: Building2, staffAccess: false },
       { title: "2. Categories", href: "/admin/pricing-categories", icon: Tag, staffAccess: false },
       { title: "3. Cost Uploads", href: "/admin/cost-uploads", icon: FileUp, staffAccess: false },

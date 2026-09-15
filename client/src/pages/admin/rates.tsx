@@ -183,7 +183,8 @@ export default function RatesPage() {
         <p className="text-sm text-muted-foreground mt-1 max-w-3xl">
           What we charge, and to whom. A rate card is the decision, held once &mdash; the price lists
           are built from it. A brand negotiated for one customer sits on top as an exception, and a
-          change to a card never touches one.
+          change to a card never touches one.{" "}
+          <Link href="/admin/pricing-guide"><span className="underline cursor-pointer">How it all works</span></Link>.
         </p>
       </div>
 
