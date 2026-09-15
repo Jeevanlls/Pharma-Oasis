@@ -190,6 +190,44 @@ export async function deleteUpload(id: number): Promise<void> {
 const normEan = (v: string | null | undefined): string =>
   (v ?? "").toString().replace(/\s+/g, "").replace(/\.0$/, "").trim();
 
+/** A barcode that appears more than once at genuinely different costs. */
+export interface DuplicateConflict {
+  ean: string;
+  description: string | null;
+  costs: string[];
+}
+
+/** Cost as a stable string, so 12.5 and 12.50 count as the same price. */
+const costKey = (r: { costPrice: string | null }): string =>
+  r.costPrice === null || r.costPrice === "" ? "no cost" : Number(r.costPrice).toFixed(2);
+
+/** Group an upload's rows by normalised barcode, keeping file order inside each group. */
+export function groupRowsByEan<T extends { ean: string | null }>(rows: T[]): Map<string, T[]> {
+  const groups = new Map<string, T[]>();
+  for (const r of rows) {
+    const k = normEan(r.ean);
+    if (!k) continue;
+    const g = groups.get(k);
+    if (g) g.push(r);
+    else groups.set(k, [r]);
+  }
+  return groups;
+}
+
+/** True when every row in a duplicate group carries the same cost and expiry —
+ *  i.e. the file simply repeats itself and one row can safely stand for all. */
+export function duplicateGroupAgrees(
+  group: { costPrice: string | null; validUntil: Date | null }[],
+): boolean {
+  const first = group[0];
+  const firstExpiry = first.validUntil ? first.validUntil.getTime() : null;
+  return group.every(
+    (r) =>
+      costKey(r) === costKey(first) &&
+      (r.validUntil ? r.validUntil.getTime() : null) === firstExpiry,
+  );
+}
+
 /** Replace a draft upload's rows with an edited set (from the review screen) and
  *  refresh the cached counts. The caller (route) re-validates via analyzeRows so the
  *  PreviewRows already carry final status/flags/comment. */
@@ -249,36 +287,64 @@ export async function updateUploadComment(id: number, comment: string | null): P
  *  matched costs onto products (active cost cache).
  *  Gating: refuses to publish while duplicate EANs remain; incomplete rows
  *  (missing EAN or cost) are skipped (deleted) and reported, never published. */
-export async function publishUpload(id: number): Promise<{ updated: number; skipped: number; noCost: number }> {
+export async function publishUpload(
+  id: number,
+): Promise<{ updated: number; skipped: number; noCost: number; collapsed: number }> {
   const found = await getUpload(id);
   if (!found) throw new Error("Upload not found");
   const { upload, rows } = found;
-  if (upload.status === "published") return { updated: 0, skipped: 0, noCost: 0 };
+  if (upload.status === "published") return { updated: 0, skipped: 0, noCost: 0, collapsed: 0 };
 
-  // Hard block: duplicate EANs must be resolved before publishing.
-  const counts = new Map<string, number>();
-  for (const r of rows) {
-    const k = normEan(r.ean);
-    if (k) counts.set(k, (counts.get(k) ?? 0) + 1);
+  // Duplicate barcodes. A supplier file listing the same barcode twice at the
+  // same cost is saying the same thing twice — we keep one row and drop the
+  // rest. A barcode listed twice at DIFFERENT costs is a real conflict: we
+  // cannot guess which price is right, so publishing still refuses and names
+  // the barcodes so they can be fixed at source.
+  const groups = groupRowsByEan(rows);
+  const dropIds: number[] = [];
+  const conflicts: DuplicateConflict[] = [];
+  for (const [ean, group] of groups) {
+    if (group.length < 2) continue;
+    if (duplicateGroupAgrees(group)) {
+      dropIds.push(...group.slice(1).map((r) => r.id));
+    } else {
+      conflicts.push({
+        ean,
+        description: group.find((r) => r.description)?.description ?? null,
+        costs: Array.from(new Set(group.map((r) => costKey(r)))),
+      });
+    }
   }
-  const dupes = Array.from(counts.entries()).filter(([, n]) => n > 1).map(([k]) => k);
-  if (dupes.length) {
+  if (conflicts.length) {
+    const shown = conflicts
+      .slice(0, 5)
+      .map((c) => `${c.ean} (${c.costs.join(" vs ")})`)
+      .join(", ");
     throw new Error(
-      `Cannot publish: ${dupes.length} duplicate EAN(s) in the file. Remove the duplicates and re-upload before publishing.`,
+      `Cannot publish: ${conflicts.length} barcode(s) appear more than once at different costs — ${shown}${
+        conflicts.length > 5 ? ", …" : ""
+      }. Fix them at source and re-sync.`,
     );
   }
+  if (dropIds.length) {
+    await db.delete(costUploadRows).where(
+      and(eq(costUploadRows.uploadId, id), inArray(costUploadRows.id, dropIds)),
+    );
+  }
+  const collapsed = dropIds.length;
+  const kept = rows.filter((r) => !dropIds.includes(r.id));
 
   // Drop only rows with NO EAN (they can't be identified, matched or priced).
   // Rows that have an EAN but a zero/blank cost are KEPT as "needs cost" — they stay
   // visible in Current Costs and are simply excluded from price lists until a cost is added.
-  const noEan = rows.filter((r) => !normEan(r.ean));
+  const noEan = kept.filter((r) => !normEan(r.ean));
   if (noEan.length) {
     await db.delete(costUploadRows).where(
       and(eq(costUploadRows.uploadId, id), inArray(costUploadRows.id, noEan.map((r) => r.id))),
     );
   }
   const skipped = noEan.length;
-  const liveRows = rows.filter((r) => normEan(r.ean));
+  const liveRows = kept.filter((r) => normEan(r.ean));
   const noCost = liveRows.filter((r) => r.costPrice === null || Number(r.costPrice) <= 0).length;
 
   // Supersede prior published uploads for the same brand.
@@ -320,7 +386,7 @@ export async function publishUpload(id: number): Promise<{ updated: number; skip
     })
     .where(eq(costUploads.id, id));
 
-  return { updated, skipped, noCost };
+  return { updated, skipped, noCost, collapsed };
 }
 
 /** Mark products whose cost validity has passed as expired (price still shown). */

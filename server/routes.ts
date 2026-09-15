@@ -4645,6 +4645,14 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
     }
   });
 
+  app.get("/api/admin/bulk/blockers", requireAdmin, async (_req, res) => {
+    try {
+      res.json(await pricingBulk.publishBlockers());
+    } catch (e: any) {
+      res.status(500).json({ message: e?.message || "Check failed" });
+    }
+  });
+
   app.post("/api/admin/bulk/publish", requireAdmin, async (req, res) => {
     try {
       const uploadIds = Array.isArray(req.body?.uploadIds)

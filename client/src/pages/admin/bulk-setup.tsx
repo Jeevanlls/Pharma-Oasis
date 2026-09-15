@@ -24,6 +24,19 @@ interface PublishPreview {
   other: number;
 }
 
+interface Blockers {
+  checked: number;
+  cleanRepeats: number;
+  blocked: {
+    uploadId: number;
+    brandId: number;
+    brand: string;
+    rows: number;
+    repeated: number;
+    conflicts: { ean: string; description: string | null; costs: string[] }[];
+  }[];
+}
+
 interface BuildPreview {
   rows: { brandId: number; brand: string; action: string; existingListName?: string }[];
   toBuild: number;
@@ -73,12 +86,15 @@ export default function BulkSetupPage() {
   const { data: pub, refetch: refetchPub, isFetching: pubLoading } =
     useQuery<PublishPreview>({ queryKey: ["/api/admin/bulk/publish-preview"] });
   const [pubResult, setPubResult] = useState<any>(null);
+  const { data: blockers, refetch: refetchBlockers } =
+    useQuery<Blockers>({ queryKey: ["/api/admin/bulk/blockers"] });
 
   const doPublish = useMutation({
     mutationFn: () => post("/api/admin/bulk/publish", {}),
     onSuccess: async (res) => {
       setPubResult(res);
       await refetchPub();
+      await refetchBlockers();
       await queryClient.invalidateQueries({ queryKey: ["/api/admin/bulk/build-preview"] });
       toast({
         title: `${res.published} brand(s) published`,
@@ -188,6 +204,50 @@ export default function BulkSetupPage() {
             </div>
           ) : null}
 
+          {blockers?.blocked.length ? (
+            <div className="rounded-md border border-amber-300 bg-amber-50 p-3 space-y-3">
+              <p className="text-sm font-medium flex items-center gap-1.5 text-amber-900">
+                <AlertTriangle className="h-4 w-4" />
+                {blockers.blocked.length} brand(s) will not publish
+              </p>
+              <p className="text-xs text-amber-900/80 max-w-3xl">
+                In each of these the same barcode appears twice at two different costs, so there is
+                no way to tell which price is right. A barcode repeated at the <em>same</em> cost is
+                fine &mdash; publishing folds those away by itself. Send the lines below to whoever
+                maintains Price Manager, then re-sync and publish again.
+              </p>
+              {blockers.blocked.map((b) => (
+                <div key={b.uploadId} className="text-sm">
+                  <div className="font-medium">
+                    {b.brand}{" "}
+                    <span className="text-xs font-normal text-muted-foreground">
+                      &mdash; {b.conflicts.length} clash{b.conflicts.length === 1 ? "" : "es"} in {b.rows} rows
+                    </span>
+                  </div>
+                  <ul className="mt-1 space-y-0.5">
+                    {b.conflicts.slice(0, 8).map((c) => (
+                      <li key={c.ean} className="text-xs flex flex-wrap gap-x-2">
+                        <span className="font-mono">{c.ean}</span>
+                        <span className="text-muted-foreground truncate max-w-xs">{c.description ?? ""}</span>
+                        <span className="text-red-700">{c.costs.join("  vs  ")}</span>
+                      </li>
+                    ))}
+                    {b.conflicts.length > 8 ? (
+                      <li className="text-xs text-muted-foreground">
+                        &hellip; and {b.conflicts.length - 8} more
+                      </li>
+                    ) : null}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          ) : blockers && blockers.checked ? (
+            <p className="text-sm text-emerald-700 flex items-center gap-1.5">
+              <CheckCircle2 className="h-4 w-4" />
+              All {blockers.checked} waiting draft(s) will publish cleanly.
+            </p>
+          ) : null}
+
           <Button
             disabled={doPublish.isPending || pubLoading || !pub?.drafts.length}
             onClick={() => doPublish.mutate()}
@@ -201,6 +261,9 @@ export default function BulkSetupPage() {
             <div className="rounded-md border bg-muted/40 p-3 text-sm space-y-1">
               <p className="font-medium">
                 {pubResult.published} published{pubResult.failed ? `, ${pubResult.failed} failed` : ""}
+                {pubResult.results.reduce((n: number, r: any) => n + (r.collapsed ?? 0), 0)
+                  ? `, ${pubResult.results.reduce((n: number, r: any) => n + (r.collapsed ?? 0), 0)} repeated row(s) folded away`
+                  : ""}
               </p>
               {pubResult.results
                 .filter((r: any) => !r.ok)

@@ -263,7 +263,7 @@ export interface InviteOutcome {
 export async function inviteCustomers(
   inventoryCustomerIds: number[],
   opts: { linkOnly?: boolean } = {},
-): Promise<{ sent: number; linked: number; failed: number; results: InviteOutcome[] }> {
+): Promise<{ sent: number; linked: number; failed: number; listsGranted: number; results: InviteOutcome[] }> {
   const preview = await customerSyncPreview();
   const wanted = new Set(inventoryCustomerIds);
   const targets = preview.rows
@@ -276,6 +276,10 @@ export async function inviteCustomers(
   const SITE_URL = process.env.SITE_URL || "https://pharmaoasis.co.uk";
 
   const results: InviteOutcome[] = [];
+  // Every account this run touches, so it can be put on the standard price
+  // lists before anyone follows the link. A login with no assignments shows an
+  // empty catalogue, which is a worse first impression than no invite at all.
+  const needLists: number[] = [];
 
   for (const row of targets) {
     const head = {
@@ -293,6 +297,7 @@ export async function inviteCustomers(
             .set({ inventoryCustomerId: row.inventoryCustomerId, updatedAt: new Date() })
             .where(eq(users.id, row.portalUserId));
         }
+        if (row.portalUserId) needLists.push(row.portalUserId);
         results.push({ ...head, result: "linked", portalUserId: row.portalUserId, detail: "existing account linked" });
         continue;
       }
@@ -326,6 +331,7 @@ export async function inviteCustomers(
         inviteUrl: `${SITE_URL}/reset-password?token=${token}`,
       });
 
+      needLists.push(user.id);
       results.push({
         ...head,
         result: emailResult.success ? "invited" : "failed",
@@ -339,7 +345,20 @@ export async function inviteCustomers(
     }
   }
 
+  let listsGranted = 0;
+  if (needLists.length) {
+    try {
+      const { grantStandardLists } = await import("./pricing-bulk");
+      listsGranted = (await grantStandardLists(needLists)).assigned;
+    } catch (e) {
+      // Pricing must never take an invite down with it — the accounts exist and
+      // the emails went; the lists can be granted again from the Go live screen.
+      console.error("[customer-sync] could not grant standard price lists:", e);
+    }
+  }
+
   return {
+    listsGranted,
     sent: results.filter((r) => r.result === "invited").length,
     linked: results.filter((r) => r.result === "linked").length,
     failed: results.filter((r) => r.result === "failed").length,

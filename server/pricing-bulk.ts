@@ -17,7 +17,7 @@
  */
 import { and, eq, inArray, like, isNotNull } from "drizzle-orm";
 import { db } from "./db";
-import { costUploads, priceLists, pricingBrands } from "@shared/schema";
+import { costUploads, customerPriceLists, priceLists, pricingBrands } from "@shared/schema";
 import * as pricingStore from "./pricing-store";
 import * as pricingV2 from "./pricing-v2";
 import { PM_SYNC_FILE_NAME } from "./pm-sync";
@@ -83,15 +83,90 @@ export interface PublishOutcome {
   skipped?: number;
   /** rows kept but with no usable cost — they show as "price on request" */
   noCost?: number;
+  /** repeated rows folded away because they said the same thing twice */
+  collapsed?: number;
   error?: string;
+}
+
+// ---------------------------------------------------------------------------
+// 1b. WHY A DRAFT WILL NOT PUBLISH
+// ---------------------------------------------------------------------------
+
+export interface DraftBlocker {
+  uploadId: number;
+  brandId: number;
+  brand: string;
+  rows: number;
+  /** barcodes repeated at the same cost — harmless, folded away on publish */
+  repeated: number;
+  /** barcodes repeated at DIFFERENT costs — these stop the publish */
+  conflicts: pricingStore.DuplicateConflict[];
+}
+
+/**
+ * Dry-run the duplicate check that publishing runs, for every waiting draft.
+ *
+ * This writes nothing. It exists because "9 brands did not publish" is not an
+ * answer anyone can act on — the barcode and the two prices are.
+ */
+export async function publishBlockers(): Promise<{
+  checked: number;
+  blocked: DraftBlocker[];
+  cleanRepeats: number;
+}> {
+  const { drafts } = await publishPreview();
+  const blocked: DraftBlocker[] = [];
+  let cleanRepeats = 0;
+
+  for (const d of drafts) {
+    const found = await pricingStore.getUpload(d.uploadId);
+    if (!found) continue;
+    const groups = pricingStore.groupRowsByEan(found.rows);
+    const conflicts: pricingStore.DuplicateConflict[] = [];
+    let repeated = 0;
+    for (const [ean, group] of groups) {
+      if (group.length < 2) continue;
+      if (pricingStore.duplicateGroupAgrees(group)) {
+        repeated += group.length - 1;
+      } else {
+        conflicts.push({
+          ean,
+          description: group.find((r) => r.description)?.description ?? null,
+          costs: Array.from(
+            new Set(
+              group.map((r) =>
+                r.costPrice === null || r.costPrice === "" ? "no cost" : Number(r.costPrice).toFixed(2),
+              ),
+            ),
+          ),
+        });
+      }
+    }
+    cleanRepeats += repeated;
+    if (conflicts.length) {
+      conflicts.sort((a, b) => a.ean.localeCompare(b.ean));
+      blocked.push({
+        uploadId: d.uploadId,
+        brandId: d.brandId,
+        brand: d.brand,
+        rows: d.rows,
+        repeated,
+        conflicts,
+      });
+    }
+  }
+
+  blocked.sort((a, b) => a.brand.localeCompare(b.brand));
+  return { checked: drafts.length, blocked, cleanRepeats };
 }
 
 /**
  * Publish the waiting drafts.
  *
- * One failure does not stop the run: a brand with duplicate barcodes throws
- * inside publishUpload, and the right answer is to publish the other 59 and
- * report that one, not to abandon the lot halfway through.
+ * One failure does not stop the run: a brand whose file repeats a barcode at
+ * two different costs throws inside publishUpload, and the right answer is to
+ * publish the other 59 and report that one, not to abandon the lot halfway
+ * through. publishBlockers() above says exactly which barcodes those are.
  */
 export async function publishAllDrafts(opts: {
   priceManagerOnly?: boolean;
@@ -126,6 +201,69 @@ export async function publishAllDrafts(opts: {
     failed: results.filter((r) => !r.ok).length,
     results,
   };
+}
+
+// ---------------------------------------------------------------------------
+// 1c. PUT A NEW CUSTOMER ON THE STANDARD LISTS
+// ---------------------------------------------------------------------------
+
+/**
+ * Give one or more customers every published brand list they are not already on.
+ *
+ * A customer with no assignments sees no prices at all, so an invite that
+ * creates a login without doing this hands someone an empty catalogue. This is
+ * the same rule as the bulk assign screen — never touch a brand the customer is
+ * already assigned for, because that is where negotiated rates live — but it
+ * runs as three queries rather than one per list, because it sits in the path
+ * of sending an invite and cannot take forty seconds.
+ */
+export async function grantStandardLists(
+  customerIds: number[],
+  opts: { assignedBy?: number | null } = {},
+): Promise<{ assigned: number; skipped: number }> {
+  if (!customerIds.length) return { assigned: 0, skipped: 0 };
+
+  const lists = await db
+    .select({ id: priceLists.id, brandId: priceLists.brandId })
+    .from(priceLists)
+    .where(and(eq(priceLists.status, "published"), eq(priceLists.scope, "brand"), isNotNull(priceLists.brandId)));
+  if (!lists.length) return { assigned: 0, skipped: 0 };
+
+  const existing = await db
+    .select({ customerId: customerPriceLists.customerId, scopeId: customerPriceLists.scopeId })
+    .from(customerPriceLists)
+    .where(and(eq(customerPriceLists.scope, "brand"), inArray(customerPriceLists.customerId, customerIds)));
+  const taken = new Set(existing.map((e) => `${e.customerId}:${e.scopeId}`));
+
+  const values: (typeof customerPriceLists.$inferInsert)[] = [];
+  let skipped = 0;
+  for (const customerId of customerIds) {
+    for (const l of lists) {
+      if (l.brandId == null) continue;
+      if (taken.has(`${customerId}:${l.brandId}`)) {
+        skipped++;
+        continue;
+      }
+      values.push({
+        customerId,
+        priceListId: l.id,
+        scope: "brand",
+        scopeId: l.brandId,
+        brandId: l.brandId,
+        assignedBy: opts.assignedBy ?? null,
+      });
+    }
+  }
+  if (!values.length) return { assigned: 0, skipped };
+
+  // Chunked: one statement per ~500 rows keeps the parameter count sane.
+  let assigned = 0;
+  for (let i = 0; i < values.length; i += 500) {
+    const chunk = values.slice(i, i + 500);
+    await db.insert(customerPriceLists).values(chunk).onConflictDoNothing();
+    assigned += chunk.length;
+  }
+  return { assigned, skipped };
 }
 
 // ---------------------------------------------------------------------------
