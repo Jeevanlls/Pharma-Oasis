@@ -111,6 +111,33 @@ export async function customerSyncHealth(): Promise<{
 
 const norm = (s: string | null | undefined) => (s ?? "").trim().toLowerCase();
 
+/** Our own addresses. A login for one of these is almost always a leftover. */
+const INTERNAL_DOMAINS = ["pharmaoasis.com", "pharmaoasis.co.uk"];
+const TEST_MARKERS = ["test", "dummy", "sample", "example"];
+
+/**
+ * Why this record should not be invited without someone looking at it first,
+ * or null if it is an ordinary customer.
+ *
+ * The automatic sweep and the manual screen both use this, so they can never
+ * disagree about what counts as a test record.
+ */
+export function internalOrTestReason(row: {
+  company: string | null;
+  email: string | null;
+}): string | null {
+  const email = norm(row.email);
+  const domain = email.split("@")[1] ?? "";
+  if (INTERNAL_DOMAINS.includes(domain)) {
+    return "internal address — invite it by hand if that is really intended";
+  }
+  const haystack = `${norm(row.company)} ${email}`;
+  if (TEST_MARKERS.some((m) => haystack.includes(m))) {
+    return "looks like a test record";
+  }
+  return null;
+}
+
 export type CustomerSyncState =
   /** has an email, no portal account yet — an invite can go out */
   | "ready"
@@ -137,12 +164,18 @@ export interface CustomerSyncRow {
   /** the portal user this maps to, when there is one */
   portalUserId?: number;
   note?: string;
+  /** set when the record looks like a test or one of our own addresses */
+  testReason?: string;
 }
 
 export interface CustomerSyncPreview {
   ranAt: string;
   inventoryCustomers: number;
   ready: number;
+  /** ready, minus anything that looks like a test or internal record */
+  readyReal: number;
+  /** records flagged as test/internal, whatever their state */
+  testLike: number;
   linked: number;
   linkOnly: number;
   noEmail: number;
@@ -227,6 +260,9 @@ export async function customerSyncPreview(): Promise<CustomerSyncPreview> {
       };
     }
     return { ...base, state: "ready" as const };
+  }).map((r) => {
+    const testReason = internalOrTestReason(r);
+    return testReason ? { ...r, testReason } : r;
   });
 
   const count = (s: CustomerSyncState) => rows.filter((r) => r.state === s).length;
@@ -234,6 +270,8 @@ export async function customerSyncPreview(): Promise<CustomerSyncPreview> {
     ranAt: new Date().toISOString(),
     inventoryCustomers: customers.length,
     ready: count("ready"),
+    readyReal: rows.filter((r) => r.state === "ready" && !r.testReason).length,
+    testLike: rows.filter((r) => !!r.testReason).length,
     linked: count("linked"),
     linkOnly: count("link_only"),
     noEmail: count("no_email"),
