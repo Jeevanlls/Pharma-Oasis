@@ -426,9 +426,17 @@ export async function repricePreview(opts: { listIds?: number[] } = {}): Promise
   onMargin: number;
   handSet: number;
 }> {
+  // A negotiated list belongs to one customer and to no rate card. A bulk
+  // reprice must never reach one by accident, so it is only ever included when
+  // its id is named — which is what rate-cards.ts does when the deal itself is
+  // renegotiated.
   const where = opts.listIds?.length
     ? and(isNotNull(priceLists.brandId), inArray(priceLists.id, opts.listIds))
-    : and(isNotNull(priceLists.brandId), eq(priceLists.scope, "brand"));
+    : and(
+        isNotNull(priceLists.brandId),
+        eq(priceLists.scope, "brand"),
+        isNull(priceLists.exceptionCustomerId),
+      );
 
   const lists = await db
     .select({

@@ -72,16 +72,6 @@ interface BuildPreview {
   noCosts: number;
 }
 
-interface RepricePreview {
-  lists: number;
-  onMargin: number;
-  handSet: number;
-  targets: {
-    listId: number; name: string; brand: string | null; status: string;
-    currentMargin: string | null; onMargin: number; handSet: number; noCost: number;
-  }[];
-}
-
 interface PriceListSummary {
   id: number; name: string; brandId: number | null; brandName: string | null;
   status: string; itemCount: number; customerCount: number;
@@ -241,7 +231,6 @@ export default function BulkSetupPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/bulk/publish-preview"] }),
       queryClient.invalidateQueries({ queryKey: ["/api/admin/bulk/blockers"] }),
       queryClient.invalidateQueries({ queryKey: ["/api/admin/bulk/build-preview"] }),
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/bulk/reprice-preview"] }),
       queryClient.invalidateQueries({ queryKey: ["/api/admin/v2/price-lists"] }),
     ]);
   }
@@ -262,27 +251,6 @@ export default function BulkSetupPage() {
   });
 
   // ---- Step 2b: change the margin on lists that already exist ----
-  const { data: reprice, refetch: refetchReprice } =
-    useQuery<RepricePreview>({ queryKey: ["/api/admin/bulk/reprice-preview"] });
-  const [newMargin, setNewMargin] = useState("25");
-  const [repriceResult, setRepriceResult] = useState<any>(null);
-  const [confirmReprice, setConfirmReprice] = useState(false);
-
-  const doReprice = useMutation({
-    mutationFn: () => post("/api/admin/bulk/reprice", { marginPercent: Number(newMargin) }),
-    onSuccess: async (res) => {
-      setRepriceResult(res);
-      setConfirmReprice(false);
-      await refetchReprice();
-      await queryClient.invalidateQueries({ queryKey: ["/api/admin/v2/price-lists"] });
-      toast({
-        title: `${res.repriced} price(s) changed`,
-        description: `${res.lists} list(s) now at ${newMargin}%.`,
-      });
-    },
-    onError: (e: any) => toast({ title: "Reprice failed", description: e.message, variant: "destructive" }),
-  });
-
   // ---- Step 3: assign ----
   const { data: lists = [] } = useQuery<PriceListSummary[]>({ queryKey: ["/api/admin/v2/price-lists"] });
   const { data: users = [] } = useQuery<AppUser[]>({ queryKey: ["/api/admin/users"] });
@@ -320,6 +288,9 @@ export default function BulkSetupPage() {
     });
   }
 
+  const summaryMargins = state?.margins.length
+    ? `${state.margins.map((m) => `${Number(m).toFixed(2).replace(/\.00$/, "")}%`).join(" / ")}`
+    : "—";
   const blocked = state?.todo.filter((t) => t.severity === "blocked") ?? [];
   const actions = state?.todo.filter((t) => t.severity === "todo") ?? [];
   const waiting = state?.todo.filter((t) => t.severity === "waiting") ?? [];
@@ -712,85 +683,21 @@ export default function BulkSetupPage() {
           ) : null}
       </Step>
 
-      {/* STEP 2b */}
+      {/* STEP 2b — moved to its own page */}
       <Step
-        title="Change the standard margin"
-        status={reprice ? `${reprice.lists} list(s) at ${state?.margins.join(" / ") ?? "—"}%` : "—"}
+        title="Change what we charge"
+        status={summaryMargins}
         tone="neutral"
       >
-          <p className="text-sm text-muted-foreground max-w-3xl">
-            Step 2 will not rebuild a brand that already has a list, because rebuilding throws away
-            anything you priced by hand. This changes the margin on the lists as they stand instead:
-            every line still priced off the margin is recalculated, and every line where you typed a
-            price yourself is left exactly where it is.
-          </p>
-
-          {reprice ? (
-            <div className="grid gap-3 sm:grid-cols-3">
-              <Stat label="Lists that would change" value={reprice.lists} tone="good" />
-              <Stat label="Prices recalculated" value={reprice.onMargin} />
-              <Stat label="Hand-set prices left alone" value={reprice.handSet} />
-            </div>
-          ) : null}
-
-          <div className="flex flex-wrap items-end gap-4">
-            <div className="space-y-1">
-              <Label htmlFor="new-margin" className="text-xs">New margin %</Label>
-              <Input
-                id="new-margin"
-                className="w-24"
-                value={newMargin}
-                onChange={(e) => { setNewMargin(e.target.value); setConfirmReprice(false); }}
-              />
-            </div>
-            {!confirmReprice ? (
-              <Button variant="outline" onClick={() => setConfirmReprice(true)} disabled={!reprice?.lists}>
-                Reprice {reprice?.lists ?? 0} list(s) at {newMargin}%
-              </Button>
-            ) : (
-              <div className="flex items-center gap-2">
-                <Button
-                  disabled={doReprice.isPending}
-                  onClick={() => doReprice.mutate()}
-                  className="bg-amber-600 hover:bg-amber-700 text-white"
-                >
-                  {doReprice.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
-                  Yes — change {reprice?.onMargin ?? 0} live price(s)
-                </Button>
-                <Button variant="ghost" onClick={() => setConfirmReprice(false)}>Cancel</Button>
-              </div>
-            )}
-          </div>
-          {confirmReprice ? (
-            <p className="text-xs text-amber-700 flex items-center gap-1.5 -mt-2">
-              <AlertTriangle className="h-3.5 w-3.5" />
-              These lists are published and assigned, so the new prices are what customers see as soon
-              as this finishes.
-            </p>
-          ) : (
-            <p className="text-xs text-muted-foreground -mt-2">
-              A margin of {newMargin || "x"}% means cost &times; {(1 + (Number(newMargin) || 0) / 100).toFixed(2)}.
-              Price endings are left as each list already has them.
-            </p>
-          )}
-
-          {repriceResult ? (
-            <div className="rounded-md border bg-muted/40 p-3 text-sm space-y-1">
-              <p className="font-medium">
-                {repriceResult.repriced} price(s) changed across {repriceResult.lists} list(s)
-                {repriceResult.untouched ? `, ${repriceResult.untouched} left alone` : ""}
-                {repriceResult.failed ? `, ${repriceResult.failed} failed` : ""}
-              </p>
-              {repriceResult.results
-                .filter((r: any) => !r.ok)
-                .map((r: any) => (
-                  <div key={r.listId} className="flex justify-between gap-3">
-                    <span>{r.name}</span>
-                    <span className="text-red-600 text-xs text-right">{r.error}</span>
-                  </div>
-                ))}
-            </div>
-          ) : null}
+        <p className="text-sm text-muted-foreground max-w-3xl">
+          Margins moved to <Link href="/admin/rates" className="underline font-medium">Rates</Link>,
+          where a rate lives once instead of once per list &mdash; so you can see every rate on one
+          screen, change one for everybody on it, and give a customer their own rate on a brand
+          without a house-wide change ever undoing it.
+        </p>
+        <Link href="/admin/rates">
+          <Button variant="outline">Open Rates</Button>
+        </Link>
       </Step>
 
       {/* STEP 3 */}
