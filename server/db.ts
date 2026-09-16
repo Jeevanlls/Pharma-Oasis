@@ -246,6 +246,14 @@ pool.query(`
   ALTER TABLE users ADD COLUMN IF NOT EXISTS two_factor_backup_codes TEXT;
   ALTER TABLE quote_items ADD COLUMN IF NOT EXISTS unit_cost DECIMAL(10,2);
   ALTER TABLE quotes ADD COLUMN IF NOT EXISTS lead_time VARCHAR(160);
+  -- Handoff to the inventory app: which enquiry this became, when it landed,
+  -- and why it did not if it did not. Null pushed_at + non-null error = needs a retry.
+  ALTER TABLE quotes ADD COLUMN IF NOT EXISTS inventory_enquiry_ref VARCHAR(40);
+  ALTER TABLE quotes ADD COLUMN IF NOT EXISTS inventory_pushed_at TIMESTAMP;
+  ALTER TABLE quotes ADD COLUMN IF NOT EXISTS inventory_push_error TEXT;
+  ALTER TABLE orders ADD COLUMN IF NOT EXISTS inventory_enquiry_ref VARCHAR(40);
+  ALTER TABLE orders ADD COLUMN IF NOT EXISTS inventory_pushed_at TIMESTAMP;
+  ALTER TABLE orders ADD COLUMN IF NOT EXISTS inventory_push_error TEXT;
   ALTER TABLE quote_items ADD COLUMN IF NOT EXISTS margin_applied DECIMAL(6,2);
   -- Price list publish/archive tracking (v2)
   ALTER TABLE price_lists ADD COLUMN IF NOT EXISTS published_at TIMESTAMP;

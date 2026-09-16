@@ -50,6 +50,7 @@ import {
   BookOpen,
   Layers,
   Megaphone,
+  Send,
   ChevronDown,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -82,6 +83,7 @@ const navGroups: NavGroup[] = [
     icon: ShoppingCart,
     items: [
       { title: "Sales (pipeline)", href: "/admin/sales", icon: ShoppingCart, staffAccess: false },
+      { title: "Website requests", href: "/admin/website-requests", icon: Send, staffAccess: false },
       { title: "Offers", href: "/admin/offers", icon: Percent, staffAccess: false },
       { title: "Suppliers", href: "/admin/suppliers", icon: Globe, staffAccess: false },
       { title: "Messages", href: "/admin/messages", icon: MessageSquare, staffAccess: false },

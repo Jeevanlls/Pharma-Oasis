@@ -6,7 +6,46 @@ const ZOHO_PASSWORD = process.env.ZOHO_EMAIL_PASSWORD;
 const NOTIFICATION_EMAIL = process.env.NOTIFICATION_EMAIL || 'jeevan@pharmaoasis.com';
 // Always-monitored trade inbox — order & quote notifications are also sent here.
 const TRADE_INBOX = process.env.TRADE_INBOX || 'trade@pharmaoasis.com';
-const ORDER_QUOTE_RECIPIENTS = Array.from(new Set([NOTIFICATION_EMAIL, TRADE_INBOX])).join(', ');
+// Sales desk. Every portal quote and order now also becomes an enquiry in the
+// inventory app, and this is the inbox the people who work those enquiries read.
+const SALES_INBOX = process.env.SALES_INBOX || 'sales@pharmaoasis.com';
+const ORDER_QUOTE_RECIPIENTS = Array.from(
+  new Set([NOTIFICATION_EMAIL, TRADE_INBOX, SALES_INBOX]),
+).join(', ');
+// Where the enquiry lands. Used to deep-link the alert emails straight to it.
+const INVENTORY_APP_URL = (process.env.INVENTORY_APP_URL || 'https://app.pharmaoasis.co.uk').replace(/\/+$/, '');
+
+/**
+ * The block that tells whoever opens the alert what already happened and what
+ * is left to do. Rendered only when the handoff actually landed — an empty
+ * "Enquiry: —" row would be worse than saying nothing.
+ */
+function enquiryBlock(enquiryNumber?: string | null, enquiryId?: number | null): string {
+  if (!enquiryNumber) {
+    return `
+      <div style="margin-top: 20px; padding: 15px; background: #fef3c7; border-radius: 8px;">
+        <p style="margin: 0; color: #92400e;">
+          <strong>Not yet in the inventory app.</strong> This request has been saved on the website but
+          has not reached app.pharmaoasis.co.uk. Open Admin → Website requests and use "Send to inventory"
+          to push it through.
+        </p>
+      </div>`;
+  }
+  const link = enquiryId
+    ? `${INVENTORY_APP_URL}/enquiry-tracker/${enquiryId}`
+    : `${INVENTORY_APP_URL}/my-desk`;
+  return `
+      <div style="margin-top: 20px; padding: 15px; background: #eef2ff; border-radius: 8px;">
+        <p style="margin: 0 0 10px 0; color: #3730a3;">
+          Filed in the inventory app as <strong>${enquiryNumber}</strong>, with no salesperson on it yet.
+          Nothing becomes a sales order until someone picks it up — and not at all unless the customer
+          is approved to trade.
+        </p>
+        <a href="${link}" style="display: inline-block; padding: 10px 18px; background: #4f46e5; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: bold;">
+          Open ${enquiryNumber}
+        </a>
+      </div>`;
+}
 
 // Create transporter for Zoho India
 const transporter = ZOHO_PASSWORD ? nodemailer.createTransport({
@@ -203,8 +242,12 @@ export async function sendQuoteSubmissionNotification(data: {
   companyName: string;
   itemCount: number;
   totalValue: string;
+  enquiryNumber?: string | null;
+  enquiryId?: number | null;
 }): Promise<EmailResult> {
-  const subject = `New Quote Request #${data.quoteId} from ${data.companyName}`;
+  const subject = data.enquiryNumber
+    ? `New Quote Request ${data.enquiryNumber} from ${data.companyName}`
+    : `New Quote Request #${data.quoteId} from ${data.companyName}`;
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: #7c3aed; color: white; padding: 20px; text-align: center;">
@@ -239,11 +282,7 @@ export async function sendQuoteSubmissionNotification(data: {
             <td style="padding: 8px 0; font-size: 18px; color: #7c3aed;">${data.totalValue}</td>
           </tr>
         </table>
-        <div style="margin-top: 20px; padding: 15px; background: #ede9fe; border-radius: 8px;">
-          <p style="margin: 0; color: #5b21b6;">
-            <strong>Action Required:</strong> Review this quote in the admin panel and provide a response to the customer.
-          </p>
-        </div>
+        ${enquiryBlock(data.enquiryNumber, data.enquiryId)}
       </div>
       <div style="padding: 15px; background: #e2e8f0; text-align: center; font-size: 12px; color: #64748b;">
         This is an automated notification from Pharma Oasis B2B Platform
@@ -734,8 +773,12 @@ export async function sendOrderSubmissionNotification(data: {
   companyName: string;
   itemCount: number;
   totalValue: string;
+  enquiryNumber?: string | null;
+  enquiryId?: number | null;
 }): Promise<EmailResult> {
-  const subject = `New Order #${data.orderId} from ${data.companyName}`;
+  const subject = data.enquiryNumber
+    ? `New Order ${data.enquiryNumber} from ${data.companyName}`
+    : `New Order #${data.orderId} from ${data.companyName}`;
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: #0f766e; color: white; padding: 20px; text-align: center;">
@@ -751,9 +794,7 @@ export async function sendOrderSubmissionNotification(data: {
           <tr><td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; font-weight: bold;">Items:</td><td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;">${data.itemCount} product(s)</td></tr>
           <tr><td style="padding: 8px 0; font-weight: bold;">Order Total:</td><td style="padding: 8px 0; font-size: 18px; color: #0f766e;">${data.totalValue}</td></tr>
         </table>
-        <div style="margin-top: 20px; padding: 15px; background: #ccfbf1; border-radius: 8px;">
-          <p style="margin: 0; color: #115e59;"><strong>Action Required:</strong> Review and confirm this order in the admin panel.</p>
-        </div>
+        ${enquiryBlock(data.enquiryNumber, data.enquiryId)}
       </div>
       <div style="padding: 15px; background: #e2e8f0; text-align: center; font-size: 12px; color: #64748b;">Automated notification from Pharma Oasis B2B Platform</div>
     </div>
