@@ -13,8 +13,16 @@ import {
   profileUpdateSchema,
   uploadJobs,
   insertBlogPostSchema,
+  quotes as quotesTable,
+  orders as ordersTable,
 } from "@shared/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, isNull } from "drizzle-orm";
+import {
+  pushEnquiryInBackground,
+  pushEnquiryOnce,
+  bridgeEnabled,
+  type BridgeLine,
+} from "./inventory-bridge";
 import bcrypt from "bcryptjs";
 import QRCode from "qrcode";
 import {
@@ -1018,21 +1026,32 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
       const totalValueFormatted = `£${total.toFixed(2)}`;
       const name = req.user.primaryContactName || req.user.companyName || req.user.email;
 
-      await sendQuoteSubmissionNotification({
-        quoteId: quote.id,
-        customerEmail: req.user.email,
-        customerName: name,
-        companyName: req.user.companyName,
-        itemCount: lines.length,
-        totalValue: totalValueFormatted,
-      });
-
       await sendQuoteConfirmationToCustomer({
         email: req.user.email,
         contactName: name,
         quoteId: quote.id,
         itemCount: lines.length,
         totalValue: totalValueFormatted,
+      });
+
+      handoffToInventory({
+        kind: "quote",
+        recordId: quote.id,
+        user: req.user,
+        lines,
+        customerNotes: customerNotes || null,
+        total,
+        notify: (enquiryNumber, enquiryId) =>
+          sendQuoteSubmissionNotification({
+            quoteId: quote.id,
+            customerEmail: req.user.email,
+            customerName: name,
+            companyName: req.user.companyName,
+            itemCount: lines.length,
+            totalValue: totalValueFormatted,
+            enquiryNumber,
+            enquiryId,
+          }),
       });
 
       res.status(201).json({ quote, message: "Quote request submitted successfully" });
@@ -5618,6 +5637,84 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
     return { lines, total, allPriced };
   }
 
+  // ===== Handoff to the inventory app =====
+  //
+  // Every price request and every order placed on the portal becomes an ENQUIRY
+  // in app.pharmaoasis.co.uk, assigned to nobody, flagged on the dashboard. It
+  // is never created as a sales order from here: approval to trade lives in the
+  // inventory app and only a person there can act on it.
+  //
+  // This runs AFTER the customer has been answered. Their submission is already
+  // saved in the portal database, so a slow or restarting inventory app delays
+  // the handoff, it never loses the request. The far end is idempotent on
+  // portal_ref, so retrying is always safe.
+
+  /** Our basket lines, in the shape the inventory app's enquiry endpoint wants. */
+  function bridgeLinesFrom(lines: any[]): BridgeLine[] {
+    return lines.map((l) => ({
+      // Deliberately no product_ref: `l.productId` is a PORTAL catalogue id and
+      // means nothing in the inventory app. The EAN is the only shared key.
+      ean: l.ean ?? null,
+      description: l.description ?? null,
+      quantity: l.quantity ?? null,
+      unit_price: l.unitPrice != null ? Number(l.unitPrice) : null,
+    }));
+  }
+
+  /**
+   * `notify` is the internal alert email. It fires AFTER the push resolves, not
+   * before, so the alert can carry the enquiry number and link straight to it
+   * — the difference between "somebody ordered something" and "ENQ-00412 is on
+   * the dashboard, go and take it". The customer's own confirmation is sent
+   * immediately by the caller and never waits on this.
+   */
+  function handoffToInventory(opts: {
+    kind: "quote" | "order";
+    recordId: number;
+    user: any;
+    lines: any[];
+    customerNotes?: string | null;
+    total: number;
+    notify?: (enquiryNumber?: string | null, enquiryId?: number | null) => Promise<any>;
+  }) {
+    if (!bridgeEnabled()) {
+      void opts.notify?.(null, null);
+      return;
+    }
+    const table = opts.kind === "order" ? ordersTable : quotesTable;
+    pushEnquiryInBackground(
+      {
+        portal_ref: `${opts.kind}:${opts.recordId}`,
+        kind: opts.kind,
+        customer_ref: opts.user.inventoryCustomerId ?? null,
+        company_name: opts.user.companyName ?? opts.user.tradingName ?? null,
+        contact_name: opts.user.primaryContactName ?? null,
+        contact_email: opts.user.email ?? null,
+        contact_phone: opts.user.phoneNumber ?? opts.user.mobileNumber ?? null,
+        currency: "GBP",
+        customer_notes: opts.customerNotes ?? null,
+        total_estimate: opts.total,
+        submitted_at: new Date().toISOString(),
+        lines: bridgeLinesFrom(opts.lines),
+      },
+      async (result) => {
+        if (!result.disabled) {
+          await db
+            .update(table)
+            .set({
+              inventoryEnquiryRef: result.ok ? result.enquiryNumber ?? null : null,
+              inventoryPushedAt: result.ok ? new Date() : null,
+              inventoryPushError: result.ok ? null : result.error ?? "Unknown error",
+            } as any)
+            .where(eq(table.id, opts.recordId));
+        }
+        // Alert the desk either way. A push that failed is MORE urgent to know
+        // about than one that worked, not less.
+        await opts.notify?.(result.enquiryNumber ?? null, result.systemRef ?? null);
+      },
+    );
+  }
+
   // Place an order from the basket (snapshots prices)
   app.post("/api/portal/orders", requireActiveCustomer, async (req: any, res) => {
     try {
@@ -5634,8 +5731,17 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
       });
       const totalFmt = `£${total.toFixed(2)}`;
       const name = req.user.primaryContactName || req.user.companyName || req.user.email;
-      await sendOrderSubmissionNotification({ orderId: order.id, customerEmail: req.user.email, customerName: name, companyName: req.user.companyName || name, itemCount: lines.length, totalValue: totalFmt });
       await sendOrderConfirmationToCustomer({ email: req.user.email, contactName: name, orderId: order.id, itemCount: lines.length, totalValue: totalFmt });
+      handoffToInventory({
+        kind: "order",
+        recordId: order.id,
+        user: req.user,
+        lines,
+        customerNotes: customerNotes || null,
+        total,
+        notify: (enquiryNumber, enquiryId) =>
+          sendOrderSubmissionNotification({ orderId: order.id, customerEmail: req.user.email, customerName: name, companyName: req.user.companyName || name, itemCount: lines.length, totalValue: totalFmt, enquiryNumber, enquiryId }),
+      });
       res.status(201).json({ order, message: "Order placed successfully" });
     } catch (error: any) {
       console.error("Order creation error:", error);
@@ -5677,12 +5783,175 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
       }
       const totalFmt = `£${total.toFixed(2)}`;
       const name = req.user.primaryContactName || req.user.companyName || req.user.email;
-      await sendQuoteSubmissionNotification({ quoteId: quote.id, customerEmail: req.user.email, customerName: name, companyName: req.user.companyName || name, itemCount: lines.length, totalValue: totalFmt });
       await sendQuoteConfirmationToCustomer({ email: req.user.email, contactName: name, quoteId: quote.id, itemCount: lines.length, totalValue: totalFmt });
+      handoffToInventory({
+        kind: "quote",
+        recordId: quote.id,
+        user: req.user,
+        lines,
+        customerNotes: customerNotes || null,
+        total,
+        notify: (enquiryNumber, enquiryId) =>
+          sendQuoteSubmissionNotification({ quoteId: quote.id, customerEmail: req.user.email, customerName: name, companyName: req.user.companyName || name, itemCount: lines.length, totalValue: totalFmt, enquiryNumber, enquiryId }),
+      });
       res.status(201).json({ quote, message: "Quote request submitted successfully" });
     } catch (error: any) {
       console.error("Portal quote creation error:", error);
       res.status(500).json({ message: error.message || "Failed to create quote" });
+    }
+  });
+
+  // ===== Handoff: what has not reached the inventory app =====
+  //
+  // The background push retries for about a minute and a half. If the inventory
+  // app was down longer than that, or the portal restarted mid-backoff, the
+  // request sits here with pushed_at still null. This lists those and re-sends
+  // them. Safe to run as often as you like — the far end is idempotent.
+  app.get("/api/admin/inventory-handoff", requireAdmin, async (_req: any, res) => {
+    try {
+      const pendingQuotes = await db
+        .select()
+        .from(quotesTable)
+        .where(isNull(quotesTable.inventoryPushedAt))
+        .orderBy(desc(quotesTable.createdAt))
+        .limit(100);
+      const pendingOrders = await db
+        .select()
+        .from(ordersTable)
+        .where(isNull(ordersTable.inventoryPushedAt))
+        .orderBy(desc(ordersTable.createdAt))
+        .limit(100);
+      res.json({
+        enabled: bridgeEnabled(),
+        quotes: pendingQuotes.map((q) => ({
+          id: q.id,
+          createdAt: q.createdAt,
+          error: q.inventoryPushError,
+        })),
+        orders: pendingOrders.map((o) => ({
+          id: o.id,
+          createdAt: o.createdAt,
+          error: o.inventoryPushError,
+        })),
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Could not read the handoff queue" });
+    }
+  });
+
+  app.post("/api/admin/inventory-handoff/retry", requireAdmin, async (req: any, res) => {
+    if (!bridgeEnabled()) {
+      return res.status(503).json({
+        message:
+          "The link to the inventory app is not configured. Add INVENTORY_API_URL and INVENTORY_API_TOKEN in Render → Environment, then try again.",
+      });
+    }
+    try {
+      const only = req.body?.kind as "quote" | "order" | undefined;
+      const sent: string[] = [];
+      const failed: { ref: string; error: string }[] = [];
+
+      const send = async (
+        kind: "quote" | "order",
+        recordId: number,
+        user: any,
+        lines: BridgeLine[],
+        customerNotes: string | null,
+        total: number | null,
+      ) => {
+        const result = await pushEnquiryOnce({
+          portal_ref: `${kind}:${recordId}`,
+          kind,
+          customer_ref: user?.inventoryCustomerId ?? null,
+          company_name: user?.companyName ?? user?.tradingName ?? null,
+          contact_name: user?.primaryContactName ?? null,
+          contact_email: user?.email ?? null,
+          contact_phone: user?.phoneNumber ?? user?.mobileNumber ?? null,
+          currency: "GBP",
+          customer_notes: customerNotes,
+          total_estimate: total ?? undefined,
+          lines,
+        });
+        const table = kind === "order" ? ordersTable : quotesTable;
+        await db
+          .update(table)
+          .set({
+            inventoryEnquiryRef: result.ok ? result.enquiryNumber ?? null : null,
+            inventoryPushedAt: result.ok ? new Date() : null,
+            inventoryPushError: result.ok ? null : result.error ?? "Unknown error",
+          } as any)
+          .where(eq(table.id, recordId));
+        if (result.ok) sent.push(`${kind}:${recordId} → ${result.enquiryNumber}`);
+        else failed.push({ ref: `${kind}:${recordId}`, error: result.error ?? "Unknown error" });
+      };
+
+      if (only !== "order") {
+        const rows = await db
+          .select()
+          .from(quotesTable)
+          .where(isNull(quotesTable.inventoryPushedAt))
+          .orderBy(desc(quotesTable.createdAt))
+          .limit(25);
+        for (const q of rows) {
+          const full = await storage.getQuoteWithItems(q.id);
+          if (!full) continue;
+          const user = await storage.getUser(q.userId);
+          await send(
+            "quote",
+            q.id,
+            user,
+            (full.items ?? []).map((i: any) => ({
+              ean: i.ean ?? i.product?.ean ?? null,
+              description: i.description ?? i.product?.productName ?? null,
+              quantity: i.quantity ?? null,
+              unit_price: i.unitPrice != null ? Number(i.unitPrice) : null,
+            })),
+            q.customerNotes ?? null,
+            q.totalEstimate != null ? Number(q.totalEstimate) : null,
+          );
+        }
+      }
+
+      if (only !== "quote") {
+        const rows = await db
+          .select()
+          .from(ordersTable)
+          .where(isNull(ordersTable.inventoryPushedAt))
+          .orderBy(desc(ordersTable.createdAt))
+          .limit(25);
+        for (const o of rows) {
+          const full = await pricingStore.getOrderWithItems(o.id);
+          if (!full) continue;
+          const user = await storage.getUser(o.userId);
+          await send(
+            "order",
+            o.id,
+            user,
+            (full.items ?? []).map((i: any) => ({
+              ean: i.ean ?? null,
+              description: i.description ?? i.productName ?? null,
+              quantity: i.quantity ?? null,
+              unit_price: i.unitPrice != null ? Number(i.unitPrice) : null,
+            })),
+            o.customerNotes ?? null,
+            o.totalAmount != null ? Number(o.totalAmount) : null,
+          );
+        }
+      }
+
+      res.json({
+        sent: sent.length,
+        failed: failed.length,
+        detail: { sent, failed },
+        message:
+          failed.length === 0
+            ? sent.length === 0
+              ? "Nothing was waiting — everything has already reached the inventory app."
+              : `${sent.length} request${sent.length === 1 ? "" : "s"} sent through to the inventory app.`
+            : `${sent.length} sent, ${failed.length} still failing. See the detail below.`,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Retry failed" });
     }
   });
 

@@ -73,6 +73,7 @@ import AdminPricingCategoriesPage from "@/pages/admin/pricing-categories";
 import AdminPriceBuilderPage from "@/pages/admin/price-builder";
 import AdminPmSyncPage from "@/pages/admin/pm-sync";
 import AdminCustomerSyncPage from "@/pages/admin/customer-sync";
+import AdminWebsiteRequestsPage from "@/pages/admin/website-requests";
 import AdminBulkSetupPage from "@/pages/admin/bulk-setup";
 import AdminRatesPage from "@/pages/admin/rates";
 import AdminAssignmentsPage from "@/pages/admin/assignments";
@@ -219,6 +220,7 @@ function Router() {
       <Route path="/admin/price-builder">{() => <AdminRoute component={AdminPriceBuilderPage} />}</Route>
       <Route path="/admin/pm-sync">{() => <AdminRoute component={AdminPmSyncPage} />}</Route>
       <Route path="/admin/customer-sync">{() => <AdminRoute component={AdminCustomerSyncPage} />}</Route>
+      <Route path="/admin/website-requests">{() => <AdminRoute component={AdminWebsiteRequestsPage} />}</Route>
       <Route path="/admin/bulk-setup">{() => <AdminRoute component={AdminBulkSetupPage} />}</Route>
       <Route path="/admin/rates">{() => <AdminRoute component={AdminRatesPage} />}</Route>
       <Route path="/admin/promotions">{() => <AdminRoute component={AdminPromotionsPage} />}</Route>

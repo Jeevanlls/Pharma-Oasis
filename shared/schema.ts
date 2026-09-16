@@ -178,6 +178,12 @@ export const quotes = pgTable("quotes", {
   totalEstimate: decimal("total_estimate", { precision: 12, scale: 2 }),
   expiryDate: timestamp("expiry_date"),
   leadTime: varchar("lead_time", { length: 160 }), // e.g. "2–3 weeks from order" — shown on the quote
+  // Handoff to app.pharmaoasis.co.uk. The enquiry number it became (ENQ-00123),
+  // when it landed, and the reason if it did not. pushed_at null + error set
+  // means somebody should retry it.
+  inventoryEnquiryRef: varchar("inventory_enquiry_ref", { length: 40 }),
+  inventoryPushedAt: timestamp("inventory_pushed_at"),
+  inventoryPushError: text("inventory_push_error"),
   version: integer("version").notNull().default(1),
   parentQuoteId: integer("parent_quote_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -1398,6 +1404,10 @@ export const orders = pgTable("orders", {
   // Handoff to the external inventory system
   enteredToInventoryAt: timestamp("entered_to_inventory_at"), // when an admin keyed it into the inventory system
   enteredBy: integer("entered_by"), // admin user id who marked it entered
+  // Automatic handoff: the enquiry this order became in the inventory app.
+  inventoryEnquiryRef: varchar("inventory_enquiry_ref", { length: 40 }),
+  inventoryPushedAt: timestamp("inventory_pushed_at"),
+  inventoryPushError: text("inventory_push_error"),
   archivedAt: timestamp("archived_at"), // when it left the active worklist
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
