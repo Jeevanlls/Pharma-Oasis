@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useLocation, useSearch } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -46,10 +47,22 @@ export default function AdminUsersPage() {
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [selectedUser, setSelectedUser] = useState<UserWithoutPassword | null>(null);
   const { toast } = useToast();
+  const queryString = useSearch();
+  const [, navigate] = useLocation();
+  const reviewId = Number(new URLSearchParams(queryString).get("review"));
+  const closeReview = () => {
+    setSelectedUser(null);
+    if (reviewId) navigate("/admin/users", { replace: true });
+  };
 
-  const { data: users, isLoading } = useQuery<UserWithoutPassword[]>({
+
+  const { data: users, isLoading, isError, refetch } = useQuery<UserWithoutPassword[]>({
     queryKey: ["/api/admin/users"],
   });
+
+  useEffect(() => {
+    if (reviewId && users) setSelectedUser(users.find(row => row.id === reviewId) || null);
+  }, [reviewId, users]);
 
   const updateUserMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: number; updates: { status?: string; role?: string } }) => {
@@ -123,6 +136,7 @@ export default function AdminUsersPage() {
         </Select>
       </div>
 
+      {isError && <div className="aw-error" role="alert"><span>Records could not load.</span><button onClick={() => { void refetch(); }}>Try again</button></div>}
       {isLoading ? (
         <div className="space-y-4">
           {Array.from({ length: 3 }).map((_, i) => (
@@ -182,7 +196,7 @@ export default function AdminUsersPage() {
         </div>
       )}
 
-      <Dialog open={!!selectedUser} onOpenChange={() => setSelectedUser(null)}>
+      <Dialog open={!!selectedUser} onOpenChange={open => !open && closeReview()}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle style={{ fontFamily: "DM Sans, sans-serif" }}>User Details</DialogTitle>

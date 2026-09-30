@@ -1,3 +1,4 @@
+import { useSearch } from "wouter";
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
@@ -32,7 +33,9 @@ import {
 import { ImageUpload } from "@/components/admin/ImageUpload";
 
 export default function AdminProductsPage() {
-  const [searchQuery, setSearchQuery] = useState("");
+  const queryString = useSearch();
+  const [searchQuery, setSearchQuery] = useState(() => new URLSearchParams(queryString).get("search") || "");
+  useEffect(() => { setSearchQuery(new URLSearchParams(queryString).get("search") || ""); }, [queryString]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());

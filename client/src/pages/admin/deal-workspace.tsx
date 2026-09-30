@@ -69,21 +69,29 @@ export default function DealWorkspacePage() {
     setDirty(false);
   }, [data, isOrder]);
 
+  const refreshSalesLists = () => {
+    queryClient.invalidateQueries({ predicate: query => {
+      const key = String(query.queryKey[0]);
+      return key.startsWith("/api/admin/quotes") || key.startsWith("/api/admin/orders") ||
+        key.startsWith("/api/admin/workspace/") || key === "/api/admin/stats";
+    } });
+  };
+
   const saveItems = useMutation({
     mutationFn: async () => apiRequest("PUT", `/api/admin/quotes/${id}/items`, { items: lines.map((l) => ({ ...l, unitPrice: l.unitPrice === "" ? null : Number(l.unitPrice), unitCost: l.unitCost === "" ? null : Number(l.unitCost) })) }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [qKey] }); setDirty(false); toast({ title: "Prices saved" }); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [qKey] }); refreshSalesLists(); setDirty(false); toast({ title: "Prices saved" }); },
     onError: (e: any) => toast({ title: "Couldn't save", description: e?.message, variant: "destructive" }),
   });
   const sendQuote = useMutation({
     mutationFn: async () => apiRequest("POST", `/api/admin/quotes/${id}/send`, { message, expiryDate: expiry || null, adminNotes: internalNote, leadTime: leadTime || null }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [qKey] }); toast({ title: "Quote sent to customer" }); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [qKey] }); refreshSalesLists(); toast({ title: "Quote sent to customer" }); },
     onError: (e: any) => toast({ title: "Couldn't send", description: e?.message, variant: "destructive" }),
   });
   const setStatus = useMutation({
     mutationFn: async (s: "accepted" | "declined") => apiRequest("PATCH", `/api/admin/quotes/${id}`, { status: s }),
     onSuccess: async (res) => {
       const body = await res.json();
-      queryClient.invalidateQueries({ queryKey: [qKey] });
+      queryClient.invalidateQueries({ queryKey: [qKey] }); refreshSalesLists();
       toast({ title: body.status === "accepted" ? `Accepted — order O-${body.orderId} created` : "Quote declined" });
     },
     onError: (e: any) => toast({ title: "Action failed", description: e?.message, variant: "destructive" }),
@@ -91,13 +99,13 @@ export default function DealWorkspacePage() {
   const respondOrder = useMutation({
     mutationFn: async (payload: { status?: string; adminResponse: string; sendEmail: boolean }) =>
       apiRequest("POST", `/api/admin/orders/${id}/respond`, payload),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [qKey] }); setOrderMsg(""); toast({ title: "Customer updated" }); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [qKey] }); refreshSalesLists(); setOrderMsg(""); toast({ title: "Customer updated" }); },
     onError: (e: any) => toast({ title: "Couldn't update", description: e?.message, variant: "destructive" }),
   });
 
   const retrySalesEmail = useMutation({
     mutationFn: async () => apiRequest("POST", `/api/admin/quotes/${id}/notify-sales`, {}),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [qKey] }); toast({ title: "Sales notification queued" }); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [qKey] }); refreshSalesLists(); toast({ title: "Sales notification queued" }); },
     onError: (e: any) => toast({ title: "Could not queue email", description: e?.message, variant: "destructive" }),
   });
 
@@ -116,6 +124,8 @@ export default function DealWorkspacePage() {
   }));
 
   const liveTotal = lines.reduce((s, l) => s + (l.unitPrice === "" ? 0 : Number(l.unitPrice) * l.quantity), 0);
+  const pricedLines = lines.filter(line => line.unitPrice.trim() !== "" && Number.isFinite(Number(line.unitPrice))).length;
+  const fullyPriced = lines.length > 0 && pricedLines === lines.length;
   const marginOf = (price: string, cost: string) => (price !== "" && cost !== "" && Number(cost) > 0 ? `${(((Number(price) - Number(cost)) / Number(cost)) * 100).toFixed(1)}%` : "—");
 
   const updateLine = (i: number, patch: Partial<EditLine>) => { setLines((prev) => prev.map((l, idx) => (idx === i ? { ...l, ...patch } : l))); setDirty(true); };
@@ -230,7 +240,7 @@ export default function DealWorkspacePage() {
                   </div>
                   <div className="flex items-center justify-between border-t p-4">
                     <Button onClick={() => saveItems.mutate()} disabled={!dirty || saveItems.isPending}>{saveItems.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />} Save prices</Button>
-                    <div className="flex gap-6"><span className="text-muted-foreground">Estimated total</span><span className="text-lg font-bold">{money(liveTotal)}</span></div>
+                    <div className="flex flex-wrap justify-end gap-x-6 gap-y-1"><span className="text-muted-foreground">{pricedLines && !fullyPriced ? "Priced subtotal · incomplete" : "Estimated total"}</span><span className="text-lg font-bold">{pricedLines ? money(liveTotal) : "Price on request"}</span></div>
                   </div>
                 </>
               ) : (
@@ -330,7 +340,7 @@ export default function DealWorkspacePage() {
               {customer?.primaryContactName && <div className="text-muted-foreground">{customer.primaryContactName}</div>}
               {customer?.email && <div className="flex items-center gap-2"><Mail className="h-4 w-4 text-muted-foreground" /> <a className="hover:underline" href={`mailto:${customer.email}`}>{customer.email}</a></div>}
               {(customer?.phoneNumber || customer?.phone) && <div className="flex items-center gap-2"><Phone className="h-4 w-4 text-muted-foreground" /> {customer.phoneNumber || customer.phone}</div>}
-              {customer?.id && <Link href={`/admin/users?id=${customer.id}`}><Button variant="ghost" size="sm" className="px-0 mt-1">View account →</Button></Link>}
+              {customer?.id && <Link href={`/admin/users?review=${customer.id}`}><Button variant="ghost" size="sm" className="px-0 mt-1">View account →</Button></Link>}
             </CardContent>
           </Card>
           {!editable && (root.expiryDate || root.leadTime) && (

@@ -1,232 +1,61 @@
-import { useQuery } from "@tanstack/react-query";
-import { Link, useLocation } from "wouter";
+import { Link } from "wouter";
+import { FileText, ShoppingBag, Users, Package, Plus, ArrowRight, ArrowUpRight, Clock3, ChevronRight } from "lucide-react";
 import { useAuth } from "@/lib/auth";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { 
-  Users, 
-  Package, 
-  FileText, 
-  Building2, 
-  MessageSquare,
-  Settings,
-  TrendingUp,
-  Clock,
-  ArrowRight,
-  Shield,
-  LayoutDashboard,
-  Tag,
-  Upload,
-  Globe,
-  AlertCircle,
-  Home,
-  ShoppingCart,
-} from "lucide-react";
-
-interface DashboardStats {
-  totalUsers: number;
-  totalProducts: number;
-  totalQuotes: number;
-  pendingApprovals: number;
-  pendingQuotes: number;
-  activeCustomers: number;
-}
+import { useWorkspaceAccounts, useWorkspaceSales, workspaceDate, workspaceMoney } from "@/lib/admin-workspace";
+import { WorkspaceStatus, WorkspaceError } from "@/components/admin/workspace-status";
 
 export default function AdminDashboard() {
-  const { user, isAdmin } = useAuth();
-  const [, setLocation] = useLocation();
-
-  const { data: stats, isLoading } = useQuery<DashboardStats>({
-    queryKey: ["/api/admin/stats"],
-    enabled: isAdmin,
-  });
-
-  const { data: orderStats } = useQuery<{ newCount: number; toFulfil: number; doneThisWeek: number; activeTotal: number }>({
-    queryKey: ["/api/admin/orders/stats"],
-    enabled: isAdmin,
-  });
-  const ordersToHandle = (orderStats?.newCount || 0) + (orderStats?.toFulfil || 0);
-
-  if (!isAdmin) {
-    return (
-      <div className="flex h-[80vh] items-center justify-center">
-        <Card className="max-w-md text-center">
-          <CardContent className="pt-6">
-            <Shield className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-            <h2 className="text-xl font-semibold mb-2">Admin Access Required</h2>
-            <p className="text-muted-foreground mb-4">
-              You need admin privileges to access this area.
-            </p>
-            <Link href="/">
-              <Button>Return Home</Button>
-            </Link>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  const quickActions = [
-    { label: "Sales (orders)", icon: ShoppingCart, href: "/admin/sales", badge: ordersToHandle || undefined },
-    { label: "User Approvals", icon: Users, href: "/admin/users", badge: stats?.pendingApprovals },
-    { label: "Quote Requests", icon: FileText, href: "/admin/sales", badge: stats?.pendingQuotes },
-    { label: "Products", icon: Package, href: "/admin/products" },
-    { label: "Brands", icon: Building2, href: "/admin/brands" },
-    { label: "Categories", icon: Tag, href: "/admin/categories" },
-    { label: "Homepage", icon: Home, href: "/admin/homepage" },
-    { label: "CSV Import", icon: Upload, href: "/admin/import" },
-    { label: "Supplier Leads", icon: Globe, href: "/admin/suppliers" },
-    { label: "Messages", icon: MessageSquare, href: "/admin/messages" },
-    { label: "CMS", icon: LayoutDashboard, href: "/admin/cms" },
-    { label: "Settings", icon: Settings, href: "/admin/settings" },
+  const { user } = useAuth();
+  const { users, suppliers } = useWorkspaceAccounts();
+  const { quotes, orders, orderStats, stats } = useWorkspaceSales();
+  const allQueries = [users, suppliers, quotes, orders, orderStats, stats];
+  const failed = allQueries.some(query => query.isError);
+  const customerName = (id: number) => {
+    const customer = users.data?.find(customer => customer.id === id);
+    return customer?.companyName || customer?.email || `Customer #${id}`;
+  };
+  const pendingCustomers = (users.data ?? []).filter(customer => customer.role === "customer" && customer.status === "pending");
+  const pendingSuppliers = (suppliers.data ?? []).filter(supplier => supplier.status === "new");
+  const pendingQuotes = (quotes.data ?? []).filter(quote => quote.status === "pending");
+  const applications = users.data && suppliers.data && !users.isError && !suppliers.isError ? pendingCustomers.length + pendingSuppliers.length : undefined;
+  const recent = [
+    ...(quotes.data ?? []).filter(quote => ["pending", "quoted"].includes(quote.status)).map(quote => ({
+      key: `quote-${quote.id}`, href: `/admin/sales/quote/${quote.id}`, ref: `Q-${quote.id}`, name: customerName(quote.userId),
+      status: quote.status, label: quote.status === "pending" ? "To price" : "Quote sent", date: quote.createdAt,
+      value: quote.status === "pending" ? null : quote.totalEstimate,
+    })),
+    ...(orders.data ?? []).map(order => ({
+      key: `order-${order.id}`, href: `/admin/sales/order/${order.id}`, ref: `O-${order.id}`,
+      name: order.companyName || order.email || customerName(order.userId), status: order.status,
+      label: undefined, date: order.createdAt, value: order.totalAmount,
+    })),
+  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 6);
+  const worklistLoading = quotes.isLoading || orders.isLoading || users.isLoading;
+  const worklistError = quotes.isError || orders.isError || users.isError;
+  const date = new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/London" });
+  const name = (user?.primaryContactName || "there").split(" ")[0];
+  const metrics = [
+    { label: "Quotations to prepare", value: quotes.isError ? undefined : quotes.data ? pendingQuotes.length : undefined, detail: "Your team's next conversations", href: "/admin/sales", icon: FileText },
+    { label: "Orders in progress", value: orderStats.isError ? undefined : orderStats.data?.activeTotal, detail: "Active website worklist", href: "/admin/sales", icon: ShoppingBag },
+    { label: "Applications to review", value: applications, detail: "Customers & supplier partners", href: "/admin/accounts?view=review", icon: Users },
+    { label: "Products in catalogue", value: stats.isError ? undefined : stats.data?.totalProducts, detail: "Manage the website range", href: "/admin/products", icon: Package },
   ];
-
-  return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold" style={{ fontFamily: "DM Sans, sans-serif" }}>
-          Admin Dashboard
-        </h1>
-        <p className="mt-2 text-muted-foreground">
-          Welcome back, {user?.primaryContactName || "Admin"}
-        </p>
-      </div>
-
-      {isLoading ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Card key={i}>
-              <CardHeader className="pb-2">
-                <Skeleton className="h-4 w-24" />
-              </CardHeader>
-              <CardContent>
-                <Skeleton className="h-8 w-16" />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
-              <CardTitle className="text-sm font-medium">Total Users</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats?.totalUsers || 0}</div>
-              <p className="text-xs text-muted-foreground">
-                {stats?.activeCustomers || 0} active customers
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
-              <CardTitle className="text-sm font-medium">Products</CardTitle>
-              <Package className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats?.totalProducts || 0}</div>
-              <p className="text-xs text-muted-foreground">In catalogue</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
-              <CardTitle className="text-sm font-medium">Quote Requests</CardTitle>
-              <FileText className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats?.totalQuotes || 0}</div>
-              <p className="text-xs text-muted-foreground">Total quotes</p>
-            </CardContent>
-          </Card>
-
-          <Card className={stats?.pendingApprovals ? "border-orange-200 bg-orange-50/50 dark:border-orange-800 dark:bg-orange-950/20" : ""}>
-            <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
-              <CardTitle className="text-sm font-medium">Pending Actions</CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {(stats?.pendingApprovals || 0) + (stats?.pendingQuotes || 0)}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {stats?.pendingApprovals || 0} approvals, {stats?.pendingQuotes || 0} quotes
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {(stats?.pendingApprovals || stats?.pendingQuotes || ordersToHandle) ? (
-        <Card className="border-orange-200 bg-orange-50/50 dark:border-orange-800 dark:bg-orange-950/20">
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <AlertCircle className="h-5 w-5 text-orange-600" />
-              <CardTitle className="text-lg">Action Required</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-4">
-              {ordersToHandle ? (
-                <Link href="/admin/sales">
-                  <Button variant="outline" className="gap-2">
-                    <ShoppingCart className="h-4 w-4" />
-                    {ordersToHandle} Order{ordersToHandle > 1 ? "s" : ""} to handle
-                    <ArrowRight className="h-4 w-4" />
-                  </Button>
-                </Link>
-              ) : null}
-              {stats?.pendingApprovals ? (
-                <Link href="/admin/users">
-                  <Button variant="outline" className="gap-2">
-                    <Users className="h-4 w-4" />
-                    {stats.pendingApprovals} User{stats.pendingApprovals > 1 ? "s" : ""} Pending Approval
-                    <ArrowRight className="h-4 w-4" />
-                  </Button>
-                </Link>
-              ) : null}
-              {stats?.pendingQuotes ? (
-                <Link href="/admin/sales">
-                  <Button variant="outline" className="gap-2">
-                    <FileText className="h-4 w-4" />
-                    {stats.pendingQuotes} Quote{stats.pendingQuotes > 1 ? "s" : ""} Pending Review
-                    <ArrowRight className="h-4 w-4" />
-                  </Button>
-                </Link>
-              ) : null}
-            </div>
-          </CardContent>
-        </Card>
-      ) : null}
-
-      <div>
-        <h2 className="text-xl font-semibold mb-4" style={{ fontFamily: "DM Sans, sans-serif" }}>
-          Quick Actions
-        </h2>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-          {quickActions.map((action) => (
-            <Link key={action.href} href={action.href}>
-              <Card className="cursor-pointer hover-elevate h-full">
-                <CardContent className="flex items-center gap-3 p-4">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                    <action.icon className="h-5 w-5" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium">{action.label}</p>
-                  </div>
-                  {action.badge ? (
-                    <Badge variant="secondary">{action.badge}</Badge>
-                  ) : null}
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
-        </div>
-      </div>
+  const attention = [
+    ...pendingQuotes.slice(0, 2).map(quote => ({ key: `q-${quote.id}`, title: customerName(quote.userId), detail: `Pricing needed · Q-${quote.id}`, href: `/admin/sales/quote/${quote.id}`, icon: Clock3 })),
+    ...pendingCustomers.slice(0, 2).map(customer => ({ key: `c-${customer.id}`, title: customer.companyName || customer.email, detail: "Customer application", href: `/admin/users?review=${customer.id}`, icon: Users })),
+    ...pendingSuppliers.slice(0, 2).map(supplier => ({ key: `s-${supplier.id}`, title: supplier.companyName, detail: "Supplier application", href: `/admin/suppliers?review=${supplier.id}`, icon: Users })),
+  ];
+  return <>
+    <div className="aw-heading"><div><span className="aw-eyebrow">{date}</span><h1>Welcome back, {name}<span>.</span></h1><p>Your working day, in focus.</p></div><Link className="aw-action primary" href="/admin/sales/new-quote"><Plus size={17} />New quotation</Link></div>
+    {failed && <WorkspaceError retry={() => allQueries.forEach(query => { void query.refetch(); })} />}
+    <div className="aw-metrics">{metrics.map(metric => <Link key={metric.label} href={metric.href} className="aw-metric"><span>{metric.label}<metric.icon size={18} /></span><strong>{metric.value == null ? "—" : metric.value.toLocaleString("en-GB", { minimumIntegerDigits: 2 })}</strong><small>{metric.detail}</small></Link>)}</div>
+    <div className="aw-grid">
+      <section className="aw-panel"><div className="aw-panel-head"><div><span className="aw-eyebrow">Your sales desk</span><h2>Keep the conversation moving.</h2></div><Link href="/admin/sales">View all <ArrowRight size={16} /></Link></div>
+        {worklistLoading ? <p className="aw-feedback" role="status">Loading your sales worklist…</p> : <div className="aw-table-wrap"><table className="aw-table"><thead><tr><th>Enquiry / customer</th><th>Status</th><th className="text-right">Value</th><th><span className="sr-only">Open request</span></th></tr></thead><tbody>{recent.map(row => <tr key={row.key}><td><Link href={row.href}><strong>{row.name}</strong><small>{row.ref} · {workspaceDate(row.date)}</small></Link></td><td><WorkspaceStatus value={row.status} label={row.label} /></td><td className="text-right whitespace-nowrap">{workspaceMoney(row.value)}</td><td><Link href={row.href} aria-label={`Open ${row.ref}`}><ArrowUpRight size={18} /></Link></td></tr>)}{!recent.length && !worklistError && <tr><td colSpan={4} className="aw-feedback">No active requests. New enquiries will appear here.</td></tr>}</tbody></table></div>}
+        <div className="aw-panel-foot"><span>EANs stay with every request.</span><Link href="/admin/sales">Open sales desk →</Link></div>
+      </section>
+      <aside className="aw-panel aw-attention"><div className="aw-panel-head"><div><span className="aw-eyebrow">A little focus</span><h2>Needs attention</h2></div></div><div className="aw-attention-list">{attention.map(item => <Link key={item.key} href={item.href}><item.icon size={18} /><span><strong>{item.title}</strong><small>{item.detail}</small></span><ChevronRight size={15} /></Link>)}{!attention.length && <p className="aw-feedback">{allQueries.some(query => query.isLoading) ? "Checking requests…" : failed ? "Some worklists could not load." : "No pending quotations or new applications."}</p>}</div><div className="aw-attention-note"><span>✳</span><p>Good relationships.<br />Thoughtful follow-through.</p></div></aside>
     </div>
-  );
+    <div className="aw-lower-grid"><section className="aw-panel aw-brand-panel"><span className="aw-eyebrow">The weekly edit</span><h2>Your brands. Their next opportunity.</h2><p>Build your next promotion around the brands your customers need.</p><Link href="/admin/offers">Manage weekly offers <ArrowRight size={16} /></Link></section><section className="aw-panel"><div className="aw-panel-head"><div><span className="aw-eyebrow">Connected work</span><h2>A clear view of each handoff.</h2></div></div><div className="aw-shortcuts"><Link href="/admin/website-requests">Website requests & inventory handoff <ArrowUpRight size={16} /></Link><Link href="/admin/pm-sync">Price Manager synchronisation <ArrowUpRight size={16} /></Link><Link href="/admin/customer-sync">Customer logins & invitations <ArrowUpRight size={16} /></Link></div></section></div>
+  </>;
 }
