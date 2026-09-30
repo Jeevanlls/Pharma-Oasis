@@ -3,6 +3,25 @@ import { gunzipSync } from "node:zlib";
 
 // Explicit public fields only. This snapshot contains no supplier or customer prices.
 export const catalogue = JSON.parse(gunzipSync(readFileSync(new URL("./review-data/commercial-catalogue.json.gz", import.meta.url))).toString("utf8"));
+// Soft archives applied to the app after this snapshot was captured must also
+// disappear from every review endpoint, including detail pages and brand counts.
+const archivedIds = new Set(JSON.parse(readFileSync(new URL("./review-data/archived-product-ids.json", import.meta.url), "utf8")));
+catalogue.products = catalogue.products.filter(p => !archivedIds.has(p.id));
+for (const brand of catalogue.brands) {
+  const products = catalogue.products.filter(p => p.brandId === brand.id);
+  brand.productCount = products.length;
+  brand.imageCount = products.filter(p => p.imageUrl).length;
+}
+const usedCategories = new Set(catalogue.products.map(p => p.categoryId));
+catalogue.categories = catalogue.categories.filter(c => usedCategories.has(c.id));
+catalogue.stats = {
+  ...catalogue.stats,
+  products: catalogue.products.length,
+  brandsWithProducts: catalogue.brands.filter(b => b.productCount > 0).length,
+  withImages: catalogue.products.filter(p => p.imageUrl).length,
+  withoutImages: catalogue.products.filter(p => !p.imageUrl).length,
+  temporaryReferences: catalogue.products.filter(p => !p.ean).length,
+};
 const normal = value => String(value ?? "").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
 const brands = new Map(catalogue.brands.map(b => [b.id, b]));
 const categories = new Map(catalogue.categories.map(c => [c.id, c]));

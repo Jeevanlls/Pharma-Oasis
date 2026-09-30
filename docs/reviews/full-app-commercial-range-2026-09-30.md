@@ -59,3 +59,13 @@ Browser verification on the deployed expanded review: BioGaia count 18; both pre
 At Jeevan's request, browsing now places existing photographed products first and rotates between brands instead of opening with a global alphabetical list. The current commercial selections lead the rotation: Myprotein, Aveeno, Nature's Aid, BioGaia, Hawkins & Brimble and Myvitamins. Other brands follow by available range size. Each round takes one product per brand, using a fixed order so products do not repeat or disappear between pages.
 
 The first two pages (24 products each) contain photographs throughout and a mixture of brands. All 9,305 products remain available; products without photos follow the photographed range. Brand/category filters retain photo priority, while searches keep exact EAN matches first regardless of whether a photograph exists. This changes presentation in the review only, not product records or eligibility.
+
+## Subsequent incomplete-product archive
+
+Jeevan authorised archiving products missing brand, category or classification, retaining any with sales/purchase history. The three groups overlap: 4,815 distinct app products, with 522 protected by transaction, inventory or commercial-work history. On 30 September, 4,293 products were soft-archived in the employee app, leaving 113,455 non-archived app records. Product identity, prices, stock and all other product fields were preserved. A recovery copy and guarded restore scripts were saved before mutation.
+
+None of those archive candidates were public website product rows. However, 18 matching customer price-list entries were deactivated after checking quote/order history, including EAN-only and price-list-item references. Their prices and other fields were preserved.
+
+The review snapshot contained 164 of the archived records, all without photos. `review-data/archived-product-ids.json` excludes them from catalogue search, detail endpoints, category/brand totals and promotion data. The review now has 9,141 products and retains all 521 photographs. The opening photographed pages remain unchanged. Future full app exports should exclude archived records at source; preserve this exclusion file while the earlier snapshot is still used.
+
+For the original RD cleanup, 103,436 was the count requiring field updates, not the active product total. The file matched 117,643 records. 4,689 source rows used `active` in the classification field; the original cleanup retained their previous classification instead of interpreting that text as POM/GSL/NON_PHARMACEUTICAL.
