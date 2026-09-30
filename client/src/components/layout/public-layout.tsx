@@ -1,23 +1,30 @@
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
+import { useLocation, useSearch } from "wouter";
 import { Header } from "./header";
 import { Footer } from "./footer";
 import { WhatsAppButton } from "../whatsapp-button";
-import { ChatWidget } from "../chat-widget";
 
 interface PublicLayoutProps {
   children: ReactNode;
 }
 
 export function PublicLayout({ children }: PublicLayoutProps) {
+  const [location] = useLocation();
+  const search = useSearch();
+  useEffect(() => {
+    if (!window.location.hash) window.scrollTo(0, 0);
+  }, [location, search]);
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div className="po-design min-h-screen flex flex-col bg-background">
+      <a className="po-skip" href="#main-content">
+        Skip to content
+      </a>
       <Header />
-      <main className="flex-1">
+      <main id="main-content" className="flex-1" tabIndex={-1}>
         {children}
       </main>
       <Footer />
       <WhatsAppButton />
-      <ChatWidget />
     </div>
   );
 }

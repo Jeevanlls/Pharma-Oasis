@@ -1,3 +1,6 @@
+import { commercialRange } from "./commercial-range";
+import { publicProduct } from "@shared/public-catalogue";
+import { catalogueSyncStatus, syncCatalogue } from "./catalogue-sync";
 import { fetchInventoryIntelligence, InventoryLookupError } from "./inventory-intelligence";
 import { verifyCostSource } from "./quote-price-source";
 import { customerQuoteView, customerLineView } from "@shared/trade-intelligence";
@@ -802,7 +805,7 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
       });
 
       res.json({
-        products: productList,
+        products: productList.map(publicProduct),
         pagination: {
           page: pageNum,
           pageSize,
@@ -825,7 +828,7 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
         return res.json([]);
       }
       const result = await storage.getPublicCatalogue({ search: query, limit, offset: 0 });
-      res.json(result.products);
+      res.json(result.products.map(publicProduct));
     } catch (error) {
       console.error("Error searching products:", error);
       res.status(500).json({ message: "Failed to search products" });
@@ -847,7 +850,7 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
         return res.status(404).json({ message: "Product not found" });
       }
       storage.trackProductView(product.id).catch(() => {});
-      res.json(product);
+      res.json(publicProduct(product));
     } catch (error) {
       console.error("Error fetching product:", error);
       res.status(500).json({ message: "Failed to fetch product" });
@@ -859,6 +862,11 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
   let brandsCache: { data: any; timestamp: number } | null = null;
   let categoriesCache: { data: any; timestamp: number } | null = null;
   const CACHE_TTL = 60000; // 1 minute cache
+
+  app.get("/api/trade/commercial-range", async(_req,res)=>{
+    try {res.set("Cache-Control","public, max-age=60");res.json(await commercialRange());}
+    catch {res.status(503).json({message:"Brand selections are temporarily unavailable."});}
+  });
 
   app.get("/api/brands", async (req, res) => {
     try {
@@ -1030,7 +1038,9 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
   app.get("/api/quotes", requireActiveCustomer, async (req: any, res) => {
     try {
       const quoteList = await storage.getQuotesByUser(req.user.id);
-      res.json(quoteList.map(customerQuoteView));
+      const counts=await pool.query("SELECT qi.quote_id,count(*)::int count FROM quote_items qi JOIN quotes q ON q.id=qi.quote_id WHERE q.user_id=$1 GROUP BY qi.quote_id",[req.user.id]);
+      const byId=new Map(counts.rows.map(r=>[r.quote_id,r.count]));
+      res.json(quoteList.map(q=>({...customerQuoteView(q),itemCount:byId.get(q.id)||0})));
     } catch (error) {
       console.error("Error fetching quotes:", error);
       res.status(500).json({ message: "Failed to fetch quotes" });
@@ -1263,7 +1273,7 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
         return res.status(404).json({ message: "Offer not found" });
       }
       const items = await storage.getOfferItems(offer.id);
-      res.json(items.filter(item => item.product.isActive));
+      res.json(items.filter(item => item.product.isActive).map(item=>({...item,product:publicProduct(item.product)})));
     } catch (error) {
       console.error("Error fetching offer items:", error);
       res.status(500).json({ message: "Failed to fetch offer items" });
@@ -1536,6 +1546,17 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
   });
 
   // Admin - Products (staff and admin can access)
+  app.get("/api/admin/catalogue-sync", requireStaffOrAdmin, async (_req,res) => {
+    try { res.json(await catalogueSyncStatus()); } catch { res.status(503).json({message:"Catalogue sync status unavailable."}); }
+  });
+  app.post("/api/admin/catalogue-sync", requireAdmin, async (_req,res) => {
+    try { res.json(await syncCatalogue()); } catch(e) { res.status(409).json({message:(e as Error).message}); }
+  });
+  app.get("/api/admin/products", requireStaffOrAdmin, async(req,res)=>{
+    const result=await storage.getPublicCatalogue({search:typeof req.query.search==="string"?req.query.search:undefined,limit:100,offset:0});
+    res.json({products:result.products,pagination:{page:1,pageSize:100,total:result.total,totalPages:Math.ceil(result.total/100)}});
+  });
+
   app.post("/api/admin/products", requireStaffOrAdmin, async (req, res) => {
     try {
       const body = { ...req.body };

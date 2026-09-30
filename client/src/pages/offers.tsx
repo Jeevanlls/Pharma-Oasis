@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useCurrentOffers } from "@/lib/trade-site";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { PublicLayout } from "@/components/layout/public-layout";
@@ -25,46 +26,6 @@ import {
   Package,
 } from "lucide-react";
 import placeholderImage from "@assets/generated_images/product_placeholder_coming_soon.png";
-
-function CountdownTimer({ endDate }: { endDate: string | Date }) {
-  const [timeLeft, setTimeLeft] = useState(() => getTimeLeft(endDate));
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setTimeLeft(getTimeLeft(endDate));
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [endDate]);
-
-  function getTimeLeft(end: string | Date) {
-    const diff = new Date(end).getTime() - Date.now();
-    if (diff <= 0) return { days: 0, hours: 0, minutes: 0, seconds: 0 };
-    return {
-      days: Math.floor(diff / (1000 * 60 * 60 * 24)),
-      hours: Math.floor((diff / (1000 * 60 * 60)) % 24),
-      minutes: Math.floor((diff / (1000 * 60)) % 60),
-      seconds: Math.floor((diff / 1000) % 60),
-    };
-  }
-
-  return (
-    <div className="flex gap-3 justify-center" data-testid="countdown-timer">
-      {[
-        { value: timeLeft.days, label: "Days" },
-        { value: timeLeft.hours, label: "Hours" },
-        { value: timeLeft.minutes, label: "Mins" },
-        { value: timeLeft.seconds, label: "Secs" },
-      ].map(({ value, label }) => (
-        <div key={label} className="flex flex-col items-center">
-          <div className="bg-background/90 backdrop-blur-sm border rounded-lg w-16 h-16 flex items-center justify-center">
-            <span className="text-2xl font-bold tabular-nums">{String(value).padStart(2, "0")}</span>
-          </div>
-          <span className="text-xs text-muted-foreground mt-1">{label}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
 
 function OfferProductCard({
   item,
@@ -210,9 +171,12 @@ export default function OffersPage() {
   const { isAuthenticated, isCustomer, isAdmin } = useAuth();
   const { toast } = useToast();
 
-  const { data: activeOffers = [], isLoading: offersLoading } = useQuery<Offer[]>({
-    queryKey: ["/api/offers"],
-  });
+  const { data: activeOffers, isLoading: offersLoading, isError: offersError } = useCurrentOffers();
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get("offer");
+    const offer = activeOffers.find(offer => offer.slug === requested || String(offer.id) === requested);
+    if (offer) document.getElementById(`offer-${offer.id}`)?.scrollIntoView();
+  }, [activeOffers.map(offer => offer.id).join(",")]);
 
   const handleQuantityChange = (productId: number, qty: number) => {
     if (qty < 1) qty = 1;
@@ -224,7 +188,7 @@ export default function OffersPage() {
     addItem(item.product, qty);
     toast({
       title: "Added to quote basket",
-      description: `${qty}x ${item.product.productName} at offer price`,
+      description: `${qty}x ${item.product.productName}. Your account price is confirmed when you submit.`,
     });
   };
 
@@ -251,31 +215,12 @@ export default function OffersPage() {
   }
 
   if (activeOffers.length === 0) {
-    return (
-      <PublicLayout>
-        <PageTracker title="Offers | Pharma Oasis" description="Current wholesale pharmaceutical offers and deals" />
-        <div className="container mx-auto px-4 py-16 text-center max-w-4xl">
-          <div className="bg-gradient-to-br from-muted/50 to-muted rounded-3xl p-12">
-            <Tag className="mx-auto h-16 w-16 text-muted-foreground mb-6" />
-            <h1 className="text-3xl font-bold mb-3" data-testid="text-no-offers">No Active Offers</h1>
-            <p className="text-muted-foreground text-lg mb-8 max-w-md mx-auto">
-              We're preparing new wholesale offers. Check back soon for exclusive deals on pharmaceutical products.
-            </p>
-            <Link href="/products">
-              <Button size="lg" data-testid="button-browse-products">
-                Browse All Products
-                <ArrowRight className="h-4 w-4 ml-2" />
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </PublicLayout>
-    );
+    return <PublicLayout><PageTracker title="The weekly edit | Pharma Oasis" /><div className="wrap"><section className="page-intro"><span className="eyebrow">THE WEEKLY EDIT</span><h1>Good things<br /><em>are taking shape.</em></h1><p>{offersError ? "We couldn't load the latest offers. Please try again or speak with our trade team." : "We’re preparing our next selection. Explore the range, sign in for your account prices, or ask our team about your next order."}</p><div className="actions mt-8"><Link className="btn citron" href="/products">Explore the range</Link><Link className="text-link" href="/portal">Your trade prices</Link><Link className="text-link" href="/contact">Talk to the team</Link></div></section></div></PublicLayout>;
   }
 
   return (
     <PublicLayout>
-      <PageTracker title="Offers | Pharma Oasis" description="Current wholesale pharmaceutical offers and deals" />
+      <PageTracker title="The weekly edit | Pharma Oasis" />
 
       <div className="container mx-auto px-4 py-8 max-w-7xl">
         <nav className="flex items-center gap-2 text-sm text-muted-foreground mb-6" data-testid="nav-breadcrumb">
@@ -284,6 +229,7 @@ export default function OffersPage() {
           <span className="text-foreground font-medium">Offers</span>
         </nav>
 
+        <div className="page-intro"><span className="eyebrow">SELECTED FOR YOUR NEXT ORDER</span><h1>The weekly edit.</h1><p>Explore current offers, then sign in to order or request a quote. Your account terms and availability are confirmed on submission.</p></div>
         {activeOffers.map((offer) => (
           <OfferSection
             key={offer.id}
@@ -327,68 +273,21 @@ function OfferSection({
     },
   });
 
-  const badgeColorMap: Record<string, string> = {
-    red: "bg-red-500",
-    green: "bg-green-500",
-    blue: "bg-blue-500",
-    orange: "bg-orange-500",
-    purple: "bg-purple-500",
-    yellow: "bg-yellow-500",
-  };
-
+  const { toast } = useToast();
+  async function copyOfferLink() {
+    const url = `${window.location.origin}/offers?offer=${encodeURIComponent(offer.slug || String(offer.id))}`;
+    try { await navigator.clipboard.writeText(url); toast({ title: "Offer link copied" }); }
+    catch { toast({ title: "Copy the offer URL", description: url }); }
+  }
   return (
-    <section className="mb-16" data-testid={`section-offer-${offer.id}`}>
-      {offer.heroImageUrl ? (
-        <div className="relative rounded-2xl overflow-hidden mb-8">
-          <img
-            src={offer.heroImageUrl}
-            alt={offer.heroTitle || offer.title}
-            className="w-full h-64 md:h-80 object-cover"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
-          <div className="absolute bottom-0 left-0 right-0 p-6 md:p-10 text-white">
-            <div className="flex items-center gap-2 mb-3">
-              <Badge className={`${badgeColorMap[offer.badgeColor || "red"] || "bg-red-500"} text-white border-0 font-bold`}>
-                <Flame className="h-3 w-3 mr-1" />
-                {offer.badgeText || "OFFER"}
-              </Badge>
-            </div>
-            <h2 className="text-2xl md:text-4xl font-bold mb-2" data-testid={`text-offer-title-${offer.id}`}>
-              {offer.heroTitle || offer.title}
-            </h2>
-            {offer.heroSubtitle && (
-              <p className="text-sm md:text-lg text-white/80 max-w-2xl">{offer.heroSubtitle}</p>
-            )}
-            <div className="mt-4">
-              <CountdownTimer endDate={offer.endDate} />
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent rounded-2xl p-6 md:p-10 mb-8">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2 mb-3">
-                <Badge className={`${badgeColorMap[offer.badgeColor || "red"] || "bg-red-500"} text-white border-0 font-bold`}>
-                  <Flame className="h-3 w-3 mr-1" />
-                  {offer.badgeText || "OFFER"}
-                </Badge>
-                <Badge variant="outline" className="gap-1">
-                  <Clock className="h-3 w-3" />
-                  Limited Time
-                </Badge>
-              </div>
-              <h2 className="text-2xl md:text-3xl font-bold mb-2" data-testid={`text-offer-title-${offer.id}`}>
-                {offer.title}
-              </h2>
-              {offer.description && (
-                <p className="text-muted-foreground max-w-2xl">{offer.description}</p>
-              )}
-            </div>
-            <CountdownTimer endDate={offer.endDate} />
-          </div>
-        </div>
-      )}
+    <section id={`offer-${offer.id}`} className="po-editorial-offer mb-16" data-testid={`section-offer-${offer.id}`}>
+      <div className="border-b pb-8 mb-8">
+        {offer.heroImageUrl && <img src={offer.heroImageUrl} alt={offer.heroTitle || offer.title} className="w-full max-h-96 object-cover rounded mb-8" />}
+        <span className="eyebrow text-xs tracking-widest mb-4">{offer.badgeText || "TRADE SELECTION"}</span>
+        <h2 className="text-3xl md:text-5xl tracking-tight font-normal mb-4" data-testid={`text-offer-title-${offer.id}`}>{offer.heroTitle || offer.title}</h2>
+        {(offer.heroSubtitle || offer.description) && <p className="text-muted-foreground max-w-2xl">{offer.heroSubtitle || offer.description}</p>}
+        <div className="po-offer-meta"><span>Until {new Date(offer.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "Europe/London" })}</span><button className="text-link" onClick={() => void copyOfferLink()}>Copy offer link</button><Link className="text-link" href="/portal">View your account prices</Link></div>
+      </div>
 
       {isLoading ? (
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { BuyingListDialog } from "@/components/buying-list-dialog";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -29,8 +30,9 @@ function StockBadge({ a, qty }: { a: string; qty: number | null }) {
 export default function PortalCataloguePage() {
   const { toast } = useToast();
   const { addItem } = usePortalBasket();
-  const [search, setSearch] = useState("");
-  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState(() => new URLSearchParams(window.location.search).get("search") || "");
+  const [quickOpen, setQuickOpen] = useState(() => new URLSearchParams(window.location.search).get("quick") === "1");
+  const [searchInput, setSearchInput] = useState(search);
   const [brand, setBrand] = useState("all");
   const [category, setCategory] = useState("all");
   const [availability, setAvailability] = useState("all");
@@ -92,10 +94,8 @@ export default function PortalCataloguePage() {
 
   return (
     <div className="space-y-4 pb-28">
-      <div>
-        <h1 className="text-2xl font-bold">Your Price List</h1>
-        <p className="text-muted-foreground">These are <strong>your account prices</strong> for the brands assigned to you — the public site never shows pricing. Enter the quantities you want, then add the whole lot to your basket in one go.</p>
-      </div>
+      <BuyingListDialog open={quickOpen} onOpenChange={setQuickOpen} />
+      <div className="po-portal-intro flex flex-wrap justify-between items-end gap-5"><div><span className="eyebrow text-xs tracking-widest">YOUR PHARMA OASIS</span><h1>Your trade space.</h1><p>Your catalogue. Your account prices. Select quantities to build an order or request a quote.</p></div><Button variant="outline" onClick={() => setQuickOpen(true)}>Paste your buying list</Button></div>
 
       {/* Pricing terms — important for wholesale */}
       <div className="flex items-start gap-2 rounded-lg border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">

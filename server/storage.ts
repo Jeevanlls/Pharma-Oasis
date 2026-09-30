@@ -415,6 +415,7 @@ export class DatabaseStorage implements IStorage {
         identityMatch,
         ilike(products.productName, contains),
         ilike(brands.name, contains),
+        sql`EXISTS(SELECT 1 FROM categories c WHERE c.id=${products.categoryId} AND c.name ILIKE ${contains})`,
         sql`to_tsvector('english', coalesce(${products.productName}, '') || ' ' || coalesce(${products.shortDescription}, '')) @@ plainto_tsquery('english', ${search})`,
       )!);
     }
@@ -424,8 +425,7 @@ export class DatabaseStorage implements IStorage {
         .leftJoin(brands, eq(products.brandId, brands.id)).where(predicate)
         .orderBy(
           search ? sql`CASE WHEN ${products.ean} = ${search} OR ${products.sku} = ${search} THEN 0 ELSE 1 END` : sql`0 + 0`,
-          sql`${brands.isDirectDistributor} DESC NULLS LAST`,
-          sql`${products.imageUrl} IS NULL`, asc(products.productName), asc(products.id),
+          sql`${products.catalogueSortRank} ASC NULLS LAST`, asc(products.productName), asc(products.id),
         ).limit(limit).offset(offset),
       db.select({ count: sql<number>`count(*)` }).from(products)
         .leftJoin(brands, eq(products.brandId, brands.id)).where(predicate),
@@ -662,6 +662,8 @@ export class DatabaseStorage implements IStorage {
       costExpiryDate: row.cost_expiry_date,
       costStatus: row.cost_status,
       availableQty: row.available_qty,
+      inventoryProductId: row.inventory_product_id, inventoryReference: row.inventory_reference,
+      inventoryProductIds: row.inventory_product_ids, inventoryDataIssues: row.inventory_data_issues, catalogueSortRank: row.catalogue_sort_rank,
     });
     
     try {
