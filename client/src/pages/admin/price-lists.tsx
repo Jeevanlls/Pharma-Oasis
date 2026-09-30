@@ -30,8 +30,8 @@ export default function AdminPriceListsPage() {
   const [previewRows, setPreviewRows] = useState<{ name: string; cost: number | null; price: number | null; level: string | null; fixed: boolean }[]>([]);
 
   const { data: lists = [] } = useQuery<PriceList[]>({ queryKey: ["/api/admin/price-lists"] });
-  const { data: brands = [] } = useQuery<Brand[]>({ queryKey: ["/api/brands"] });
-  const { data: categories = [] } = useQuery<Category[]>({ queryKey: ["/api/categories"] });
+  const { data: brands = [] } = useQuery<Brand[]>({ queryKey: ["/api/admin/brands"] });
+  const { data: categories = [] } = useQuery<Category[]>({ queryKey: ["/api/admin/categories"] });
   const { data: users = [] } = useQuery<UserRow[]>({ queryKey: ["/api/admin/users"] });
   const { data: detail } = useQuery<{ list: PriceList; rules: Rule[] }>({
     queryKey: ["/api/admin/price-lists", selectedId],

@@ -68,11 +68,11 @@ export default function AdminProductsPage() {
   const products = productsResponse?.products;
 
   const { data: brands } = useQuery<Brand[]>({
-    queryKey: ["/api/brands"],
+    queryKey: ["/api/admin/brands"],
   });
 
   const { data: categories } = useQuery<Category[]>({
-    queryKey: ["/api/categories"],
+    queryKey: ["/api/admin/categories"],
   });
 
   const form = useForm<InsertProduct>({

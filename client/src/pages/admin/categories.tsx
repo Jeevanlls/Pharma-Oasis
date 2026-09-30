@@ -34,7 +34,7 @@ export default function AdminCategoriesPage() {
   const { toast } = useToast();
 
   const { data: categories, isLoading } = useQuery<Category[]>({
-    queryKey: ["/api/categories"],
+    queryKey: ["/api/admin/categories"],
   });
 
   const form = useForm<InsertCategory>({
@@ -51,6 +51,7 @@ export default function AdminCategoriesPage() {
       return apiRequest("POST", "/api/admin/categories", data);
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/categories"] });
       queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
       toast({ title: "Category created successfully" });
       setIsDialogOpen(false);
@@ -66,6 +67,7 @@ export default function AdminCategoriesPage() {
       return apiRequest("PATCH", `/api/admin/categories/${id}`, data);
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/categories"] });
       queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
       toast({ title: "Category updated successfully" });
       setIsDialogOpen(false);
@@ -82,6 +84,7 @@ export default function AdminCategoriesPage() {
       return apiRequest("DELETE", `/api/admin/categories/${id}`);
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/categories"] });
       queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
       toast({ title: "Category deleted successfully" });
     },
