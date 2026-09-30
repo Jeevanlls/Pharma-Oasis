@@ -75,17 +75,21 @@ export function createPreviewApp(upstreamFetch = fetch) {
       res.set("Cache-Control", "public, max-age=30");
       res.send(Buffer.from(await response.arrayBuffer()));
     } catch {
-      res
-        .status(502)
-        .json({
-          message:
-            "Public content could not be loaded. Please try again shortly.",
-        });
+      res.status(502).json({
+        message:
+          "Public content could not be loaded. Please try again shortly.",
+      });
     }
   });
   app.use("/api", (_req, res) => res.status(403).json({ message }));
   // A fixed-width frame lets reviewers inspect the real responsive app without device emulation.
-  app.get("/__review/mobile", (_req, res) => res.type("html").send(`<!doctype html><html lang="en"><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mobile review · Pharma Oasis</title><style>body{margin:0;background:#e9e4e7;font:14px Arial;color:#432338}header{padding:14px;text-align:center}iframe{display:block;width:390px;max-width:100%;height:850px;border:0;margin:0 auto;background:white;box-shadow:0 2px 24px #43233822}</style></head><body><header>390px mobile review · <a href="/">Open full website</a></header><iframe title="Pharma Oasis mobile preview" src="/"></iframe></body></html>`));
+  app.get("/__review/mobile", (_req, res) =>
+    res
+      .type("html")
+      .send(
+        `<!doctype html><html lang="en"><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mobile review · Pharma Oasis</title><style>body{margin:0;background:#e9e4e7;font:14px Arial;color:#432338}header{padding:14px;text-align:center}iframe{display:block;width:390px;max-width:100%;height:850px;border:0;margin:0 auto;background:white;box-shadow:0 2px 24px #43233822}</style></head><body><header>390px mobile review · <a href="/">Open full website</a></header><iframe title="Pharma Oasis mobile preview" src="/"></iframe></body></html>`,
+      ),
+  );
   app.use(express.static(root, { index: false, dotfiles: "deny" }));
   app.get("*", async (_req, res) => {
     let html = await readFile(path.join(root, "index.html"), "utf8");

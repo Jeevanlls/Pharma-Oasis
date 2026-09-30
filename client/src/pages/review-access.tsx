@@ -1,8 +1,10 @@
 import { Link } from "wouter";
+import { PageTracker } from "@/hooks/use-page-tracking";
 import { PublicLayout } from "@/components/layout/public-layout";
 export default function ReviewAccessPage() {
   return (
     <PublicLayout>
+      <PageTracker title="Your trade space | Pharma Oasis review" />
       <div className="wrap">
         <section className="page-intro">
           <span className="eyebrow">WEBSITE REVIEW</span>

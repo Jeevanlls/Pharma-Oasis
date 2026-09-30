@@ -40,6 +40,7 @@ Production build: `node --import tsx script/build.ts`, then existing `npm start`
 - Buying-list tests: leading zeroes, duplicate sums, quantity/format limits, exact matching, account price/quote-only values, all-or-nothing failure, ambiguous and out-of-stock products.
 - Review-host test: writes/private routes blocked; anonymous public reads only; no forwarded browser cookies/auth headers; noindex response header.
 - React DOM checks with fixture APIs pass for four public pages, exact EAN search, active/expired offer filtering, authenticated account prices, priced basket order submission, and unpriced basket quote-only submission. These are frontend checks with isolated fixtures, not live trading transactions.
+- Deployed browser review: desktop homepage, public search (13 live results for the tested term), preview login guard, mobile homepage at 390px, expanded/collapsed mobile menu and company-page navigation. Mobile company page fits its viewport without horizontal overflow. Public catalogue records sometimes store EAN in SKU; homepage features support both.
 - Full signed-in customer/order/quote end-to-end testing still needs an isolated website database before production launch. Browsing preview does not claim to test actual order processing.
 
 ## Launch gate

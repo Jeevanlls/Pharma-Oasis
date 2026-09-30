@@ -27,8 +27,18 @@ export default function HomePage() {
     staleTime: 60_000,
   });
   const focusProduct = focus?.products.find(
-    (product) => product.ean === "3574661482378",
+    (product) => (product.ean || product.sku) === "3574661482378",
   );
+  const { data: vitaminFocus } = useQuery<{ products: Product[] }>({
+    queryKey: ["/api/products?search=5021265221424&limit=1"],
+    staleTime: 60_000,
+  });
+  const vitaminProduct = vitaminFocus?.products.find(
+    (product) => (product.ean || product.sku) === "5021265221424",
+  );
+  const vitaminHref = vitaminProduct?.brandId
+    ? `/products?brand=${vitaminProduct.brandId}`
+    : "/brands";
   const offer = offers[0];
   const featureHref = offer
     ? `/offers?offer=${encodeURIComponent(offer.slug || String(offer.id))}`
@@ -198,7 +208,7 @@ export default function HomePage() {
             </div>
           </Link>
           <div className="radar-feed">
-            <Link className="radar-row" href="/products?search=Vitabiotics">
+            <Link className="radar-row" href={vitaminHref}>
               <div className="radar-index">01</div>
               <div>
                 <span className="eyebrow">DISCOVER / VITAMINS</span>
@@ -209,9 +219,17 @@ export default function HomePage() {
                 </h3>
                 <p>Explore our Vitabiotics range.</p>
               </div>
-              <span className="oasis-glyph" aria-hidden="true">
-                V
-              </span>
+              {vitaminProduct?.imageUrl ? (
+                <img
+                  src={vitaminProduct.imageUrl}
+                  alt={vitaminProduct.productName}
+                  loading="lazy"
+                />
+              ) : (
+                <span className="oasis-glyph" aria-hidden="true">
+                  V
+                </span>
+              )}
             </Link>
             <Link className="radar-row" href="/oasisbiome">
               <div className="radar-index">02</div>
