@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
+import { gunzipSync } from "node:zlib";
 
 // Explicit public fields only. This snapshot contains no supplier or customer prices.
-export const catalogue = JSON.parse(readFileSync(new URL("./review-data/commercial-catalogue.json", import.meta.url), "utf8"));
+export const catalogue = JSON.parse(gunzipSync(readFileSync(new URL("./review-data/commercial-catalogue.json.gz", import.meta.url))).toString("utf8"));
 const normal = value => String(value ?? "").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
 const brands = new Map(catalogue.brands.map(b => [b.id, b]));
 const categories = new Map(catalogue.categories.map(c => [c.id, c]));
@@ -20,7 +21,9 @@ export function mountCommercialReview(app) {
   app.get("/api/brands", (_req, res) => res.json(catalogue.brands));
   app.get("/api/categories", (_req, res) => res.json(catalogue.categories));
   app.get("/api/featured-brands", (_req, res) => res.json([]));
-  app.get("/api/review/commercial-range", (_req, res) => res.json(catalogue));
+  // The catalogue is paginated separately. Brand pages and campaign artwork
+  // need only the taxonomy/counts and approved photographed products.
+  app.get("/api/review/commercial-range", (_req, res) => res.json({ ...catalogue, products: catalogue.products.filter(p => p.imageUrl) }));
   app.get("/api/products/search", (req, res) => res.json(selectProducts(req.query).products));
   app.get("/api/products", (req, res) => res.json(selectProducts(req.query)));
   app.get("/api/products/:idOrSlug", (req, res) => {

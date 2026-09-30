@@ -1,5 +1,7 @@
 # Commercial range and weekly edit review — 30 September 2026
 
+**Superseded catalogue scope:** see full-app-commercial-range-2026-09-30.md. Missing photos no longer block catalogue visibility. The five campaign designs below remain current.
+
 ## Scope
 
 Review service only. No production database, employee inventory, price lists, customer access or trading records were changed. The source is an explicit public-field snapshot from the website Neon database, read in a read-only transaction. Direct access to RD’s upstream Supabase database could not be verified from this workspace (DNS unavailable; connected Supabase account does not expose that project).
