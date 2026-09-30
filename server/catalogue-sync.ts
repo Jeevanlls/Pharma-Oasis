@@ -1,7 +1,7 @@
 import pg from "pg";
 import { randomUUID } from "node:crypto";
 import { pool } from "./db";
-import { prepareCatalogue, catalogueSchemaStatements, stageCatalogueSql, applyCatalogueStatements, type AppCatalogueRow } from "./catalogue-sync-plan";
+import { prepareCatalogue, catalogueSchemaStatements, stageCatalogueSql, applyCatalogueStatements, type AppCatalogueRow, canonicalReference } from "./catalogue-sync-plan";
 let running = false;
 let source: pg.Pool | null = null;
 let schemaReady: Promise<unknown> | null = null;
@@ -22,6 +22,8 @@ export async function syncCatalogue() {
     running = true;
     const runId = randomUUID();
     let client: pg.PoolClient | null = null;
+    let sourceClient: pg.PoolClient | null = null;
+    let sourceTransaction=false;
     try {
         await ensureCatalogueSchema();
         client = await pool.connect();
@@ -29,15 +31,46 @@ export async function syncCatalogue() {
         if (!lock.rows[0].locked)
             throw new Error("Another catalogue sync is running.");
         source ??= new pg.Pool({ connectionString: process.env.APP_CATALOGUE_DATABASE_URL, max: 1, connectionTimeoutMillis: 15000, idleTimeoutMillis: 10000 });
-        const rows = await source.query<AppCatalogueRow>("SELECT id,ean,name,brand,category,pack_size,case_size,status,is_archived FROM products ORDER BY id");
-        const existing = await client.query("SELECT id,ean,sku,is_active,inventory_product_id,inventory_reference FROM products");
-        const plan = prepareCatalogue(rows.rows, existing.rows);
-        const previous = await client.query("SELECT summary FROM catalogue_sync_runs WHERE status='complete' ORDER BY finished_at DESC LIMIT 1");
-        if (previous.rows[0]?.summary?.products && plan.products.length < previous.rows[0].summary.products * 0.9)
-            throw new Error("Source catalogue fell by more than 10%; review in the app before retrying.");
-        await client.query("INSERT INTO catalogue_sync_runs(id,summary) VALUES($1,$2)", [runId, JSON.stringify(plan.summary)]);
-        for (let i = 0; i < plan.products.length; i += 1000)
-            await client.query(stageCatalogueSql, [runId, JSON.stringify(plan.products.slice(i, i + 1000))]);
+        sourceClient=await source.connect();
+        await sourceClient.query("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY");
+        sourceTransaction=true;
+        const counts=await sourceClient.query("SELECT count(*)::integer total,count(*) FILTER(WHERE NOT coalesce(is_archived,false))::integer active FROM products");
+        if(!counts.rows[0].active) throw new Error("Empty source catalogue; sync stopped.");
+        const summary={sourceRecords:counts.rows[0].total,activeAppRecords:counts.rows[0].active,products:0,duplicateRecords:0,newProducts:0,matchedProducts:0,flaggedProducts:0};
+        await client.query("INSERT INTO catalogue_sync_runs(id,summary) VALUES($1,$2)",[runId,JSON.stringify(summary)]);
+        // A read-only cursor gives a consistent source snapshot with bounded memory.
+        // Carry the last reference across fetches so duplicate app IDs stay together.
+        await sourceClient.query("DECLARE catalogue_source NO SCROLL CURSOR FOR SELECT id,ean,name,brand,category,pack_size,case_size,status,is_archived FROM products WHERE NOT coalesce(is_archived,false) ORDER BY regexp_replace(ean,'\\s','','g') COLLATE \"C\",id");
+        let carry:AppCatalogueRow[]=[];
+        const claimed=new Set<number>();
+        let readCount=0;
+        while(true){
+            const page=await sourceClient.query<AppCatalogueRow>("FETCH FORWARD 1000 FROM catalogue_source");
+            readCount+=page.rows.length;
+            let rows=[...carry,...page.rows];carry=[];
+            if(page.rows.length){
+                const last=canonicalReference(rows[rows.length-1].ean);
+                let split=rows.length-1;while(split>0 && canonicalReference(rows[split-1].ean)===last)split--;
+                carry=rows.slice(split);rows=rows.slice(0,split);
+                if(carry.length>10000)throw new Error("Too many duplicate app references; review required.");
+            }
+            if(rows.length){
+                const refs=rows.map(r=>canonicalReference(r.ean)),ids=rows.map(r=>r.id);
+                const existing=await client.query("SELECT id,ean,sku,is_active,inventory_product_id,inventory_reference FROM products WHERE inventory_reference=ANY($1::text[]) OR regexp_replace(coalesce(nullif(ean,''),sku),'\\s','','g')=ANY($1::text[]) OR inventory_product_id=ANY($2::integer[])",[refs,ids]);
+                const batch=prepareCatalogue(rows,existing.rows);
+                for(const p of batch.products){if(p.existing_id){if(claimed.has(p.existing_id))throw new Error("Two source references claim one website product; sync stopped.");claimed.add(p.existing_id);}}
+                for(const key of ["products","duplicateRecords","newProducts","matchedProducts","flaggedProducts"] as const)summary[key]+=batch.summary[key];
+                await client.query(stageCatalogueSql,[runId,JSON.stringify(batch.products)]);
+            }
+            if(!page.rows.length)break;
+        }
+        await sourceClient.query("COMMIT");sourceTransaction=false;sourceClient.release();sourceClient=null;
+        if(readCount!==summary.activeAppRecords)throw new Error("Incomplete source snapshot; sync stopped.");
+        const staged=await client.query("SELECT count(*)::integer count FROM catalogue_sync_rows WHERE run_id=$1",[runId]);
+        if(staged.rows[0].count!==summary.products)throw new Error("Incomplete staging; sync stopped.");
+        const previous=await client.query("SELECT summary FROM catalogue_sync_runs WHERE status='complete' ORDER BY finished_at DESC LIMIT 1");
+        if(previous.rows[0]?.summary?.products && summary.products<previous.rows[0].summary.products*0.9)throw new Error("Source catalogue fell by more than 10%; review in the app before retrying.");
+        await client.query("UPDATE catalogue_sync_runs SET summary=$2 WHERE id=$1",[runId,JSON.stringify(summary)]);
         await client.query("BEGIN");
         try {
             await client.query("SET LOCAL statement_timeout='120s'");
@@ -51,7 +84,7 @@ export async function syncCatalogue() {
         }
         // Staging has no prices or personal data. Retain failed runs for investigation.
         await client.query("DELETE FROM catalogue_sync_rows WHERE run_id IN(SELECT id FROM catalogue_sync_runs WHERE status='complete' AND finished_at<now()-interval '7 days')").catch(error => console.error('Catalogue staging cleanup failed:', error.message));
-        return { runId, ...plan.summary };
+        return { runId, ...summary };
     }
     catch (error) {
         if (client)
@@ -59,6 +92,7 @@ export async function syncCatalogue() {
         throw error;
     }
     finally {
+        if(sourceClient){if(sourceTransaction)await sourceClient.query("ROLLBACK").catch(()=>{});sourceClient.release();}
         if (client) {
             await client.query("SELECT pg_advisory_unlock(73119,20260930)").catch(() => { });
             client.release();

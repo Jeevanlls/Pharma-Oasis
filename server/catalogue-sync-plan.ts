@@ -91,6 +91,7 @@ export const catalogueSchemaStatements = [
     `CREATE UNIQUE INDEX IF NOT EXISTS products_live_ean_unique ON products((regexp_replace(ean,'\\s','','g'))) WHERE is_active AND nullif(ean,'') IS NOT NULL`,
     `CREATE INDEX IF NOT EXISTS products_catalogue_order ON products(is_active,catalogue_sort_rank,id)`,
     `CREATE INDEX IF NOT EXISTS products_ean_lookup ON products(ean)`,
+    `CREATE INDEX IF NOT EXISTS products_source_reference_lookup ON products((regexp_replace(coalesce(nullif(ean,''),sku),'\\s','','g')))`,
     `CREATE INDEX IF NOT EXISTS brands_catalogue_name ON brands((lower(btrim(name))))`,
     `CREATE INDEX IF NOT EXISTS categories_catalogue_name ON categories((lower(btrim(name)))) WHERE parent_id IS NULL`,
 ];

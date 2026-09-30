@@ -6670,48 +6670,12 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
 
 async function migrateProductSlugs() {
   try {
-    const { products } = await import("@shared/schema");
-    const { isNull, or, sql: sqlExpr } = await import("drizzle-orm");
-
-    const productsNeedingSlugs = await db
-      .select({ id: products.id, productName: products.productName, slug: products.slug })
-      .from(products)
-      .where(or(isNull(products.slug), sqlExpr`${products.slug} ~ '^[0-9]+$'`));
-
-    if (productsNeedingSlugs.length === 0) {
-      console.log("[Slug Migration] All products have proper slugs");
-      return;
-    }
-
-    console.log(`[Slug Migration] Generating slugs for ${productsNeedingSlugs.length} products...`);
-
-    const existingSlugs = new Set<string>();
-    const allProducts = await db.select({ slug: products.slug }).from(products);
-    allProducts.forEach(p => { if (p.slug) existingSlugs.add(p.slug); });
-
-    let updated = 0;
-    for (const product of productsNeedingSlugs) {
-      let baseSlug = product.productName
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/(^-|-$)/g, "")
-        .substring(0, 100);
-
-      let slug = baseSlug;
-      let counter = 2;
-      while (existingSlugs.has(slug)) {
-        slug = `${baseSlug}-${counter}`;
-        counter++;
-      }
-
-      existingSlugs.add(slug);
-      const { eq } = await import("drizzle-orm");
-      await db.update(products).set({ slug }).where(eq(products.id, product.id));
-      updated++;
-    }
-
-    console.log(`[Slug Migration] Updated ${updated} product slugs`);
-  } catch (error) {
-    console.error("[Slug Migration] Error:", error);
-  }
+    // Backfill legacy URLs in SQL: never load the entire catalogue into Node memory.
+    const result=await pool.query(`WITH candidates AS (
+      SELECT id,left(trim(both '-' from regexp_replace(lower(product_name),'[^a-z0-9]+','-','g')),100)||'-product-'||id AS new_slug
+      FROM products WHERE slug IS NULL OR slug ~ '^[0-9]+$'
+    ) UPDATE products p SET slug=c.new_slug FROM candidates c WHERE p.id=c.id
+      AND NOT EXISTS(SELECT 1 FROM products other WHERE other.slug=c.new_slug AND other.id<>p.id)`);
+    console.log('[Slug Migration] Updated',result.rowCount,'legacy product slugs');
+  } catch(error){console.error('[Slug Migration] Error:',error);}
 }
