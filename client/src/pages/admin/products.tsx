@@ -42,6 +42,8 @@ export default function AdminProductsPage() {
   const [isGeneratingDescription, setIsGeneratingDescription] = useState(false);
   const { toast } = useToast();
 
+  const syncStatus=useQuery<any>({queryKey:["/api/admin/catalogue-sync"],refetchInterval:30000});
+  const sync=useMutation({mutationFn:async()=>{const r=await apiRequest("POST","/api/admin/catalogue-sync",{});return r.json();},onSuccess:(data)=>{toast({title:"Catalogue connected",description:`${data.products.toLocaleString()} products synced from the app.`});queryClient.invalidateQueries({queryKey:["/api/admin/catalogue-sync"]});queryClient.invalidateQueries({queryKey:["/api/admin/products"]});},onError:(e:Error)=>toast({title:"Sync needs attention",description:e.message,variant:"destructive"})});
   const [debouncedSearch, setDebouncedSearch] = useState("");
   
   // Debounce search to avoid too many API calls
@@ -60,9 +62,9 @@ export default function AdminProductsPage() {
   }
   
   const { data: productsResponse, isLoading } = useQuery<{ products: Product[]; pagination: { page: number; pageSize: number; total: number; totalPages: number } }>({
-    queryKey: ["/api/products", debouncedSearch],
+    queryKey: ["/api/admin/products", debouncedSearch],
     queryFn: async () => {
-      const res = await fetch(`/api/products?${queryParams.toString()}`);
+      const res = await fetch(`/api/admin/products?${queryParams.toString()}`);
       if (!res.ok) throw new Error("Failed to fetch products");
       return res.json();
     },
@@ -248,13 +250,19 @@ export default function AdminProductsPage() {
 
   return (
     <div className="space-y-8">
+      <div className="rounded-xl border bg-card p-4 text-sm">
+        <strong>Connected to the inventory app</strong><p className="text-muted-foreground">EAN, name, brand, category and classification follow the app. Manage photographs and website descriptions here.</p>
+        <p>Last sync: {syncStatus.data?.runs?.[0]?.finished_at ? new Date(syncStatus.data.runs[0].finished_at).toLocaleString("en-GB") : "Not yet recorded"} · {syncStatus.data?.runs?.[0]?.status || "Checking"}</p>
+        {syncStatus.data?.runs?.[0]?.error && <p role="alert" className="text-destructive">{syncStatus.data.runs[0].error}</p>}
+        <Button className="mt-2" variant="outline" disabled={!syncStatus.data?.configured || sync.isPending || syncStatus.data?.running} onClick={()=>sync.mutate()}>{sync.isPending || syncStatus.data?.running ? "Syncing…" : "Sync from app"}</Button>
+      </div>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold" style={{ fontFamily: "DM Sans, sans-serif" }}>
             Product Management
           </h1>
           <p className="mt-2 text-muted-foreground">
-            Manage your product catalogue ({products?.length || 0} products)
+            Manage your product catalogue ({productsResponse?.pagination.total.toLocaleString() || 0} products)
           </p>
         </div>
         <Button onClick={handleCreate} className="gap-2">
@@ -622,7 +630,13 @@ export default function AdminProductsPage() {
                 name="shortDescription"
                 render={({ field }) => (
                   <FormItem>
-                    <div className="flex items-center justify-between">
+                    <div className="rounded-xl border bg-card p-4 text-sm">
+        <strong>Connected to the inventory app</strong><p className="text-muted-foreground">EAN, product name, brand, category and classification follow the app. Manage photographs and website descriptions here.</p>
+        <p>Last sync: {syncStatus.data?.runs?.[0]?.finished_at ? new Date(syncStatus.data.runs[0].finished_at).toLocaleString("en-GB") : "Not yet recorded"} · {syncStatus.data?.runs?.[0]?.status || "Checking"}</p>
+        {syncStatus.data?.runs?.[0]?.error && <p role="alert" className="text-destructive">{syncStatus.data.runs[0].error}</p>}
+        <Button className="mt-2" variant="outline" disabled={!syncStatus.data?.configured || sync.isPending || syncStatus.data?.running} onClick={()=>sync.mutate()}>{sync.isPending || syncStatus.data?.running ? "Syncing…" : "Sync from app"}</Button>
+      </div>
+      <div className="flex items-center justify-between">
                       <FormLabel>Description</FormLabel>
                       <Button
                         type="button"

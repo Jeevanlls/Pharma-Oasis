@@ -1514,10 +1514,11 @@ export default function AdminHomepagePage() {
           Homepage Content
         </h1>
         <p className="mt-2 text-muted-foreground">
-          Manage all dynamic content displayed on the public homepage
+          Legacy homepage content (retained for reference)
         </p>
       </div>
 
+      <div className="rounded border p-5 space-y-2"><h2 className="font-semibold">Concept 02 homepage</h2><p>The new homepage uses scheduled offers from Offers Management and contact/social links from Settings. The previous carousel, statistics and sections below are retained but are no longer displayed.</p><p><a className="underline" href="/admin/offers">Manage current offers</a> · <a className="underline" href="/admin/settings">Edit contact and social links</a></p></div>
       <Tabs defaultValue="stats" className="w-full">
         <TabsList className="grid w-full grid-cols-5 mb-6">
           <TabsTrigger value="stats" className="gap-2" data-testid="tab-stats">

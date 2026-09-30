@@ -290,6 +290,9 @@ async function initializeFullApplication() {
 
     // Register all API routes
     await registerRoutes(httpServer, app);
+    const { ensureCatalogueSchema, startCatalogueSync } = await import("./catalogue-sync");
+    await ensureCatalogueSchema();
+    startCatalogueSync();
     const { startQuoteEmailWorker } = await import("./quote-outbox");
     const stopQuoteEmailWorker = startQuoteEmailWorker();
     httpServer.once("close", stopQuoteEmailWorker);

@@ -130,14 +130,14 @@ export const categories = pgTable("categories", {
 export const products = pgTable("products", {
   id: serial("id").primaryKey(),
   sku: varchar("sku", { length: 100 }).notNull().unique(),
-  ean: varchar("ean", { length: 50 }),
+  ean: text("ean"),
   brandId: integer("brand_id").notNull(),
   productName: varchar("product_name", { length: 500 }).notNull(),
   shortDescription: text("short_description"),
   longDescription: text("long_description"),
   categoryId: integer("category_id").notNull(),
   subcategoryId: integer("subcategory_id"),
-  packSize: varchar("pack_size", { length: 100 }),
+  packSize: text("pack_size"),
   caseSize: varchar("case_size", { length: 100 }),
   uom: varchar("uom", { length: 50 }),
   rrp: decimal("rrp", { precision: 10, scale: 2 }),
@@ -155,6 +155,11 @@ export const products = pgTable("products", {
   metaTitle: varchar("meta_title", { length: 255 }),
   metaDescription: text("meta_description"),
   googleFeedPrice: decimal("google_feed_price", { precision: 10, scale: 2 }),
+  inventoryProductId: integer("inventory_product_id"),
+  inventoryReference: text("inventory_reference"),
+  inventoryProductIds: jsonb("inventory_product_ids"),
+  inventoryDataIssues: jsonb("inventory_data_issues"),
+  catalogueSortRank: integer("catalogue_sort_rank"),
   // --- Customer-pricing cost cache (populated when a cost upload is published) ---
   activeCostPrice: decimal("active_cost_price", { precision: 10, scale: 2 }),
   activeCostUploadId: integer("active_cost_upload_id"),
@@ -198,7 +203,7 @@ export const quoteItems = pgTable("quote_items", {
   quoteId: integer("quote_id").notNull(),
   productId: integer("product_id"), // legacy catalogue product (nullable in v2)
   priceListItemId: integer("price_list_item_id"), // v2: the prepared list line quoted
-  ean: varchar("ean", { length: 50 }),
+  ean: text("ean"),
   description: varchar("description", { length: 500 }),
   quantity: integer("quantity").notNull(),
   unitPrice: decimal("unit_price", { precision: 10, scale: 2 }),
@@ -1444,7 +1449,7 @@ export const orderItems = pgTable("order_items", {
   orderId: integer("order_id").notNull(),
   productId: integer("product_id"), // legacy catalogue product (nullable in v2)
   priceListItemId: integer("price_list_item_id"), // v2: the prepared list line ordered
-  ean: varchar("ean", { length: 50 }), // snapshot for standalone display
+  ean: text("ean"), // snapshot for standalone display
   description: varchar("description", { length: 500 }), // snapshot product name
   quantity: integer("quantity").notNull(),
   unitCost: decimal("unit_cost", { precision: 10, scale: 2 }), // snapshot

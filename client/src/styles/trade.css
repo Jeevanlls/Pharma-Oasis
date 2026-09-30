@@ -1,0 +1,405 @@
+/* Public/customer surfaces only. Staff admin retains its existing colour theme. */
+body:has(.po-design),
+.po-design {
+  --background: 0 0% 100%;
+  --foreground: 321 31% 20%;
+  --card: 0 0% 100%;
+  --card-foreground: 321 31% 20%;
+  --border: 317 11% 88%;
+  --card-border: 317 11% 88%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 321 31% 20%;
+  --primary: 321 31% 20%;
+  --primary-foreground: 0 0% 100%;
+  --primary-border: 321 31% 20%;
+  --secondary: 74 88% 75%;
+  --secondary-foreground: 321 31% 20%;
+  --secondary-border: 74 70% 70%;
+  --muted: 320 16% 97%;
+  --muted-foreground: 300 5% 40%;
+  --muted-border: 317 11% 88%;
+  --accent: 74 88% 90%;
+  --accent-foreground: 321 31% 20%;
+  --accent-border: 74 70% 70%;
+  --input: 317 11% 83%;
+  --ring: 321 31% 32%;
+  --radius: 0.35rem;
+  --font-sans: "DM Sans", sans-serif;
+  --po-display: "Manrope", sans-serif;
+  --po-sans: "DM Sans", sans-serif;
+  --po-serif: Georgia, serif;
+  font-family: var(--font-sans);
+  background: white;
+  color: #432338;
+  color-scheme: light;
+}
+.po-design h1,
+.po-design h2,
+.po-design h3 {
+  font-family: var(--po-display);
+}
+.po-design .wrap {
+  margin-left: auto;
+  margin-right: auto;
+}
+.po-design .header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4.2%;
+  position: relative;
+  z-index: 40;
+  background: white;
+}
+.po-design .header nav {
+  display: flex;
+  align-items: center;
+}
+.po-design .header nav > a {
+  padding: 12px 0;
+  white-space: nowrap;
+}
+.po-design .header nav > a[aria-current="page"] {
+  text-decoration: underline;
+  text-underline-offset: 7px;
+}
+.po-design .header-actions {
+  display: flex;
+  align-items: center;
+  gap: 17px;
+}
+.po-design .menu-toggle {
+  display: none;
+  padding: 10px;
+  border-radius: 4px;
+}
+.po-design .btn {
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid;
+  gap: 9px;
+  padding: 13px 23px;
+  line-height: 1.5;
+  transition: background 0.15s;
+}
+.po-design .actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 22px;
+}
+.po-design .text-link {
+  border-bottom: 1px solid;
+  padding-bottom: 4px;
+  display: inline-block;
+  width: fit-content;
+}
+.po-design .eyebrow {
+  display: block;
+  line-height: 1.5;
+}
+.po-design .footer-bottom {
+  border-top: 1px solid;
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.po-design .po-policy-links,
+.po-design .po-social-links {
+  display: flex;
+  gap: 15px;
+  flex-wrap: wrap;
+}
+.po-design .po-social-links {
+  margin-top: 15px;
+  font-size: 13px;
+}
+.po-design .po-supply-note {
+  font-size: 11px;
+  color: #d1b9c8;
+  margin-top: 17px;
+  line-height: 1.7;
+  max-width: 700px;
+}
+.po-design .po-basket-link {
+  position: relative;
+  padding: 7px;
+}
+.po-design .po-basket-link > span {
+  position: absolute;
+  top: -7px;
+  right: -9px;
+  font-size: 10px;
+  background: #ddf785;
+  color: #432338;
+  padding: 2px 5px;
+  border-radius: 20px;
+}
+.po-design .po-skip {
+  position: fixed;
+  top: 0;
+  left: 16px;
+  transform: translateY(-120%);
+  z-index: 100;
+  background: #ddf785;
+  color: #432338;
+  padding: 12px 20px;
+}
+.po-design .po-skip:focus {
+  transform: translateY(0);
+}
+.po-design :focus-visible {
+  outline: 2px solid #a85d89;
+  outline-offset: 4px;
+}
+.po-design .page-intro {
+  padding: 60px 0 40px;
+}
+.po-design .page-intro h1 {
+  font-size: clamp(42px, 5.2vw, 78px);
+  letter-spacing: -0.055em;
+  line-height: 1.08;
+  margin: 20px 0;
+}
+.po-design .page-intro > p {
+  font-size: 18px;
+  line-height: 1.8;
+  max-width: 640px;
+}
+.po-design .story-big,
+.po-design .story-short,
+.po-design .standalone-biome {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10%;
+  padding: 30px 0 80px;
+  align-items: start;
+}
+.po-design .story-big h2,
+.po-design .story-short h2 {
+  font-size: clamp(34px, 4vw, 56px);
+  line-height: 1.15;
+  letter-spacing: -0.04em;
+}
+.po-design .story-big p,
+.po-design .story-short p,
+.po-design .biome-copy p {
+  font-size: 18px;
+  line-height: 1.8;
+  margin-bottom: 24px;
+  color: #706570;
+}
+.po-design .credential-block {
+  padding: 32px;
+  margin-top: 35px;
+  color: white;
+}
+.po-design .credential-block h3 {
+  font-size: 28px;
+  margin: 15px 0;
+}
+.po-design .credential-block p {
+  margin: 0;
+  font-size: 15px;
+}
+.po-design .biome-copy h1 {
+  font-family: Georgia, serif;
+  font-size: clamp(52px, 7vw, 110px);
+  letter-spacing: -0.065em;
+  line-height: 1.2;
+  margin: 22px 0;
+}
+.po-design .biome-copy .byline {
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  margin-bottom: 25px;
+}
+.po-design .biome-copy .soft-note {
+  font-size: 12px;
+  line-height: 1.7;
+  margin-top: 23px;
+}
+.po-design .standalone-biome > img {
+  width: 100%;
+  height: 100%;
+  min-height: 460px;
+  object-fit: cover;
+}
+.po-design .story-short {
+  padding-top: 70px;
+}
+.po-design .po-offer-art {
+  background: #ede6eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.po-design .po-offer-art > img {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: none;
+  mix-blend-mode: normal;
+}
+.po-design .po-offer-art > span {
+  font-family: Georgia, serif;
+  font-size: 76px;
+  line-height: 1;
+  letter-spacing: -0.05em;
+  padding: 35px;
+}
+.po-design .po-portal-intro {
+  padding: 28px 0 24px;
+  border-bottom: 1px solid #e3dce1;
+  margin-bottom: 28px;
+}
+.po-design .po-portal-intro h1 {
+  font-size: 40px;
+  letter-spacing: -0.05em;
+  font-weight: 400;
+}
+.po-design .po-portal-intro p {
+  color: #706570;
+  margin-top: 10px;
+}
+.po-design .po-editorial-offer {
+  scroll-margin-top: 24px;
+}
+.po-design .po-offer-meta {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-top: 22px;
+  color: #706570;
+  font-size: 13px;
+  align-items: center;
+}
+.po-preview-bar {
+  background: #432338;
+  color: white;
+  text-align: center;
+  font-family: "DM Sans", sans-serif;
+  font-size: 12px;
+  padding: 10px 16px;
+  line-height: 1.6;
+}
+.po-preview-bar a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+@media (max-width: 1100px) {
+  .po-design .header nav {
+    gap: 17px !important;
+  }
+  .po-design .header-actions {
+    gap: 8px;
+  }
+  .po-design .future-brand {
+    font-size: 29px;
+  }
+}
+@media (max-width: 850px) {
+  .po-design .menu-toggle {
+    display: block;
+  }
+  .po-design .header.menu-open nav {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    padding: 15px 5% 25px;
+    box-shadow: 0 15px 20px #43233812;
+  }
+  .po-design .mobile-account-links {
+    display: flex;
+    flex-direction: column;
+    border-top: 1px solid #e3dce1;
+    margin-top: 12px;
+    padding-top: 12px;
+    gap: 18px;
+    text-align: left;
+  }
+  .po-design .mobile-account-links button {
+    text-align: left;
+  }
+  .po-design .story-big,
+  .po-design .story-short {
+    gap: 5%;
+  }
+}
+@media (min-width: 851px) {
+  .po-design .mobile-account-links {
+    position: absolute;
+    right: 4%;
+    top: 90px;
+    background: white;
+    padding: 20px;
+    border: 1px solid #e3dce1;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .po-design .menu-toggle {
+    display: block;
+  }
+  .po-design .header.menu-open nav {
+    display: flex;
+  }
+}
+@media (max-width: 600px) {
+  .po-design .story-big,
+  .po-design .story-short,
+  .po-design .standalone-biome {
+    grid-template-columns: 1fr;
+    gap: 30px;
+    padding-bottom: 40px;
+  }
+  .po-design .standalone-biome > img {
+    min-height: 260px;
+    height: auto;
+  }
+  .po-design .page-intro {
+    padding: 30px 0;
+  }
+  .po-design .header-actions {
+    gap: 2px;
+  }
+  .po-design .po-basket-link {
+    display: none;
+  }
+  .po-design .login {
+    white-space: nowrap;
+  }
+  .po-design .menu-toggle {
+    padding: 6px;
+  }
+  .po-design .po-offer-art > span {
+    font-size: 55px;
+  }
+  .po-design .po-portal-intro h1 {
+    font-size: 32px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .po-design * {
+    animation: none !important;
+    scroll-behavior: auto !important;
+    transition: none !important;
+  }
+}
+
+.po-design .po-portal-logo {
+  font-size: 27px !important;
+}
+.po-design .po-portal-logo i {
+  font-size: 25px;
+  margin-top: 10px;
+}

@@ -109,8 +109,8 @@ export function OrganizationJsonLd() {
     "name": "Pharma Oasis",
     "legalName": "Pharma Oasis Limited",
     "url": "https://pharmaoasis.co.uk",
-    "logo": "https://pharmaoasis.co.uk/logo.png",
-    "description": "MHRA-licensed pharmaceutical wholesaler and healthcare distributor serving UK pharmacies, hospitals, and healthcare providers with over 20,000 products.",
+    "logo": "https://pharmaoasis.co.uk/brand/wordmark.svg",
+    "description": "MHRA-licensed pharmaceutical wholesaler and healthcare distributor serving UK pharmacies, hospitals, and healthcare providers across healthcare, wellness and beauty.",
     "address": {
       "@type": "PostalAddress",
       "streetAddress": "Unit - J, Doddington Park Farmhouse, Bridgemere",

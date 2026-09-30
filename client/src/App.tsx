@@ -1,3 +1,4 @@
+import { WeeklyOffersPage, CommercialBrandsPage, CampaignStudio } from "@/components/weekly-edit";
 import { Switch, Route, Redirect, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -33,6 +34,13 @@ import CompliancePage from "@/pages/compliance";
 import PharmaceuticalWholesalersPage from "@/pages/pharmaceutical-wholesalers";
 import ProductDetailPage from "@/pages/product-detail";
 import OffersPage from "@/pages/offers";
+import AboutPage from "@/pages/about";
+import OasisbiomePage from "@/pages/oasisbiome";
+import ReviewAccessPage from "@/pages/review-access";
+import AdminPreview from "@/pages/admin-preview";
+import { TradePreviewProvider } from "@/lib/trade-preview";
+import { TradeCatalogue, TradeDashboard, TradeQuote, TradeRequests, TradeAccess } from "@/pages/trade-preview";
+const reviewOnly = import.meta.env.VITE_REVIEW_PREVIEW === "true";
 import ForgotPasswordPage from "@/pages/forgot-password";
 import ResetPasswordPage from "@/pages/reset-password";
 
@@ -141,29 +149,37 @@ function PortalRoute({ component: Component }: { component: React.ComponentType 
   );
 }
 
+function TradeAccountRoute({component:Component}:{component:React.ComponentType}) {
+  const {isAuthenticated,isCustomer,isAdmin,isLoading}=useAuth();
+  if(isLoading)return <div className="tp-empty">Loading your account…</div>;
+  if(!isAuthenticated)return <Redirect to="/login?redirect=/portal"/>;
+  if(!isCustomer&&!isAdmin)return <DashboardPage/>;
+  return <Component/>;
+}
 function Router() {
   return (
     <Switch>
+      {reviewOnly && <Route path="/__review/admin/:section?" component={AdminPreview} />}
       <Route path="/" component={HomePage} />
-      <Route path="/login">{() => <LoginPage />}</Route>
+      <Route path="/login">{() => reviewOnly ? <TradeAccess /> : <LoginPage />}</Route>
       {/* Private admin/staff sign-in — intentionally NOT linked from the public site. */}
-      <Route path="/staff">{() => <LoginPage adminMode />}</Route>
-      <Route path="/forgot-password" component={ForgotPasswordPage} />
-      <Route path="/reset-password" component={ResetPasswordPage} />
-      <Route path="/register" component={RegisterPage} />
-      <Route path="/products" component={ProductsPage} />
+      <Route path="/staff">{() => reviewOnly ? <ReviewAccessPage /> : <LoginPage adminMode />}</Route>
+      <Route path="/forgot-password" component={reviewOnly ? ReviewAccessPage : ForgotPasswordPage} />
+      <Route path="/reset-password" component={reviewOnly ? ReviewAccessPage : ResetPasswordPage} />
+      <Route path="/register" component={reviewOnly ? ReviewAccessPage : RegisterPage} />
+      <Route path="/products">{()=> <TradeCatalogue/>}</Route>
       <Route path="/products/:idOrSlug" component={ProductDetailPage} />
-      <Route path="/brands" component={BrandsPage} />
+      <Route path="/brands" component={CommercialBrandsPage} />
       <Route path="/distribution-network" component={DistributionNetworkPage} />
       <Route path="/contact" component={ContactPage} />
       <Route path="/how-to-order" component={HowToOrderPage} />
-      <Route path="/basket" component={BasketPage} />
+      <Route path="/basket" component={reviewOnly ? TradeQuote : BasketPage} />
       {/* D2: one shared basket + checkout. Old checkout routes now redirect here. */}
       <Route path="/quote">{() => <Redirect to="/basket" />}</Route>
-      <Route path="/my-quotes" component={MyQuotesPage} />
+      <Route path="/my-quotes" component={reviewOnly ? TradeRequests : MyQuotesPage} />
       <Route path="/my-quotes/:id" component={QuoteDetailPage} />
       <Route path="/quotes/:id/print" component={QuoteDocumentPage} />
-      <Route path="/dashboard" component={DashboardPage} />
+      <Route path="/dashboard" component={reviewOnly ? TradeDashboard : DashboardPage} />
       <Route path="/supplier-registration" component={SupplierRegistrationPage} />
       <Route path="/privacy" component={PrivacyPolicyPage} />
       <Route path="/terms" component={TermsOfServicePage} />
@@ -171,7 +187,10 @@ function Router() {
       <Route path="/blog" component={BlogPage} />
       <Route path="/blog/:slug" component={BlogPostPage} />
       <Route path="/compliance" component={CompliancePage} />
-      <Route path="/offers" component={OffersPage} />
+      <Route path="/offers" component={WeeklyOffersPage} />
+      {reviewOnly && <Route path="/__review/campaigns" component={CampaignStudio} />}
+      <Route path="/about" component={AboutPage} />
+      <Route path="/oasisbiome" component={OasisbiomePage} />
       <Route path="/pharmaceutical-wholesalers" component={PharmaceuticalWholesalersPage} />
       
       <Route path="/admin">{() => <AdminRoute component={AdminDashboard} />}</Route>
@@ -227,11 +246,15 @@ function Router() {
       <Route path="/admin/rates">{() => <AdminRoute component={AdminRatesPage} />}</Route>
       <Route path="/admin/promotions">{() => <AdminRoute component={AdminPromotionsPage} />}</Route>
 
-      <Route path="/portal">{() => <PortalRoute component={PortalCataloguePage} />}</Route>
+      <Route path="/portal">{() => reviewOnly ? <TradeDashboard /> : <TradeAccountRoute component={TradeDashboard} />}</Route>
+      <Route path="/portal/prices">{() => <PortalRoute component={PortalCataloguePage}/>}</Route>
+      <Route path="/portal/catalogue">{()=> <TradeCatalogue/>}</Route>
+      <Route path="/portal/quote" component={TradeQuote} />
+      <Route path="/portal/saved">{() => <TradeCatalogue savedOnly />}</Route>
       <Route path="/portal/promotions">{() => <PortalRoute component={PortalPromotionsPage} />}</Route>
       {/* D2: portal basket + the duplicate portal quotes list fold into the shared basket / my-quotes. */}
       <Route path="/portal/basket">{() => <Redirect to="/basket" />}</Route>
-      <Route path="/portal/quotes">{() => <Redirect to="/my-quotes" />}</Route>
+      <Route path="/portal/quotes">{() => reviewOnly ? <TradeRequests/> : <TradeAccountRoute component={TradeRequests}/>}</Route>
       <Route path="/portal/orders">{() => <PortalRoute component={PortalOrdersPage} />}</Route>
       <Route path="/portal/downloads">{() => <PortalRoute component={PortalDownloadsPage} />}</Route>
 
@@ -247,7 +270,7 @@ function App() {
         <BasketProvider>
           <TooltipProvider>
             <Toaster />
-            <Router />
+            <TradePreviewProvider><Router /></TradePreviewProvider>
             <CookieConsentBanner />
           </TooltipProvider>
         </BasketProvider>
