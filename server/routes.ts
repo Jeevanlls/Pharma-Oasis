@@ -1,3 +1,6 @@
+import { fetchInventoryIntelligence, InventoryLookupError } from "./inventory-intelligence";
+import { verifyCostSource } from "./quote-price-source";
+import { customerQuoteView, customerLineView } from "@shared/trade-intelligence";
 import type { Express, Request, Response, NextFunction } from "express";
 import type { Server } from "http";
 import multer from "multer";
@@ -1027,7 +1030,7 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
   app.get("/api/quotes", requireActiveCustomer, async (req: any, res) => {
     try {
       const quoteList = await storage.getQuotesByUser(req.user.id);
-      res.json(quoteList);
+      res.json(quoteList.map(customerQuoteView));
     } catch (error) {
       console.error("Error fetching quotes:", error);
       res.status(500).json({ message: "Failed to fetch quotes" });
@@ -1043,7 +1046,7 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
       if (quote.userId !== req.user.id && req.user.role !== "admin") {
         return res.status(403).json({ message: "Access denied" });
       }
-      res.json(quote);
+      res.json(req.user.role === "admin" ? quote : customerQuoteView(quote));
     } catch (error) {
       console.error("Error fetching quote:", error);
       res.status(500).json({ message: "Failed to fetch quote" });
@@ -2502,6 +2505,25 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     }
   });
 
+  const intelligenceLimiter = rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: true, legacyHeaders: false });
+  app.get("/api/admin/quotes/:id/intelligence", requireAdmin, intelligenceLimiter, async (req, res) => {
+    res.setHeader("Cache-Control", "private, no-store");
+    try {
+      const id = z.coerce.number().int().positive().parse(req.params.id);
+      const ean = z.string().transform(v => v.replace(/\s/g, "")).pipe(z.string().regex(/^\d{8,14}$/)).parse(req.query.ean);
+      const quote = await storage.getQuote(id);
+      if (!quote) return res.status(404).json({ message: "Quote not found" });
+      const customer = await storage.getUser(quote.userId);
+      const data = await fetchInventoryIntelligence(id, ean, customer?.inventoryCustomerId ?? null);
+      const customerPrice = await pricingV2.effectivePriceForCustomer(quote.userId, ean);
+      res.json({ ...data, customerPrice });
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Enter a valid EAN to look up inventory." });
+      if (error instanceof InventoryLookupError) return res.status(error.status).json({ message: error.message });
+      res.status(503).json({ message: "Product intelligence is temporarily unavailable. You can enter prices manually." });
+    }
+  });
+
   // Single quote with items + customer (for the printable quotation document).
   app.get("/api/admin/quotes/:id", requireAdmin, async (req, res) => {
     try {
@@ -2611,16 +2633,37 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
       if (!["pending", "quoted"].includes(quote.status)) {
         return res.status(400).json({ message: `A ${quote.status} quote can no longer be edited.` });
       }
-      const incoming: any[] = Array.isArray(req.body?.items) ? req.body.items : [];
+      const incoming = z.array(z.object({
+        id: z.number().int().positive().optional(),
+        ean: z.string().max(50).nullable().optional(), description: z.string().max(500).nullable().optional(),
+        quantity: z.number().int().min(1).max(1000000),
+        unitPrice: z.number().finite().min(0).max(99999999.99).nullable(),
+        unitCost: z.number().finite().min(0).max(99999999.99).nullable(),
+        productId: z.number().int().positive().nullable().optional(), priceListItemId: z.number().int().positive().nullable().optional(),
+        sourceToken: z.string().max(6000).nullable().optional(),
+      })).min(1).max(500).parse(req.body?.items);
+      const existingItems = await storage.getQuoteItems(id);
+      const existingById = new Map(existingItems.map(it => [it.id, it]));
       if (incoming.length === 0) return res.status(400).json({ message: "A quote must have at least one line." });
 
       const lines = incoming.map((it) => {
         const quantity = Math.max(1, Number(it.quantity) || 1);
-        const unitPrice = it.unitPrice === null || it.unitPrice === undefined || it.unitPrice === "" ? null : Number(it.unitPrice);
-        const unitCost = it.unitCost === null || it.unitCost === undefined || it.unitCost === "" ? null : Number(it.unitCost);
-        const marginApplied = unitPrice != null && unitCost != null && unitCost > 0 ? ((unitPrice - unitCost) / unitCost) * 100 : (it.marginApplied != null ? Number(it.marginApplied) : null);
+        const unitPrice = it.unitPrice;
+        const unitCost = it.unitCost;
+        const marginApplied = unitPrice != null && unitCost != null && unitCost > 0 ? ((unitPrice - unitCost) / unitCost) * 100 : null;
         const lineTotal = unitPrice != null ? unitPrice * quantity : 0;
+        const ean = quoteEan(it.ean);
+        let pricingSource = null;
+        if (it.sourceToken) {
+          try { pricingSource = verifyCostSource(it.sourceToken, id, ean || "", unitCost, (req as any).user.id, process.env.INVENTORY_INTELLIGENCE_TOKEN || ""); }
+          catch (error) { throw new InventoryLookupError((error as Error).message, 400); }
+        } else {
+          const previous = it.id ? existingById.get(it.id) : undefined;
+          if (previous && previous.ean === ean && previous.unitCost != null && unitCost != null && Number(previous.unitCost) === unitCost)
+            pricingSource = previous.pricingSource;
+        }
         return {
+          pricingSource,
           productId: it.productId ?? null,
           priceListItemId: it.priceListItemId ?? null,
           ean: it.ean ?? null,
@@ -2634,10 +2677,14 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
       });
       const total = lines.reduce((s, l) => s + (l.lineTotal || 0), 0);
 
+      if (lines.some(l => l.marginApplied != null && Math.abs(l.marginApplied) > 9999.99))
+        return res.status(400).json({ message: "The price-to-cost ratio is too large. Check unit and case prices." });
+      if (!Number.isFinite(total) || total > 9999999999.99) return res.status(400).json({ message: "The quote total is too large." });
       const updated = await storage.replaceQuoteItems(id, quoteSnapshotLines(lines), total.toFixed(2));
       await logDealEvent({ dealKind: "quote", dealId: id, type: "priced", actorId: (req as any).user?.id ?? null, message: `Prices saved (${lines.length} line${lines.length === 1 ? "" : "s"}, total £${total.toFixed(2)})` });
       res.json({ ...updated, itemCount: lines.length });
     } catch (error: any) {
+      if (error instanceof InventoryLookupError) return res.status(error.status).json({ message: error.message });
       if (error instanceof z.ZodError) return res.status(400).json({ message: "Invalid input", errors: error.errors });
       console.error("Quote items update error:", error);
       res.status(500).json({ message: "Failed to update quote items" });
@@ -2654,6 +2701,9 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
       if (!["pending", "quoted"].includes(quote.status)) {
         return res.status(400).json({ message: `A ${quote.status} quote cannot be sent.` });
       }
+      const quoteLines = await storage.getQuoteItems(id);
+      if (!quoteLines.length || quoteLines.some(l => l.unitPrice == null || !Number.isFinite(Number(l.unitPrice))))
+        return res.status(400).json({ message: "Set and save a selling price for every line before sending the quotation." });
       const message: string = typeof req.body?.message === "string" ? req.body.message : "";
       const expiryRaw = req.body?.expiryDate;
       const expiryDate = expiryRaw ? new Date(expiryRaw) : null;
@@ -5532,6 +5582,7 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
   function quoteSnapshotLines(lines: any[]) {
     return lines.map(l => ({
       productId: l.productId ?? null, priceListItemId: l.priceListItemId ?? null,
+      pricingSource: l.pricingSource ?? null,
       ean: quoteEan(l.ean), description: l.description ?? null, quantity: l.quantity,
       unitPrice: l.unitPrice != null ? String(l.unitPrice) : null,
       unitCost: l.unitCost != null ? String(l.unitCost) : null,
@@ -5725,7 +5776,7 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
     const found = await pricingStore.getOrderWithItems(Number(req.params.id));
     if (!found) return res.status(404).json({ message: "Order not found" });
     if (found.order.userId !== req.user.id && req.user.role !== "admin") return res.status(403).json({ message: "Access denied" });
-    res.json(found);
+    res.json(req.user.role === "admin" ? found : { order: customerQuoteView(found.order), items: found.items.map(customerLineView) });
   });
 
   // Request a quote / availability from the basket (snapshots prices)
