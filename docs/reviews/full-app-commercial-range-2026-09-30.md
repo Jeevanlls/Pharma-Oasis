@@ -12,7 +12,7 @@ Review only: all active app records matched to the verified Price Manager commer
 - 8,784 products use Image coming soon and remain searchable and quotable.
 - 87 verified PM-linked brand groups; 82 have matching active app products.
 - 15 source-app categories.
-- 106 temporary/non-barcode references remain available, labelled Ref rather than EAN.
+- 489 temporary/non-barcode references remain available, labelled Ref rather than EAN.
 - All previous 289 products and their exact image URLs are retained.
 
 ## Brand detail
@@ -34,7 +34,7 @@ BIOSEN, LIGHTS BY TENA, OLEO, TENA LADY and TENA MEN currently lack an unambiguo
 
 App name, category, product type/status, pack and case details are carried through; only non-archived app rows enter the source export. Commercial grouping uses a unique Price Manager EAN match first, then a normalized app brand match. Explicit aliases supported by source EANs: VALUPAK→ValuePak, Warrior→Warrior Nutrition, Max Dry→MAXXDRY, Nanny→Nanny Care, BYPHASSSE→BYPHASSE, PG TIPS/Lipton→Lipton - PG Tips. This does not rewrite the employee app's brand field. The private audit flags 411 discrepancies between app brand text and the commercial group for later master-data review.
 
-Whitespace is removed from numeric barcode strings; leading zeroes are preserved. Duplicate canonical EANs display once. Temporary NEW- references are retained as product references; no barcode is invented. Existing website IDs and photographs are retained by EAN. New preview-only products have negative app-derived IDs, preventing collisions with positive website IDs. These IDs must not be sent to the production quote backend; the review remains browser-local and all API writes remain blocked.
+Whitespace is removed from numeric barcode strings; leading zeroes are preserved. Only standard 8, 12, 13 or 14 digit lengths are labelled as barcodes. Truncated numeric values remain searchable product references; zeroes are never guessed. Duplicate canonical EANs display once. Temporary NEW- references are retained as product references; no barcode is invented. Existing website IDs and photographs are retained by EAN. New preview-only products have negative app-derived IDs, preventing collisions with positive website IDs. These IDs must not be sent to the production quote backend; the review remains browser-local and all API writes remain blocked.
 
 The app image_url field includes website-page links, example.com placeholders and unverified external sources. These are not automatically treated as approved product photography. Existing website photos remain authoritative for this phase. Other photos can be reviewed/uploaded later without blocking product visibility.
 
@@ -51,3 +51,5 @@ Build passed. No client TypeScript errors; the existing server errors are unchan
 ## Remaining live work
 
 This is a dated review snapshot, not a production import or continuous synchronisation. Connect the production catalogue/quote identity mapping and scheduled sync before launch. Confirm the two additional expected PM brands and the five unresolved app brand mappings. Review master-brand discrepancies and external image URLs separately. Image absence is no longer a publishing gate.
+
+Browser verification on the deployed expanded review: BioGaia count 18; both previously missing EANs display Image coming soon. Pharax Kids Drops opens its detail modal and adds to the quote workspace with the correct EAN/pack size despite having no photo. A subsequent barcode-format correction relabels truncated numeric identifiers as product references without changing product counts.

@@ -19,7 +19,7 @@ def norm(value):
 
 def barcode(value):
     value = re.sub(r"\s+", "", value or "")
-    return value if re.fullmatch(r"[0-9]{8,14}", value) else None
+    return value if re.fullmatch(r"(?:[0-9]{8}|[0-9]{12,14})", value) else None
 
 
 def build(app, web):
