@@ -53,3 +53,9 @@ Build passed. No client TypeScript errors; the existing server errors are unchan
 This is a dated review snapshot, not a production import or continuous synchronisation. Connect the production catalogue/quote identity mapping and scheduled sync before launch. Confirm the two additional expected PM brands and the five unresolved app brand mappings. Review master-brand discrepancies and external image URLs separately. Image absence is no longer a publishing gate.
 
 Browser verification on the deployed expanded review: BioGaia count 18; both previously missing EANs display Image coming soon. Pharax Kids Drops opens its detail modal and adds to the quote workspace with the correct EAN/pack size despite having no photo. A subsequent barcode-format correction relabels truncated numeric identifiers as product references without changing product counts.
+
+## Catalogue presentation update
+
+At Jeevan's request, browsing now places existing photographed products first and rotates between brands instead of opening with a global alphabetical list. The current commercial selections lead the rotation: Myprotein, Aveeno, Nature's Aid, BioGaia, Hawkins & Brimble and Myvitamins. Other brands follow by available range size. Each round takes one product per brand, using a fixed order so products do not repeat or disappear between pages.
+
+The first two pages (24 products each) contain photographs throughout and a mixture of brands. All 9,305 products remain available; products without photos follow the photographed range. Brand/category filters retain photo priority, while searches keep exact EAN matches first regardless of whether a photograph exists. This changes presentation in the review only, not product records or eligibility.
