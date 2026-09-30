@@ -17,6 +17,7 @@ export function usePageTracking(pageTitle?: string) {
   const lastTrackedRef = useRef<{ path: string; title: string } | null>(null);
 
   useEffect(() => {
+    if (import.meta.env.VITE_REVIEW_PREVIEW === "true") return;
     const pathOnly = location.split("?")[0].split("#")[0];
     const title = pageTitle || document.title;
     

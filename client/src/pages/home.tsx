@@ -52,7 +52,8 @@ export default function HomePage() {
       `${isCustomer || isAdmin ? "/portal" : "/products"}?search=${encodeURIComponent(search.trim())}`,
     );
   };
-  const quickHref =
+  const reviewOnly = import.meta.env.VITE_REVIEW_PREVIEW === "true";
+  const quickHref = reviewOnly ? "/portal/quote" :
     isCustomer || isAdmin
       ? "/portal?quick=1"
       : "/login?redirect=%2Fportal%3Fquick%3D1";
@@ -129,7 +130,7 @@ export default function HomePage() {
           <span className="dock-symbol" aria-hidden="true">
             +
           </span>
-          Paste your buying list
+          {reviewOnly ? "Build your quote" : "Paste your buying list"}
         </Link>
       </section>
       <section className="future-edit wrap">
