@@ -21,7 +21,15 @@ const app = express();
 app.set("trust proxy", 1);
 app.use(express.json());
 app.use((_req, res, next) => { res.setHeader("X-Robots-Tag", "noindex, nofollow"); next(); });
-app.get('/objects/*', (req, res) => res.redirect(302, 'https://pharmaoasis.co.uk' + req.originalUrl));
+app.get('/objects/*', async (req, res) => {
+    try {
+        const upstream=await fetch('https://pharmaoasis.co.uk'+req.path);
+        if(!upstream.ok) return res.sendStatus(upstream.status);
+        res.type(upstream.headers.get('content-type')||'application/octet-stream');
+        res.setHeader('Cache-Control','public, max-age=3600');
+        res.send(Buffer.from(await upstream.arrayBuffer()));
+    } catch { res.sendStatus(502); }
+});
 app.get('/healthz', (_req, res) => res.send('OK'));
 app.use((req, res, next) => {
     if (req.path.startsWith('/api/admin') || req.path === '/staff' || req.path.startsWith('/api/auth/2fa') || req.path === '/api/register')

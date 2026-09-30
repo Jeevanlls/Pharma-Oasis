@@ -107,8 +107,8 @@ export const applyCatalogueStatements = [
     FROM catalogue_sync_rows s WHERE s.run_id=$1 AND p.id=s.existing_id AND
     (p.ean,p.product_name,p.brand_id,p.category_id,p.subcategory_id,p.pack_size,p.case_size,p.product_type,p.is_active,p.inventory_product_id,p.inventory_reference,p.inventory_product_ids,p.inventory_data_issues)
     IS DISTINCT FROM (s.reference,s.name,${brandId},${categoryId},NULL::integer,s.pack_size,s.case_size,s.classification,true,s.app_id,s.reference,s.app_ids,s.issues)`,
-    `INSERT INTO products(sku,ean,product_name,brand_id,category_id,pack_size,case_size,product_type,is_active,inventory_product_id,inventory_reference,inventory_product_ids,inventory_data_issues,google_feed_enabled)
-    SELECT 'APP-'||s.app_id,s.reference,s.name,${brandId},${categoryId},s.pack_size,s.case_size,s.classification,true,s.app_id,s.reference,s.app_ids,s.issues,false
+    `INSERT INTO products(sku,slug,ean,product_name,brand_id,category_id,pack_size,case_size,product_type,is_active,inventory_product_id,inventory_reference,inventory_product_ids,inventory_data_issues,google_feed_enabled)
+    SELECT 'APP-'||s.app_id,left(trim(both '-' from regexp_replace(lower(s.name),'[^a-z0-9]+','-','g')),100)||'-app-'||s.app_id,s.reference,s.name,${brandId},${categoryId},s.pack_size,s.case_size,s.classification,true,s.app_id,s.reference,s.app_ids,s.issues,false
     FROM catalogue_sync_rows s WHERE s.run_id=$1 AND s.existing_id IS NULL`,
     `UPDATE products p SET is_active=false,updated_at=now() WHERE p.inventory_reference IS NOT NULL AND p.is_active
     AND NOT EXISTS(SELECT 1 FROM catalogue_sync_rows s WHERE s.run_id=$1 AND s.reference=p.inventory_reference)
