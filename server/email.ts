@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import { escapeEmail, quoteEmailLines, type QuoteEmailLine } from './quote-email-content';
 
 // Zoho India SMTP configuration
 const ZOHO_EMAIL = process.env.ZOHO_EMAIL || 'jeevan@pharmaoasis.com';
@@ -52,37 +53,42 @@ const transporter = ZOHO_PASSWORD ? nodemailer.createTransport({
   host: 'smtp.zoho.in', // Zoho India
   port: 465,
   secure: true, // SSL
+  connectionTimeout: 15000,
+  greetingTimeout: 15000,
+  socketTimeout: 45000,
   auth: {
     user: ZOHO_EMAIL,
     pass: ZOHO_PASSWORD,
   },
 }) : null;
 
-interface EmailResult {
+export interface EmailResult {
   success: boolean;
   error?: string;
 }
 
-async function sendEmail(to: string, subject: string, html: string): Promise<EmailResult> {
+async function sendEmail(to: string, subject: string, html: string, options: { replyTo?: string; messageId?: string } = {}): Promise<EmailResult> {
   if (!transporter) {
-    console.log(`[EMAIL - DEV MODE] Zoho password not configured`);
-    console.log(`[EMAIL - DEV MODE] To: ${to}, Subject: ${subject}`);
-    console.log(`[EMAIL - DEV MODE] Body preview: ${html.substring(0, 200)}...`);
-    return { success: true };
+    console.error("[EMAIL] SMTP credentials are not configured; message was not sent.");
+    return { success: false, error: "SMTP credentials are not configured." };
   }
 
   try {
-    await transporter.sendMail({
+    const info = await transporter.sendMail({
       from: `Pharma Oasis <${ZOHO_EMAIL}>`,
       to,
       subject,
       html,
+      ...options,
     });
+    if (!info.accepted?.length || info.rejected?.length) {
+      return { success: false, error: "The mail server did not accept every recipient. Check the configured notification inboxes." };
+    }
     console.log(`[EMAIL] Sent to ${to}: ${subject}`);
     return { success: true };
   } catch (error: any) {
     console.error(`[EMAIL ERROR] Failed to send to ${to}:`, error?.message || error);
-    return { success: false, error: error?.message || 'Unknown error' };
+    return { success: false, error: "SMTP delivery failed. Check mail credentials and provider logs." };
   }
 }
 
@@ -236,61 +242,28 @@ export async function sendContactFormNotification(data: {
 }
 
 export async function sendQuoteSubmissionNotification(data: {
-  quoteId: number;
-  customerEmail: string;
-  customerName: string;
-  companyName: string;
-  itemCount: number;
-  totalValue: string;
-  enquiryNumber?: string | null;
-  enquiryId?: number | null;
+  quoteId: number; customerEmail: string; customerName: string; companyName: string;
+  itemCount: number; totalValue: string; lines: QuoteEmailLine[];
+  customerPhone?: string | null; customerNotes?: string | null;
+  enquiryNumber?: string | null; enquiryId?: number | null;
 }): Promise<EmailResult> {
-  const subject = data.enquiryNumber
-    ? `New Quote Request ${data.enquiryNumber} from ${data.companyName}`
-    : `New Quote Request #${data.quoteId} from ${data.companyName}`;
-  const html = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <div style="background: #7c3aed; color: white; padding: 20px; text-align: center;">
-        <h1 style="margin: 0;">New Quote Request</h1>
-        <p style="margin: 5px 0 0 0; opacity: 0.9;">Quote #${data.quoteId}</p>
-      </div>
-      <div style="padding: 20px; background: #f8fafc;">
-        <h2 style="color: #7c3aed; margin-top: 0;">Quote Details</h2>
-        <table style="width: 100%; border-collapse: collapse;">
-          <tr>
-            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; font-weight: bold; width: 140px;">Quote ID:</td>
-            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;">#${data.quoteId}</td>
-          </tr>
-          <tr>
-            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; font-weight: bold;">Company:</td>
-            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;">${data.companyName}</td>
-          </tr>
-          <tr>
-            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; font-weight: bold;">Contact:</td>
-            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;">${data.customerName}</td>
-          </tr>
-          <tr>
-            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; font-weight: bold;">Email:</td>
-            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;">${data.customerEmail}</td>
-          </tr>
-          <tr>
-            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; font-weight: bold;">Items:</td>
-            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;">${data.itemCount} product(s)</td>
-          </tr>
-          <tr>
-            <td style="padding: 8px 0; font-weight: bold;">Estimated Total:</td>
-            <td style="padding: 8px 0; font-size: 18px; color: #7c3aed;">${data.totalValue}</td>
-          </tr>
-        </table>
-        ${enquiryBlock(data.enquiryNumber, data.enquiryId)}
-      </div>
-      <div style="padding: 15px; background: #e2e8f0; text-align: center; font-size: 12px; color: #64748b;">
-        This is an automated notification from Pharma Oasis B2B Platform
-      </div>
-    </div>
-  `;
-
-  return sendEmail(ORDER_QUOTE_RECIPIENTS, subject, html);
+  const subject = `New Quote Request Q-${data.quoteId} from ${data.companyName}`;
+  const website = (process.env.APP_URL || 'https://pharmaoasis.co.uk').replace(/\/+$/, '');
+  const html = `<div style="font-family:Arial,sans-serif;max-width:800px;margin:auto;color:#173d37">
+    <h1>New quote request Q-${data.quoteId}</h1>
+    <p><strong>Company:</strong> ${escapeEmail(data.companyName)}<br>
+    <strong>Contact:</strong> ${escapeEmail(data.customerName)}<br>
+    <strong>Email:</strong> ${escapeEmail(data.customerEmail)}<br>
+    <strong>Telephone:</strong> ${escapeEmail(data.customerPhone || 'Not provided')}</p>
+    <p>${data.itemCount} product(s) · ${escapeEmail(data.totalValue)}</p>
+    ${quoteEmailLines(data.lines)}
+    ${data.customerNotes ? `<h2>Customer notes</h2><p style="white-space:pre-wrap">${escapeEmail(data.customerNotes)}</p>` : ''}
+    <p><a href="${escapeEmail(website)}/admin/sales/quote/${data.quoteId}">Open the saved request and respond</a></p>
+    ${data.enquiryNumber ? `<p>Inventory enquiry: ${escapeEmail(data.enquiryNumber)}</p>` : '<p>The request is saved on the website and ready for the sales team. External CRM handoff is separate.</p>'}
+    <p>Reply to this email to contact the customer.</p></div>`;
+  return sendEmail(ORDER_QUOTE_RECIPIENTS, subject, html, {
+    replyTo: data.customerEmail, messageId: `<quote-${data.quoteId}-sales@pharmaoasis.co.uk>`,
+  });
 }
 
 export async function sendAccountApprovalEmail(data: {
@@ -402,6 +375,7 @@ export async function sendQuoteConfirmationToCustomer(data: {
   quoteId: number;
   itemCount: number;
   totalValue: string;
+  lines: QuoteEmailLine[];
 }): Promise<EmailResult> {
   const subject = `Quote Request Received - #${data.quoteId}`;
   const html = `
@@ -411,7 +385,7 @@ export async function sendQuoteConfirmationToCustomer(data: {
         <p style="margin: 5px 0 0 0; opacity: 0.9;">Reference: #${data.quoteId}</p>
       </div>
       <div style="padding: 20px; background: #f8fafc;">
-        <p style="font-size: 16px;">Dear ${data.contactName},</p>
+        <p style="font-size: 16px;">Dear ${escapeEmail(data.contactName)},</p>
         <p>Thank you for your quote request. We have received your submission and our team will review it shortly.</p>
         <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 20px 0;">
           <h3 style="margin-top: 0; color: #1e40af;">Quote Summary</h3>
@@ -426,10 +400,11 @@ export async function sendQuoteConfirmationToCustomer(data: {
             </tr>
             <tr>
               <td style="padding: 5px 0;">Estimated Total:</td>
-              <td style="text-align: right; font-weight: bold; color: #1e40af;">${data.totalValue}</td>
+              <td style="text-align: right; font-weight: bold; color: #1e40af;">${escapeEmail(data.totalValue)}</td>
             </tr>
           </table>
         </div>
+        ${quoteEmailLines(data.lines)}
         <p><strong>What happens next?</strong></p>
         <ol style="color: #374151;">
           <li>Our team will review your quote request</li>
@@ -444,7 +419,7 @@ export async function sendQuoteConfirmationToCustomer(data: {
     </div>
   `;
 
-  return sendEmail(data.email, subject, html);
+  return sendEmail(data.email, subject, html, { messageId: `<quote-${data.quoteId}-customer@pharmaoasis.co.uk>` });
 }
 
 export async function sendContactFormConfirmation(data: {

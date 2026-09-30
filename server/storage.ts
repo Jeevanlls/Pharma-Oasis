@@ -1,5 +1,5 @@
 import { 
-  users, brands, categories, products, quotes, quoteItems, 
+  users, brands, categories, products, quotes, quoteItems, priceListItems, quoteEmailOutbox,
   supplierLeads, cmsBlocks, siteSettings, contactMessages, heroSlides, companyLocations,
   homeStats, homeFeatures, homeCategories, homeProcessSteps, homeSections,
   footerSections, mediaAssets, chatSessions, chatMessages, chatLeads, pageViews,
@@ -34,6 +34,7 @@ import {
   type OfferItem, type InsertOfferItem,
 } from "@shared/schema";
 import { db } from "./db";
+import { quoteLineIdentity, quoteVersionLine } from "@shared/quote-lines";
 import { eq, and, or, ilike, desc, asc, sql, isNull, inArray } from "drizzle-orm";
 
 export interface PublicCatalogueOptions {
@@ -113,6 +114,7 @@ export interface IStorage {
   getQuote(id: number): Promise<Quote | undefined>;
   getQuoteWithItems(id: number): Promise<(Quote & { items: (QuoteItem & { product: Product })[] }) | undefined>;
   createQuote(quote: InsertQuote): Promise<Quote>;
+  createQuoteWithItems(quote: InsertQuote, items: Omit<InsertQuoteItem, "quoteId">[], notify?: boolean): Promise<Quote>;
   updateQuote(id: number, updates: Partial<InsertQuote>): Promise<Quote | undefined>;
   getQuotesByUser(userId: number): Promise<Quote[]>;
   getAllQuotes(): Promise<Quote[]>;
@@ -124,6 +126,7 @@ export interface IStorage {
   createQuoteItem(item: InsertQuoteItem): Promise<QuoteItem>;
   getQuoteItems(quoteId: number): Promise<(QuoteItem & { product: Product })[]>;
   deleteQuoteItems(quoteId: number): Promise<void>;
+  replaceQuoteItems(quoteId: number, items: Omit<InsertQuoteItem, "quoteId">[], totalEstimate: string): Promise<Quote>;
 
   // Supplier Leads
   createSupplierLead(lead: InsertSupplierLead): Promise<SupplierLead>;
@@ -803,6 +806,19 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
+  async createQuoteWithItems(quote: InsertQuote, items: Omit<InsertQuoteItem, "quoteId">[], notify = false): Promise<Quote> {
+    if (!items.length) throw new Error("A quote must contain at least one line");
+    return db.transaction(async tx => {
+      const [created] = await tx.insert(quotes).values(quote).returning();
+      await tx.insert(quoteItems).values(items.map(item => ({ ...item, quoteId: created.id })));
+      if (notify) await tx.insert(quoteEmailOutbox).values([
+        { quoteId: created.id, audience: "sales" },
+        { quoteId: created.id, audience: "customer" },
+      ]);
+      return created;
+    });
+  }
+
   async updateQuote(id: number, updates: Partial<InsertQuote>): Promise<Quote | undefined> {
     const [updated] = await db.update(quotes)
       .set({ ...updates, updatedAt: new Date() })
@@ -866,13 +882,7 @@ export class DatabaseStorage implements IStorage {
       
       if (originalItems.length > 0) {
         await tx.insert(quoteItems).values(
-          originalItems.map(item => ({
-            quoteId: newQuote.id,
-            productId: item.productId,
-            quantity: item.quantity,
-            unitPrice: item.unitPrice,
-            lineTotal: item.lineTotal,
-          }))
+          originalItems.map(item => quoteVersionLine(item, newQuote.id))
         );
       }
       
@@ -890,15 +900,28 @@ export class DatabaseStorage implements IStorage {
     const items = await db.select().from(quoteItems).where(eq(quoteItems.quoteId, quoteId));
     const productIds = items.map(item => item.productId).filter((id): id is number => id != null);
 
-    if (productIds.length === 0) return items.map(item => ({ ...item, product: undefined as any }));
-
-    const productList = await db.select().from(products).where(inArray(products.id, productIds));
+    const listIds = items.map(item => item.priceListItemId).filter((id): id is number => id != null);
+    const productList = productIds.length ? await db.select().from(products).where(inArray(products.id, productIds)) : [];
+    const listItems = listIds.length ? await db.select().from(priceListItems).where(inArray(priceListItems.id, listIds)) : [];
     const productMap = new Map(productList.map(p => [p.id, p]));
+    const listMap = new Map(listItems.map(p => [p.id, p]));
+    return items.map(item => {
+      const product = item.productId != null ? productMap.get(item.productId) : undefined;
+      const listItem = item.priceListItemId != null ? listMap.get(item.priceListItemId) : undefined;
+      return { ...quoteLineIdentity(item, product, listItem), product: product as any };
+    });
+  }
 
-    return items.map(item => ({
-      ...item,
-      product: item.productId != null ? productMap.get(item.productId)! : (undefined as any),
-    }));
+  async replaceQuoteItems(quoteId: number, items: Omit<InsertQuoteItem, "quoteId">[], totalEstimate: string): Promise<Quote> {
+    if (!items.length) throw new Error("A quote must contain at least one line");
+    return db.transaction(async tx => {
+      const [current] = await tx.select().from(quotes).where(eq(quotes.id, quoteId)).for("update");
+      if (!current || !["pending", "quoted"].includes(current.status)) throw new Error("This quote can no longer be edited");
+      await tx.delete(quoteItems).where(eq(quoteItems.quoteId, quoteId));
+      await tx.insert(quoteItems).values(items.map(item => ({ ...item, quoteId })));
+      const [updated] = await tx.update(quotes).set({ totalEstimate, updatedAt: new Date() }).where(eq(quotes.id, quoteId)).returning();
+      return updated;
+    });
   }
 
   async deleteQuoteItems(quoteId: number): Promise<void> {

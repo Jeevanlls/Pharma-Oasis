@@ -208,6 +208,20 @@ export const quoteItems = pgTable("quote_items", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Durable submission notifications, created in the same transaction as the quote.
+export const quoteEmailOutbox = pgTable("quote_email_outbox", {
+  id: serial("id").primaryKey(),
+  quoteId: integer("quote_id").notNull().references(() => quotes.id),
+  audience: varchar("audience", { length: 16 }).notNull(),
+  status: varchar("status", { length: 16 }).notNull().default("pending"),
+  attempts: integer("attempts").notNull().default(0),
+  nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).defaultNow().notNull(),
+  lockedUntil: timestamp("locked_until", { withTimezone: true }),
+  lastError: text("last_error"),
+  sentAt: timestamp("sent_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [unique("quote_email_outbox_quote_audience_unique").on(t.quoteId, t.audience)]);
+
 // ============================================
 // SUPPLIER LEADS TABLE
 // ============================================

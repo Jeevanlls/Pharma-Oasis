@@ -56,7 +56,7 @@ export default function DealWorkspacePage() {
     if (!data || isOrder) return;
     setLines((data.items || []).map((it: any) => ({
       description: it.description ?? it.product?.productName ?? "",
-      ean: it.ean ?? "",
+      ean: it.ean || it.product?.ean || "",
       quantity: it.quantity ?? 1,
       unitPrice: it.unitPrice != null ? String(it.unitPrice) : "",
       unitCost: it.unitCost != null ? String(it.unitCost) : "",
@@ -93,6 +93,12 @@ export default function DealWorkspacePage() {
       apiRequest("POST", `/api/admin/orders/${id}/respond`, payload),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: [qKey] }); setOrderMsg(""); toast({ title: "Customer updated" }); },
     onError: (e: any) => toast({ title: "Couldn't update", description: e?.message, variant: "destructive" }),
+  });
+
+  const retrySalesEmail = useMutation({
+    mutationFn: async () => apiRequest("POST", `/api/admin/quotes/${id}/notify-sales`, {}),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [qKey] }); toast({ title: "Sales notification queued" }); },
+    onError: (e: any) => toast({ title: "Could not queue email", description: e?.message, variant: "destructive" }),
   });
 
   if (isLoading) return <div className="space-y-6"><div className="h-40 animate-pulse rounded-lg bg-muted/40" /></div>;
@@ -135,6 +141,17 @@ export default function DealWorkspacePage() {
   return (
     <div className="space-y-6">
       <BackLink />
+      {!isOrder && <Card><CardContent className="py-4 space-y-2">
+        <h2 className="font-semibold">Quote email delivery</h2>
+        {(data.notifications || []).map((n: any) => <div key={n.audience} className="text-sm">
+          <strong>{n.audience === "sales" ? "Sales team" : "Customer confirmation"}:</strong>{" "}
+          {n.status === "sent" ? "Accepted by mail server" : n.status === "sending" ? "Sending" : n.status === "failed" ? "Failed — action required" : "Queued for delivery"}
+          {n.last_error && <p className="text-destructive">{n.last_error}</p>}
+        </div>)}
+        {!(data.notifications || []).length && <p className="text-sm text-muted-foreground">This older quote has no recorded notification delivery status.</p>}
+        {!(data.notifications || []).some((n: any) => n.audience === "sales" && n.status !== "failed") &&
+          <Button variant="outline" onClick={() => retrySalesEmail.mutate()} disabled={retrySalesEmail.isPending}>Send notification to sales</Button>}
+      </CardContent></Card>}
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>

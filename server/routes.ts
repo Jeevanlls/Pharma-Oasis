@@ -4,6 +4,8 @@ import multer from "multer";
 import rateLimit from "express-rate-limit";
 import { storage } from "./storage";
 import { db } from "./db";
+import { quoteEan } from "@shared/quote-lines";
+import { ensureQuoteOutbox, quoteNotificationStatus, retrySalesNotification, processQuoteEmailQueue } from "./quote-outbox";
 import { 
   loginSchema, 
   customerRegistrationSchema, 
@@ -47,8 +49,6 @@ import {
   sendCustomerRegistrationNotification,
   sendSupplierRegistrationNotification,
   sendContactFormNotification,
-  sendQuoteSubmissionNotification,
-  sendQuoteConfirmationToCustomer,
   sendAccountApprovalEmail,
   sendAccountRejectionEmail,
   sendRegistrationConfirmationToUser,
@@ -126,6 +126,7 @@ function clearTrustedCookie(res: any) {
 }
 
 export async function registerRoutes(server: Server, app: Express): Promise<void> {
+  await ensureQuoteOutbox();
   // Trust proxy for production (required behind reverse proxies like Replit)
   app.set("trust proxy", 1);
 
@@ -978,10 +979,20 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     }
   });
 
+  const quoteRequestSchema = z.object({
+    items: z.array(z.object({
+      productId: z.number().int().positive().optional(),
+      itemId: z.number().int().positive().optional(),
+      quantity: z.number().int().min(1).max(1000000),
+    }).refine(it => (it.productId != null) !== (it.itemId != null), "Provide one product reference"))
+      .min(1).max(500),
+    customerNotes: z.string().max(5000).nullable().optional(),
+  });
+
   // ==================== QUOTE ROUTES (CUSTOMER) ====================
   app.post("/api/quotes", requireActiveCustomer, async (req: any, res) => {
     try {
-      const { items, customerNotes } = req.body;
+      const { items, customerNotes } = quoteRequestSchema.parse(req.body);
 
       if (!items || !Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ message: "Quote must have at least one item" });
@@ -990,63 +1001,21 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
       // Unified single-channel resolver: applies the customer's own price where the
       // product is in one of their assigned lists, else marks it price-on-request.
       // Carries productId + priceListItemId so it behaves identically to portal quotes.
-      const { lines, total } = await buildPricedLines(req.user, items);
-      const quote = await storage.createQuote({
-        userId: req.user.id,
-        status: "pending",
-        customerNotes: customerNotes || null,
-        totalEstimate: total.toFixed(2),
-      });
-      for (const l of lines) {
-        await storage.createQuoteItem({
-          quoteId: quote.id,
-          productId: l.productId ?? null,
-          priceListItemId: l.priceListItemId ?? null,
-          ean: l.ean ?? null,
-          description: l.description ?? null,
-          quantity: l.quantity,
-          unitPrice: l.unitPrice != null ? String(l.unitPrice) : null,
-          unitCost: l.unitCost != null ? String(l.unitCost) : null,
-          marginApplied: l.marginApplied != null ? String(l.marginApplied) : null,
-          lineTotal: l.lineTotal.toFixed(2),
-        });
-      }
-
-      await logDealEvent({ dealKind: "quote", dealId: quote.id, type: "created", actorId: req.user.id, message: "Quote requested by customer" });
-
-      const totalValueFormatted = `£${total.toFixed(2)}`;
-      const name = req.user.primaryContactName || req.user.companyName || req.user.email;
-
-      await sendQuoteConfirmationToCustomer({
-        email: req.user.email,
-        contactName: name,
-        quoteId: quote.id,
-        itemCount: lines.length,
-        totalValue: totalValueFormatted,
-      });
-
-      handoffToInventory({
-        kind: "quote",
-        recordId: quote.id,
-        user: req.user,
-        lines,
-        customerNotes: customerNotes || null,
-        total,
-        notify: (enquiryNumber, enquiryId) =>
-          sendQuoteSubmissionNotification({
-            quoteId: quote.id,
-            customerEmail: req.user.email,
-            customerName: name,
-            companyName: req.user.companyName,
-            itemCount: lines.length,
-            totalValue: totalValueFormatted,
-            enquiryNumber,
-            enquiryId,
-          }),
-      });
+      const { lines, total, allPriced } = await buildPricedLines(req.user, items);
+      const quote = await storage.createQuoteWithItems({
+        userId: req.user.id, status: "pending", customerNotes: customerNotes || null,
+        totalEstimate: allPriced ? total.toFixed(2) : null,
+      }, quoteSnapshotLines(lines), true);
+      await logDealEvent({ dealKind: "quote", dealId: quote.id, type: "created", actorId: req.user.id,
+        message: "Quote requested; sales and customer emails queued." });
+      // Delivery is persisted and independent of any CRM/inventory handoff.
+      void processQuoteEmailQueue();
+      handoffToInventory({ kind: "quote", recordId: quote.id, user: req.user,
+        lines, customerNotes: customerNotes || null, total });
 
       res.status(201).json({ quote, message: "Quote request submitted successfully" });
     } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Invalid quote items or notes", errors: error.errors });
       console.error("Quote creation error:", error);
       res.status(500).json({ message: "Failed to create quote" });
     }
@@ -2517,26 +2486,11 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
       });
       const total = lines.reduce((s, l) => s + (l.lineTotal || 0), 0);
 
-      const quote = await storage.createQuote({
-        userId,
-        status: "pending",
+      const quote = await storage.createQuoteWithItems({
+        userId, status: "pending",
         customerNotes: typeof req.body?.customerNotes === "string" && req.body.customerNotes ? req.body.customerNotes : null,
         totalEstimate: total.toFixed(2),
-      } as any);
-      for (const l of lines) {
-        await storage.createQuoteItem({
-          quoteId: quote.id,
-          productId: null,
-          priceListItemId: null,
-          ean: l.ean,
-          description: l.description,
-          quantity: l.quantity,
-          unitPrice: l.unitPrice != null ? String(l.unitPrice) : null,
-          unitCost: l.unitCost != null ? String(l.unitCost) : null,
-          marginApplied: l.marginApplied != null ? String(l.marginApplied) : null,
-          lineTotal: l.lineTotal.toFixed(2),
-        } as any);
-      }
+      }, quoteSnapshotLines(lines));
       await logDealEvent({ dealKind: "quote", dealId: quote.id, type: "created", actorId: req.user?.id ?? null, message: "Quote created by salesman" });
       res.status(201).json(quote);
     } catch (error: any) {
@@ -2552,9 +2506,26 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
       if (!full) return res.status(404).json({ message: "Quote not found" });
       const customer = await storage.getUser(full.userId);
       const events = await listDealEvents("quote", full.id);
-      res.json({ ...full, customer: customer ? publicUser(customer) : null, events });
+      res.json({ ...full, customer: customer ? publicUser(customer) : null, events, notifications: await quoteNotificationStatus(full.id) });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch quote" });
+    }
+  });
+
+  app.post("/api/admin/quotes/:id/notify-sales", requireAdmin, async (req: any, res) => {
+    try {
+      const id = Number(req.params.id);
+      if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ message: "Invalid quote reference" });
+      if (!await storage.getQuote(id)) return res.status(404).json({ message: "Quote not found" });
+      const queued = await retrySalesNotification(id);
+      if (queued) {
+        await logDealEvent({ dealKind: "quote", dealId: id, type: "email_queued", actorId: req.user.id,
+          message: "Sales notification queued by administrator." });
+        void processQuoteEmailQueue();
+      }
+      res.json({ queued, notifications: await quoteNotificationStatus(id) });
+    } catch {
+      res.status(500).json({ message: "Could not queue the sales notification" });
     }
   });
 
@@ -2660,22 +2631,7 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
       });
       const total = lines.reduce((s, l) => s + (l.lineTotal || 0), 0);
 
-      await storage.deleteQuoteItems(id);
-      for (const l of lines) {
-        await storage.createQuoteItem({
-          quoteId: id,
-          productId: l.productId,
-          priceListItemId: l.priceListItemId,
-          ean: l.ean,
-          description: l.description,
-          quantity: l.quantity,
-          unitPrice: l.unitPrice != null ? String(l.unitPrice) : null,
-          unitCost: l.unitCost != null ? String(l.unitCost) : null,
-          marginApplied: l.marginApplied != null ? String(l.marginApplied) : null,
-          lineTotal: l.lineTotal.toFixed(2),
-        } as any);
-      }
-      const updated = await storage.updateQuote(id, { totalEstimate: total.toFixed(2) } as any);
+      const updated = await storage.replaceQuoteItems(id, quoteSnapshotLines(lines), total.toFixed(2));
       await logDealEvent({ dealKind: "quote", dealId: id, type: "priced", actorId: (req as any).user?.id ?? null, message: `Prices saved (${lines.length} line${lines.length === 1 ? "" : "s"}, total £${total.toFixed(2)})` });
       res.json({ ...updated, itemCount: lines.length });
     } catch (error: any) {
@@ -2711,7 +2667,7 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
       const customer = await storage.getUser(quote.userId);
       const SITE_URL = process.env.SITE_URL || "https://pharmaoasis.co.uk";
       if (customer) {
-        await sendCustomerResponseEmail({
+        const delivery = await sendCustomerResponseEmail({
           email: customer.email,
           contactName: customer.primaryContactName || customer.companyName || customer.email,
           kind: "quote",
@@ -2720,6 +2676,13 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
           message: message || "Your quotation is ready. Please review and accept or decline.",
           documentUrl: `${SITE_URL}/quotes/${id}/print`,
         });
+        if (!delivery.success) {
+          await logDealEvent({ dealKind: "quote", dealId: id, type: "email_failed", actorId: (req as any).user?.id ?? null,
+            message: "Quotation saved, but the customer email failed. Please retry sending." });
+          return res.status(502).json({ message: "Quotation saved, but email delivery failed. Check mail settings and retry.", sent: false });
+        }
+      } else {
+        return res.status(409).json({ message: "Quotation saved, but its customer could not be found.", sent: false });
       }
       await logDealEvent({ dealKind: "quote", dealId: id, type: "sent", actorId: (req as any).user?.id ?? null, message: quote.status === "quoted" ? "Quote re-sent to customer" : "Quote sent to customer" });
       res.json({ ...updated, sent: true });
@@ -5563,6 +5526,17 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
   //   2. productId, EAN in a list → the customer's prepared price for that EAN (priced).
   //   3. productId, not in a list → "price on request": productId kept, unitPrice null.
   // `allPriced` is false if any line is price-on-request (→ quote-only, not a firm order).
+  function quoteSnapshotLines(lines: any[]) {
+    return lines.map(l => ({
+      productId: l.productId ?? null, priceListItemId: l.priceListItemId ?? null,
+      ean: quoteEan(l.ean), description: l.description ?? null, quantity: l.quantity,
+      unitPrice: l.unitPrice != null ? String(l.unitPrice) : null,
+      unitCost: l.unitCost != null ? String(l.unitCost) : null,
+      marginApplied: l.marginApplied != null ? String(l.marginApplied) : null,
+      lineTotal: l.lineTotal.toFixed(2),
+    }));
+  }
+
   async function buildPricedLines(user: any, items: any[]) {
     const lines: any[] = [];
     let total = 0;
@@ -5601,7 +5575,7 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
         lines.push({
           productId: product?.id ?? null,
           priceListItemId: li.id,
-          ean: li.ean ?? product?.ean ?? null,
+          ean: quoteEan(li.ean, product?.ean),
           description: li.description ?? product?.productName ?? null,
           quantity: qty,
           unitCost,
@@ -5615,7 +5589,7 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
         lines.push({
           productId: product.id,
           priceListItemId: null,
-          ean: product.ean ?? null,
+          ean: quoteEan(product.ean),
           description: product.productName ?? null,
           quantity: qty,
           unitCost: null,
@@ -5754,39 +5728,23 @@ Use professional, clean pharmaceutical colors. For baby products use soft pastel
   // Request a quote / availability from the basket (snapshots prices)
   app.post("/api/portal/quotes", requireActiveCustomer, async (req: any, res) => {
     try {
-      const { items, customerNotes } = req.body;
+      const { items, customerNotes } = quoteRequestSchema.parse(req.body);
       if (!Array.isArray(items) || items.length === 0) return res.status(400).json({ message: "Quote must have at least one item" });
-      const { lines, total } = await buildPricedLines(req.user, items);
-      const quote = await storage.createQuote({ userId: req.user.id, status: "pending", customerNotes: customerNotes || null, totalEstimate: total.toFixed(2) });
-      for (const l of lines) {
-        await storage.createQuoteItem({
-          quoteId: quote.id,
-          productId: l.productId ?? null,
-          priceListItemId: l.priceListItemId ?? null,
-          ean: l.ean ?? null,
-          description: l.description ?? null,
-          quantity: l.quantity,
-          unitPrice: l.unitPrice != null ? String(l.unitPrice) : null,
-          unitCost: l.unitCost != null ? String(l.unitCost) : null,
-          marginApplied: l.marginApplied != null ? String(l.marginApplied) : null,
-          lineTotal: l.lineTotal.toFixed(2),
-        });
-      }
-      const totalFmt = `£${total.toFixed(2)}`;
-      const name = req.user.primaryContactName || req.user.companyName || req.user.email;
-      await sendQuoteConfirmationToCustomer({ email: req.user.email, contactName: name, quoteId: quote.id, itemCount: lines.length, totalValue: totalFmt });
-      handoffToInventory({
-        kind: "quote",
-        recordId: quote.id,
-        user: req.user,
-        lines,
-        customerNotes: customerNotes || null,
-        total,
-        notify: (enquiryNumber, enquiryId) =>
-          sendQuoteSubmissionNotification({ quoteId: quote.id, customerEmail: req.user.email, customerName: name, companyName: req.user.companyName || name, itemCount: lines.length, totalValue: totalFmt, enquiryNumber, enquiryId }),
-      });
+      const { lines, total, allPriced } = await buildPricedLines(req.user, items);
+      const quote = await storage.createQuoteWithItems({
+        userId: req.user.id, status: "pending", customerNotes: customerNotes || null,
+        totalEstimate: allPriced ? total.toFixed(2) : null,
+      }, quoteSnapshotLines(lines), true);
+      await logDealEvent({ dealKind: "quote", dealId: quote.id, type: "created", actorId: req.user.id,
+        message: "Quote requested; sales and customer emails queued." });
+      // Delivery is persisted and independent of any CRM/inventory handoff.
+      void processQuoteEmailQueue();
+      handoffToInventory({ kind: "quote", recordId: quote.id, user: req.user,
+        lines, customerNotes: customerNotes || null, total });
+
       res.status(201).json({ quote, message: "Quote request submitted successfully" });
     } catch (error: any) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Invalid quote items or notes", errors: error.errors });
       console.error("Portal quote creation error:", error);
       res.status(500).json({ message: error.message || "Failed to create quote" });
     }
