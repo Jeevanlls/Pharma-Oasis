@@ -124,6 +124,8 @@ export default function DealWorkspacePage() {
   }));
 
   const liveTotal = lines.reduce((s, l) => s + (l.unitPrice === "" ? 0 : Number(l.unitPrice) * l.quantity), 0);
+  const pricedLines = lines.filter(line => line.unitPrice.trim() !== "" && Number.isFinite(Number(line.unitPrice))).length;
+  const fullyPriced = lines.length > 0 && pricedLines === lines.length;
   const marginOf = (price: string, cost: string) => (price !== "" && cost !== "" && Number(cost) > 0 ? `${(((Number(price) - Number(cost)) / Number(cost)) * 100).toFixed(1)}%` : "—");
 
   const updateLine = (i: number, patch: Partial<EditLine>) => { setLines((prev) => prev.map((l, idx) => (idx === i ? { ...l, ...patch } : l))); setDirty(true); };
@@ -238,7 +240,7 @@ export default function DealWorkspacePage() {
                   </div>
                   <div className="flex items-center justify-between border-t p-4">
                     <Button onClick={() => saveItems.mutate()} disabled={!dirty || saveItems.isPending}>{saveItems.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />} Save prices</Button>
-                    <div className="flex gap-6"><span className="text-muted-foreground">Estimated total</span><span className="text-lg font-bold">{money(liveTotal)}</span></div>
+                    <div className="flex flex-wrap justify-end gap-x-6 gap-y-1"><span className="text-muted-foreground">{pricedLines && !fullyPriced ? "Priced subtotal · incomplete" : "Estimated total"}</span><span className="text-lg font-bold">{pricedLines ? money(liveTotal) : "Price on request"}</span></div>
                   </div>
                 </>
               ) : (
@@ -338,7 +340,7 @@ export default function DealWorkspacePage() {
               {customer?.primaryContactName && <div className="text-muted-foreground">{customer.primaryContactName}</div>}
               {customer?.email && <div className="flex items-center gap-2"><Mail className="h-4 w-4 text-muted-foreground" /> <a className="hover:underline" href={`mailto:${customer.email}`}>{customer.email}</a></div>}
               {(customer?.phoneNumber || customer?.phone) && <div className="flex items-center gap-2"><Phone className="h-4 w-4 text-muted-foreground" /> {customer.phoneNumber || customer.phone}</div>}
-              {customer?.id && <Link href={`/admin/users?id=${customer.id}`}><Button variant="ghost" size="sm" className="px-0 mt-1">View account →</Button></Link>}
+              {customer?.id && <Link href={`/admin/users?review=${customer.id}`}><Button variant="ghost" size="sm" className="px-0 mt-1">View account →</Button></Link>}
             </CardContent>
           </Card>
           {!editable && (root.expiryDate || root.leadTime) && (
