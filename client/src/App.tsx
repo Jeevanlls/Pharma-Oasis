@@ -37,6 +37,7 @@ import OffersPage from "@/pages/offers";
 import AboutPage from "@/pages/about";
 import OasisbiomePage from "@/pages/oasisbiome";
 import ReviewAccessPage from "@/pages/review-access";
+import AdminPreview from "@/pages/admin-preview";
 import { TradePreviewProvider } from "@/lib/trade-preview";
 import { TradeCatalogue, TradeDashboard, TradeQuote, TradeRequests, TradeAccess } from "@/pages/trade-preview";
 const reviewOnly = import.meta.env.VITE_REVIEW_PREVIEW === "true";
@@ -150,6 +151,7 @@ function PortalRoute({ component: Component }: { component: React.ComponentType 
 function Router() {
   return (
     <Switch>
+      {reviewOnly && <Route path="/__review/admin/:section?" component={AdminPreview} />}
       <Route path="/" component={HomePage} />
       <Route path="/login">{() => reviewOnly ? <TradeAccess /> : <LoginPage />}</Route>
       {/* Private admin/staff sign-in — intentionally NOT linked from the public site. */}
