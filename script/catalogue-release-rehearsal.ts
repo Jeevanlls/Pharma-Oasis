@@ -36,7 +36,9 @@ app.use((req, res, next) => {
         return res.status(403).json({ message: "Unavailable in launch rehearsal." });
     if (req.path === '/api/auth/login' && req.body?.email !== 'catalogue-test@example.invalid')
         return res.status(403).json({ message: "Fictional rehearsal account only." });
-    if (req.path.startsWith('/api/') && !/^\/api\/(products|brands|categories|trade\/commercial-range|site-settings|offers|auth\/(me|login|logout)|quotes|portal\/(products|brands|categories|orders|quotes|promotions))($|\/|\?)/.test(req.path))
+    if (req.path === '/api/auth/register' && !/^registration-test-[a-z0-9-]+@example\.invalid$/.test(req.body?.email || ''))
+        return res.status(403).json({ message: "Fictional registration fixtures only." });
+    if (req.path.startsWith('/api/') && !/^\/api\/(products|brands|categories|trade\/commercial-range|site-settings|offers|auth\/(me|login|logout|register)|quotes|portal\/(products|brands|categories|orders|quotes|promotions))($|\/|\?)/.test(req.path))
         return res.status(403).json({ message: "Unavailable in launch rehearsal." });
     next();
 });
@@ -48,7 +50,7 @@ app.get('*', (_req, res) => res.sendFile(path.resolve('dist/public/index.html'))
 server.listen(Number(process.env.PORT || 10000), '0.0.0.0');
 
 // Exercise the same metadata-only sync against the fixed test branch.
-if(process.env.APP_CATALOGUE_DATABASE_URL){
+if(process.env.APP_CATALOGUE_DATABASE_URL && process.env.REHEARSAL_SYNC_ENABLED === 'true'){
  const {syncCatalogue}=await import('../server/catalogue-sync');
  void syncCatalogue().then(result=>console.log('REHEARSAL SYNC COMPLETE',JSON.stringify(result))).catch(error=>console.error('REHEARSAL SYNC FAILED',error.message));
 }
