@@ -99,11 +99,11 @@ export default function QuoteDocumentPage() {
             {items.map((it, i) => (
               <tr key={it.id ?? i} className="border-b">
                 <td className="py-2 text-gray-400">{i + 1}</td>
-                <td className="py-2">{it.product?.productName || it.description || "Item"}</td>
-                <td className="py-2 text-gray-600">{it.ean || "—"}</td>
+                <td className="py-2">{it.description || it.product?.productName || "Item"}</td>
+                <td className="py-2 text-gray-600">{it.ean || it.product?.ean || "Not available"}</td>
                 <td className="py-2 text-right">{it.quantity}</td>
                 <td className="py-2 text-right">{money(it.unitPrice)}</td>
-                <td className="py-2 text-right">{money(it.lineTotal)}</td>
+                <td className="py-2 text-right">{it.unitPrice == null ? "On request" : money(it.lineTotal)}</td>
               </tr>
             ))}
             {items.length === 0 && (
@@ -113,7 +113,7 @@ export default function QuoteDocumentPage() {
           <tfoot>
             <tr>
               <td colSpan={5} className="py-3 text-right font-semibold">Total</td>
-              <td className="py-3 text-right font-bold text-lg">{money(total)}</td>
+              <td className="py-3 text-right font-bold text-lg">{items.some(it => it.unitPrice == null) ? "Price on request" : money(total)}</td>
             </tr>
           </tfoot>
         </table>

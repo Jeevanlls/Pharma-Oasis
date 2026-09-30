@@ -290,6 +290,9 @@ async function initializeFullApplication() {
 
     // Register all API routes
     await registerRoutes(httpServer, app);
+    const { startQuoteEmailWorker } = await import("./quote-outbox");
+    const stopQuoteEmailWorker = startQuoteEmailWorker();
+    httpServer.once("close", stopQuoteEmailWorker);
 
     // Error handler
     app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

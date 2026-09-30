@@ -365,10 +365,10 @@ export default function QuoteDetailPage() {
                         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
                           <div className="min-w-0">
                             <h4 className="font-medium leading-tight line-clamp-2">
-                              {item.product?.productName || "Product Unavailable"}
+                              {item.description || item.product?.productName || "Product Unavailable"}
                             </h4>
                             <p className="text-sm text-muted-foreground mt-1">
-                              {item.product?.sku && `SKU: ${item.product.sku}`}
+                              {`EAN: ${item.ean || item.product?.ean || "Not available"}`}
                               {item.product?.packSize && ` | ${item.product.packSize}`}
                             </p>
                           </div>
@@ -382,7 +382,7 @@ export default function QuoteDetailPage() {
                                 <span className="font-medium">£{Number(item.unitPrice).toFixed(2)}</span>
                               </p>
                             )}
-                            {item.lineTotal && (
+                            {item.unitPrice != null && item.lineTotal != null && (
                               <p className="text-sm font-semibold">
                                 £{Number(item.lineTotal).toFixed(2)}
                               </p>
