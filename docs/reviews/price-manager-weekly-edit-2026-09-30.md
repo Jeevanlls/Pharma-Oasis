@@ -44,3 +44,7 @@ Connect the authoritative upstream PM UUID/EAN feed; reconcile the remaining two
 ## Verification
 
 Preview build succeeds. Existing 17 server TypeScript errors remain; no client errors added. Data checks cover the 87-brand scope, 289 unique EANs, image requirements, exact EAN search, combined filters, stable pagination and absence of private pricing fields. Browser verification is recorded after deployment below.
+
+Browser checks on deployed review: all five campaigns and their 15 real photos render; Myvitamins EAN 5055534304143 enters the quote workspace. Changing the headline and pausing the combined Myprotein/Myvitamins campaign persists across navigation and removes it from the scheduled edit (four remain). Original wording and enabled state restored after testing.
+
+Brand directory renders exactly 87 cards; spaced search “my protein” returns Myprotein and its 10 reviewed products. The mobile weekly edit renders all five campaigns with viewport/content width both 375px (no horizontal overflow).
