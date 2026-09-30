@@ -771,46 +771,36 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
   app.get("/api/products", async (req, res) => {
     try {
       const { category, brand, search, featured, limit, offset, page } = req.query;
-      
-      const pageSize = limit ? Math.min(Number(limit), 100) : 24;
-      const pageNum = page ? Math.max(1, Number(page)) : 1;
-      const offsetNum = offset ? Number(offset) : (pageNum - 1) * pageSize;
-      
-      let productList: any[];
-      let totalCount: number;
-      
-      const paginationOpts = { activeOnly: true, limit: pageSize, offset: offsetNum };
-      
-      if (search && typeof search === "string" && search.trim().length > 0) {
-        // Use full-text search for better performance and relevance
-        productList = await storage.searchProductsFullText(search, paginationOpts);
-        totalCount = await storage.getProductCount({ activeOnly: true, search });
-      } else if (category) {
-        const categoryId = Number(category);
-        productList = await storage.getProductsByCategory(categoryId, paginationOpts);
-        totalCount = await storage.getProductCount({ activeOnly: true, categoryId });
-      } else if (brand) {
-        const brandId = Number(brand);
-        productList = await storage.getProductsByBrand(brandId, paginationOpts);
-        totalCount = await storage.getProductCount({ activeOnly: true, brandId });
-      } else {
-        productList = await storage.getAllProducts({
-          activeOnly: true,
-          featuredOnly: featured === "true",
-          limit: pageSize,
-          offset: offsetNum,
-          page: pageNum,
-        });
-        totalCount = await storage.getProductCount({ activeOnly: true });
+      const integer = (value: unknown, fallback: number, minimum: number, maximum: number) => {
+        if (value === undefined) return fallback;
+        const parsed = Number(value);
+        return Number.isSafeInteger(parsed) && parsed >= minimum && parsed <= maximum ? parsed : null;
+      };
+      const pageSize = integer(limit, 24, 1, 100);
+      const pageNum = integer(page, 1, 1, 1000000);
+      const categoryId = integer(category, 0, 1, 2147483647);
+      const brandId = integer(brand, 0, 1, 2147483647);
+      const explicitOffset = integer(offset, 0, 0, 100000000);
+      if ([pageSize, pageNum, categoryId, brandId, explicitOffset].some(v => v === null)
+          || (search !== undefined && typeof search !== "string")) {
+        return res.status(400).json({ message: "Invalid catalogue filters or pagination" });
       }
-      
+      const offsetNum = offset !== undefined ? explicitOffset! : (pageNum! - 1) * pageSize!;
+      const { products: productList, total: totalCount } = await storage.getPublicCatalogue({
+        categoryId: categoryId || undefined,
+        brandId: brandId || undefined,
+        search: search as string | undefined,
+        featuredOnly: featured === "true",
+        limit: pageSize!, offset: offsetNum,
+      });
+
       res.json({
         products: productList,
         pagination: {
           page: pageNum,
           pageSize,
           total: totalCount,
-          totalPages: Math.ceil(totalCount / pageSize),
+          totalPages: Math.ceil(totalCount / pageSize!),
         }
       });
     } catch (error) {
@@ -822,12 +812,13 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
   app.get("/api/products/search", async (req, res) => {
     try {
       const query = (req.query.q as string || "").trim();
-      const limit = Math.min(Number(req.query.limit) || 10, 50);
+      const requestedLimit = Number(req.query.limit ?? 10);
+      const limit = Number.isSafeInteger(requestedLimit) && requestedLimit > 0 ? Math.min(requestedLimit, 50) : 10;
       if (!query) {
         return res.json([]);
       }
-      const results = await storage.searchProductsFullText(query, { limit, offset: 0 });
-      res.json(results);
+      const result = await storage.getPublicCatalogue({ search: query, limit, offset: 0 });
+      res.json(result.products);
     } catch (error) {
       console.error("Error searching products:", error);
       res.status(500).json({ message: "Failed to search products" });
@@ -845,7 +836,7 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
       if (!product) {
         product = await storage.getProductBySlug(param);
       }
-      if (!product) {
+      if (!product || !product.isActive) {
         return res.status(404).json({ message: "Product not found" });
       }
       storage.trackProductView(product.id).catch(() => {});
@@ -868,7 +859,7 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
         res.set("Cache-Control", "public, max-age=60");
         return res.json(brandsCache.data);
       }
-      const brandList = await storage.getAllBrands(true);
+      const brandList = await storage.getAllBrands(true, true);
       brandsCache = { data: brandList, timestamp: Date.now() };
       res.set("Cache-Control", "public, max-age=60");
       res.json(brandList);
@@ -884,7 +875,7 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
         res.set("Cache-Control", "public, max-age=60");
         return res.json(categoriesCache.data);
       }
-      const categoryList = await storage.getAllCategories(true);
+      const categoryList = await storage.getAllCategories(true, true);
       categoriesCache = { data: categoryList, timestamp: Date.now() };
       res.set("Cache-Control", "public, max-age=60");
       res.json(categoryList);
@@ -1297,7 +1288,7 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
         return res.status(404).json({ message: "Offer not found" });
       }
       const items = await storage.getOfferItems(offer.id);
-      res.json(items);
+      res.json(items.filter(item => item.product.isActive));
     } catch (error) {
       console.error("Error fetching offer items:", error);
       res.status(500).json({ message: "Failed to fetch offer items" });

@@ -36,6 +36,15 @@ import {
 import { db } from "./db";
 import { eq, and, or, ilike, desc, asc, sql, isNull, inArray } from "drizzle-orm";
 
+export interface PublicCatalogueOptions {
+  search?: string;
+  categoryId?: number;
+  brandId?: number;
+  featuredOnly?: boolean;
+  limit?: number;
+  offset?: number;
+}
+
 export interface IStorage {
   // Users
   getUser(id: number): Promise<User | undefined>;
@@ -52,7 +61,7 @@ export interface IStorage {
   createBrand(brand: InsertBrand): Promise<Brand>;
   updateBrand(id: number, updates: Partial<InsertBrand>): Promise<Brand | undefined>;
   deleteBrand(id: number): Promise<void>;
-  getAllBrands(activeOnly?: boolean): Promise<Brand[]>;
+  getAllBrands(activeOnly?: boolean, withLiveProducts?: boolean): Promise<Brand[]>;
 
   // Categories
   getCategory(id: number): Promise<Category | undefined>;
@@ -60,13 +69,14 @@ export interface IStorage {
   createCategory(category: InsertCategory): Promise<Category>;
   updateCategory(id: number, updates: Partial<InsertCategory>): Promise<Category | undefined>;
   deleteCategory(id: number): Promise<void>;
-  getAllCategories(activeOnly?: boolean): Promise<Category[]>;
+  getAllCategories(activeOnly?: boolean, withLiveProducts?: boolean): Promise<Category[]>;
   getTopLevelCategories(activeOnly?: boolean): Promise<Category[]>;
   getSubcategories(parentId: number, activeOnly?: boolean): Promise<Category[]>;
 
   // Products
   getProduct(id: number): Promise<Product | undefined>;
   getProductBySlug(slug: string): Promise<Product | undefined>;
+  getPublicCatalogue(options?: PublicCatalogueOptions): Promise<{ products: Product[]; total: number }>;
   getProductBySku(sku: string): Promise<Product | undefined>;
   createProduct(product: InsertProduct): Promise<Product>;
   updateProduct(id: number, updates: Partial<InsertProduct>): Promise<Product | undefined>;
@@ -282,11 +292,13 @@ export class DatabaseStorage implements IStorage {
     await db.delete(brands).where(eq(brands.id, id));
   }
 
-  async getAllBrands(activeOnly = false): Promise<Brand[]> {
-    if (activeOnly) {
-      return db.select().from(brands).where(eq(brands.isActive, true)).orderBy(asc(brands.name));
-    }
-    return db.select().from(brands).orderBy(asc(brands.name));
+  async getAllBrands(activeOnly = false, withLiveProducts = false): Promise<Brand[]> {
+    const conditions = [];
+    if (activeOnly) conditions.push(eq(brands.isActive, true));
+    if (withLiveProducts) conditions.push(sql`EXISTS (
+      SELECT 1 FROM ${products} WHERE ${products.brandId} = ${brands.id} AND ${products.isActive} = true
+    )`);
+    return db.select().from(brands).where(and(...conditions)).orderBy(asc(brands.name));
   }
 
   // ==================== CATEGORIES ====================
@@ -326,11 +338,14 @@ export class DatabaseStorage implements IStorage {
     await db.delete(categories).where(eq(categories.id, id));
   }
 
-  async getAllCategories(activeOnly = false): Promise<Category[]> {
-    if (activeOnly) {
-      return db.select().from(categories).where(eq(categories.isActive, true)).orderBy(asc(categories.name));
-    }
-    return db.select().from(categories).orderBy(asc(categories.name));
+  async getAllCategories(activeOnly = false, withLiveProducts = false): Promise<Category[]> {
+    const conditions = [];
+    if (activeOnly) conditions.push(eq(categories.isActive, true));
+    if (withLiveProducts) conditions.push(sql`EXISTS (
+      SELECT 1 FROM ${products} WHERE ${products.isActive} = true
+      AND (${products.categoryId} = ${categories.id} OR ${products.subcategoryId} = ${categories.id})
+    )`);
+    return db.select().from(categories).where(and(...conditions)).orderBy(asc(categories.name));
   }
 
   async getTopLevelCategories(activeOnly = false): Promise<Category[]> {
@@ -376,6 +391,43 @@ export class DatabaseStorage implements IStorage {
 
   async deleteProduct(id: number): Promise<void> {
     await db.delete(products).where(eq(products.id, id));
+  }
+
+  /** One predicate for results and count: search, brand and category always combine.
+   * Stable ordering avoids repeats between pages; barcodes stay strings. */
+  async getPublicCatalogue(options: PublicCatalogueOptions = {}): Promise<{ products: Product[]; total: number }> {
+    const { categoryId, brandId, featuredOnly, limit = 24, offset = 0 } = options;
+    const search = options.search?.trim();
+    const conditions = [eq(products.isActive, true)];
+    if (categoryId) conditions.push(or(eq(products.categoryId, categoryId), eq(products.subcategoryId, categoryId))!);
+    if (brandId) conditions.push(eq(products.brandId, brandId));
+    if (featuredOnly) conditions.push(eq(products.isFeatured, true));
+    if (search) {
+      // Treat '%' and '_' literally. Do not turn a broad fuzzy similarity into
+      // unrelated medicine/pack matches when someone supplies an exact EAN.
+      const contains = `%${search.replace(/[\\%_]/g, "\\$&")}%`;
+      const barcode = /^[0-9][0-9 -]*$/.test(search);
+      const identityMatch = or(ilike(products.ean, contains), ilike(products.sku, contains));
+      conditions.push(barcode ? identityMatch! : or(
+        identityMatch,
+        ilike(products.productName, contains),
+        ilike(brands.name, contains),
+        sql`to_tsvector('english', coalesce(${products.productName}, '') || ' ' || coalesce(${products.shortDescription}, '')) @@ plainto_tsquery('english', ${search})`,
+      )!);
+    }
+    const predicate = and(...conditions);
+    const [rows, counts] = await Promise.all([
+      db.select({ product: products }).from(products)
+        .leftJoin(brands, eq(products.brandId, brands.id)).where(predicate)
+        .orderBy(
+          search ? sql`CASE WHEN ${products.ean} = ${search} OR ${products.sku} = ${search} THEN 0 ELSE 1 END` : sql`0 + 0`,
+          sql`${brands.isDirectDistributor} DESC NULLS LAST`,
+          sql`${products.imageUrl} IS NULL`, asc(products.productName), asc(products.id),
+        ).limit(limit).offset(offset),
+      db.select({ count: sql<number>`count(*)` }).from(products)
+        .leftJoin(brands, eq(products.brandId, brands.id)).where(predicate),
+    ]);
+    return { products: rows.map(r => r.product), total: Number(counts[0]?.count ?? 0) };
   }
 
   async getAllProducts(options: { activeOnly?: boolean; featuredOnly?: boolean; limit?: number; offset?: number; page?: number } = {}): Promise<Product[]> {

@@ -51,11 +51,11 @@ export default function AdminSeoPage() {
   const products = productsData?.products;
 
   const { data: brands, isLoading: brandsLoading } = useQuery<Brand[]>({
-    queryKey: ["/api/brands"],
+    queryKey: ["/api/admin/brands"],
   });
 
   const { data: categories, isLoading: categoriesLoading } = useQuery<Category[]>({
-    queryKey: ["/api/categories"],
+    queryKey: ["/api/admin/categories"],
   });
 
   const updateProductSeoMutation = useMutation({
@@ -78,6 +78,7 @@ export default function AdminSeoPage() {
       return apiRequest("PATCH", `/api/admin/brands/${id}/seo`, data);
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/brands"] });
       queryClient.invalidateQueries({ queryKey: ["/api/brands"] });
       toast({ title: "Brand SEO updated successfully" });
       setIsDialogOpen(false);
@@ -93,6 +94,7 @@ export default function AdminSeoPage() {
       return apiRequest("PATCH", `/api/admin/categories/${id}/seo`, data);
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/categories"] });
       queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
       toast({ title: "Category SEO updated successfully" });
       setIsDialogOpen(false);
