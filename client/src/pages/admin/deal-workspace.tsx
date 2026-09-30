@@ -1,3 +1,5 @@
+import { QuoteIntelligence } from "@/components/admin/quote-intelligence";
+import type { PricingSource } from "@shared/trade-intelligence";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -27,7 +29,7 @@ const statusBadge: Record<string, { label: string; variant: "default" | "seconda
 const money = (v: any) => (v == null || v === "" ? "—" : `£${Number(v).toFixed(2)}`);
 const fmt = (d: any) => (d ? format(new Date(d), "d MMM yyyy, HH:mm") : null);
 
-interface EditLine { description: string; ean: string; quantity: number; unitPrice: string; unitCost: string; productId: number | null; priceListItemId: number | null }
+interface EditLine { id?: number; sourceToken?: string | null; pricingSource?: PricingSource | null; description: string; ean: string; quantity: number; unitPrice: string; unitCost: string; productId: number | null; priceListItemId: number | null }
 
 export default function DealWorkspacePage() {
   const params = useParams();
@@ -51,10 +53,13 @@ export default function DealWorkspacePage() {
   const status = root?.status as string;
   const editable = !isOrder && ["pending", "quoted"].includes(status);
 
+  useEffect(() => { setDirty(false); setLines([]); }, [id, kind]);
+
   // Seed editable line state once data arrives.
   useEffect(() => {
-    if (!data || isOrder) return;
+    if (!data || isOrder || dirty) return;
     setLines((data.items || []).map((it: any) => ({
+      id: it.id, pricingSource: it.pricingSource ?? null, sourceToken: null,
       description: it.description ?? it.product?.productName ?? "",
       ean: it.ean || it.product?.ean || "",
       quantity: it.quantity ?? 1,
@@ -213,7 +218,7 @@ export default function DealWorkspacePage() {
                         <div className="grid grid-cols-2 sm:grid-cols-12 gap-2 items-end">
                           <div className="sm:col-span-4">
                             <label className="text-[11px] uppercase tracking-wide text-muted-foreground">EAN</label>
-                            <Input className="h-9 font-mono text-xs" value={l.ean} placeholder="Barcode" onChange={(e) => updateLine(i, { ean: e.target.value })} />
+                            <Input className="h-9 font-mono text-xs" value={l.ean} placeholder="Barcode" onChange={(e) => updateLine(i, { ean: e.target.value, productId: null, priceListItemId: null, sourceToken: null, pricingSource: null })} />
                           </div>
                           <div className="sm:col-span-2">
                             <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Qty</label>
@@ -221,20 +226,24 @@ export default function DealWorkspacePage() {
                           </div>
                           <div className="sm:col-span-2">
                             <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Cost £</label>
-                            <Input className="h-9 text-right" type="number" min={0} step="0.01" value={l.unitCost} placeholder="—" onChange={(e) => updateLine(i, { unitCost: e.target.value })} />
+                            <Input className="h-9 text-right" type="number" min={0} step="0.01" value={l.unitCost} placeholder="—" onChange={(e) => updateLine(i, { unitCost: e.target.value, sourceToken: null, pricingSource: null })} />
                           </div>
                           <div className="sm:col-span-2">
                             <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Unit price £</label>
                             <Input className="h-9 text-right" type="number" min={0} step="0.01" value={l.unitPrice} placeholder="On request" onChange={(e) => updateLine(i, { unitPrice: e.target.value })} />
                           </div>
                           <div className="sm:col-span-2 text-right">
-                            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Margin · Line</div>
+                            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Markup · Line</div>
                             <div className="text-sm h-9 flex items-center justify-end gap-1">
                               <span className="text-muted-foreground">{marginOf(l.unitPrice, l.unitCost)}</span>
                               <span className="font-semibold">{l.unitPrice === "" ? "—" : money(Number(l.unitPrice) * l.quantity)}</span>
                             </div>
                           </div>
                         </div>
+                        <QuoteIntelligence key={`${id}-${l.ean}-${i}`} quoteId={id} ean={l.ean} quantity={l.quantity}
+                          currentCost={l.unitCost} currentPrice={l.unitPrice} savedSource={l.pricingSource}
+                          onApply={patch => { updateLine(i, patch); toast({ title: "Applied to quote line", description: "Use Save prices to keep these changes." }); }} />
+                        {l.sourceToken && <p className="text-xs text-primary">Inventory cost selected · save prices to record its source.</p>}
                       </div>
                     ))}
                   </div>
@@ -246,7 +255,7 @@ export default function DealWorkspacePage() {
               ) : (
                 <>
                   <Table>
-                    <TableHeader><TableRow><TableHead>Item</TableHead><TableHead>EAN</TableHead><TableHead className="text-right">Qty</TableHead><TableHead className="text-right">Cost</TableHead><TableHead className="text-right">Margin</TableHead><TableHead className="text-right">Unit price</TableHead><TableHead className="text-right">Line total</TableHead></TableRow></TableHeader>
+                    <TableHeader><TableRow><TableHead>Item</TableHead><TableHead>EAN</TableHead><TableHead className="text-right">Qty</TableHead><TableHead className="text-right">Cost</TableHead><TableHead className="text-right">Markup</TableHead><TableHead className="text-right">Unit price</TableHead><TableHead className="text-right">Line total</TableHead></TableRow></TableHeader>
                     <TableBody>
                       {roLines.length === 0 ? (<TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No line items.</TableCell></TableRow>) : roLines.map((l: any, i: number) => (
                         <TableRow key={i}>
@@ -309,12 +318,13 @@ export default function DealWorkspacePage() {
                 <div><label className="text-sm font-medium">Message to customer (sent with the quote)</label><Textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="e.g. Pleased to quote as below; prices held until the validity date." /></div>
                 <div><label className="text-sm font-medium">Internal note (private)</label><Textarea value={internalNote} onChange={(e) => setInternalNote(e.target.value)} placeholder="Notes for the team — not shown to the customer." /></div>
                 <div className="flex flex-wrap gap-3">
-                  <Button onClick={() => sendQuote.mutate()} disabled={sendQuote.isPending || dirty} title={dirty ? "Save prices first" : undefined}>{sendQuote.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />} {status === "quoted" ? "Re-send quote" : "Send quote"}</Button>
+                  <Button onClick={() => sendQuote.mutate()} disabled={sendQuote.isPending || dirty || !fullyPriced} title={dirty ? "Save prices first" : undefined}>{sendQuote.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />} {status === "quoted" ? "Re-send quote" : "Send quote"}</Button>
                   {status === "quoted" && (<>
                     <Button variant="outline" onClick={() => setStatus.mutate("accepted")} disabled={setStatus.isPending}><Check className="h-4 w-4 mr-2" /> Mark accepted</Button>
                     <Button variant="outline" onClick={() => setStatus.mutate("declined")} disabled={setStatus.isPending}><X className="h-4 w-4 mr-2" /> Mark declined</Button>
                   </>)}
                 </div>
+                {!fullyPriced && <p className="text-xs text-amber-600">Set a selling price for every line before sending.</p>}
                 {dirty && <p className="text-xs text-amber-600">You have unsaved price changes — save before sending.</p>}
               </CardContent>
             </Card>

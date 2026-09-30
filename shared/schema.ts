@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, decimal, varchar, unique } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, decimal, varchar, unique, jsonb } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -203,6 +203,7 @@ export const quoteItems = pgTable("quote_items", {
   quantity: integer("quantity").notNull(),
   unitPrice: decimal("unit_price", { precision: 10, scale: 2 }),
   unitCost: decimal("unit_cost", { precision: 10, scale: 2 }), // snapshot of cost at submission
+  pricingSource: jsonb("pricing_source").$type<import("./trade-intelligence").PricingSource>(),
   marginApplied: decimal("margin_applied", { precision: 6, scale: 2 }), // snapshot of margin %
   lineTotal: decimal("line_total", { precision: 12, scale: 2 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -606,7 +607,7 @@ export type InsertQuote = z.infer<typeof insertQuoteSchema>;
 export type Quote = typeof quotes.$inferSelect;
 
 // Quote item schemas
-export const insertQuoteItemSchema = createInsertSchema(quoteItems).omit({
+export const insertQuoteItemSchema = createInsertSchema(quoteItems, { pricingSource: z.custom<import("./trade-intelligence").PricingSource>().nullable().optional() }).omit({
   id: true,
   createdAt: true,
 });

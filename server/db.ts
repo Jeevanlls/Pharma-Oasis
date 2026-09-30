@@ -245,6 +245,7 @@ pool.query(`
   ALTER TABLE users ADD COLUMN IF NOT EXISTS two_factor_enabled BOOLEAN NOT NULL DEFAULT false;
   ALTER TABLE users ADD COLUMN IF NOT EXISTS two_factor_backup_codes TEXT;
   ALTER TABLE quote_items ADD COLUMN IF NOT EXISTS unit_cost DECIMAL(10,2);
+  ALTER TABLE quote_items ADD COLUMN IF NOT EXISTS pricing_source JSONB;
   ALTER TABLE quotes ADD COLUMN IF NOT EXISTS lead_time VARCHAR(160);
   -- Handoff to the inventory app: which enquiry this became, when it landed,
   -- and why it did not if it did not. Null pushed_at + non-null error = needs a retry.

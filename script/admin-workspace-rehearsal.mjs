@@ -53,6 +53,25 @@ export function createRehearsal() {
   app.get('/api/admin/orders', (req, res) => res.json(req.query.archived === 'true' ? [] : orders));
   app.get('/api/admin/orders/stats', (_req, res) => res.json({ newCount: 1, toFulfil: 1, doneThisWeek: 0, activeTotal: 2 }));
   app.get('/api/admin/stats', (_req, res) => res.json({ totalProducts: products.length, pendingQuotes: 2, activeCustomers: 2 }));
+  app.get('/api/admin/quotes/:id/intelligence', (req, res) => {
+    const ean = String(req.query.ean || '');
+    const product = products.find(p => p.ean === ean);
+    if (!product) return res.status(404).json({ message: 'No fictional product matches this EAN.' });
+    const fetchedAt = new Date().toISOString();
+    res.json({ product: { id: product.id, ean, name: product.productName, brand: 'Example Wellness', packSize: '60 tablets', caseSize: 12 },
+      fetchedAt, customerLinked: true, warnings: ['Fictional records for testing the quotation interface.'],
+      inventory: { onHand: 9, allocated: 24, available: -15, incoming: 60 },
+      costOptions: [
+        { source: 'last_purchase', unitCost: '4.99', currency: 'GBP', supplierId: 1, supplierName: 'Example Wellness Supply', reference: 'GRN-EXAMPLE', priceDate: '2026-09-29', token: 'fictional', fetchedAt, ean, productRef: product.id },
+        { source: 'supplier_price', unitCost: '4.92', currency: 'GBP', supplierId: 1, supplierName: 'Example Wellness Supply', reference: 'Older offer', priceDate: '2026-03-05', token: 'fictional', fetchedAt, ean, productRef: product.id },
+        { source: 'supplier_price', unitCost: '5.50', currency: 'EUR', supplierId: 2, supplierName: 'Example European Supply', reference: 'EU-EXAMPLE', priceDate: '2026-09-29', fetchedAt, ean, productRef: product.id }
+      ],
+      customerPrice: { price: 6.49, scope: 'brand', listId: 9001 },
+      pricing: { recommendations: { suggestedMinPrice: '5.66', suggestedMaxPrice: '6.46', optimalPricePoint: '6.46', confidence: 'high' }, reasoning: 'Fictional indicative pricing.', dealPerformance: { wonDeals: 10, lostDeals: 0, winRate: '100' } },
+      customerSales: [{ reference: 'INV-EXAMPLE', date: '2026-09-28', quantity: 24, unitPrice: '6.49', currency: 'GBP', customerName: 'Example North Pharmacy' }],
+      sales: [], purchases: [{ source: 'Goods in', reference: 'GRN-EXAMPLE', date: '2026-09-29', quantity: 60, unitCost: '4.99', currency: 'GBP', supplierName: 'Example Wellness Supply' }]
+    });
+  });
   app.get('/api/admin/quotes/:id', (req, res) => {
     const quote = quotes.find(row => row.id === Number(req.params.id));
     if (!quote) return res.status(404).json({ message: 'No such fictional quote.' });
