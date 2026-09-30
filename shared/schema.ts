@@ -203,7 +203,7 @@ export const quoteItems = pgTable("quote_items", {
   quoteId: integer("quote_id").notNull(),
   productId: integer("product_id"), // legacy catalogue product (nullable in v2)
   priceListItemId: integer("price_list_item_id"), // v2: the prepared list line quoted
-  ean: varchar("ean", { length: 50 }),
+  ean: text("ean"),
   description: varchar("description", { length: 500 }),
   quantity: integer("quantity").notNull(),
   unitPrice: decimal("unit_price", { precision: 10, scale: 2 }),
@@ -1449,7 +1449,7 @@ export const orderItems = pgTable("order_items", {
   orderId: integer("order_id").notNull(),
   productId: integer("product_id"), // legacy catalogue product (nullable in v2)
   priceListItemId: integer("price_list_item_id"), // v2: the prepared list line ordered
-  ean: varchar("ean", { length: 50 }), // snapshot for standalone display
+  ean: text("ean"), // snapshot for standalone display
   description: varchar("description", { length: 500 }), // snapshot product name
   quantity: integer("quantity").notNull(),
   unitCost: decimal("unit_cost", { precision: 10, scale: 2 }), // snapshot

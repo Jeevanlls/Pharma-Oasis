@@ -46,3 +46,9 @@ await registerRoutes(server, app);
 app.use(express.static(path.resolve('dist/public')));
 app.get('*', (_req, res) => res.sendFile(path.resolve('dist/public/index.html')));
 server.listen(Number(process.env.PORT || 10000), '0.0.0.0');
+
+// Exercise the same metadata-only sync against the fixed test branch.
+if(process.env.APP_CATALOGUE_DATABASE_URL){
+ const {syncCatalogue}=await import('../server/catalogue-sync');
+ void syncCatalogue().then(result=>console.log('REHEARSAL SYNC COMPLETE',JSON.stringify(result))).catch(error=>console.error('REHEARSAL SYNC FAILED',error.message));
+}

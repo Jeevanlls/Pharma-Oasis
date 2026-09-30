@@ -84,6 +84,8 @@ export const catalogueSchemaStatements = [
     `CREATE TABLE IF NOT EXISTS catalogue_sync_rows (run_id uuid NOT NULL REFERENCES catalogue_sync_runs(id), reference text NOT NULL, app_id integer NOT NULL, app_ids jsonb NOT NULL, existing_id integer, name text NOT NULL, brand text NOT NULL, category text NOT NULL, pack_size text, case_size text, classification text, issues jsonb NOT NULL, PRIMARY KEY(run_id,reference))`,
     `ALTER TABLE products ADD COLUMN IF NOT EXISTS inventory_product_id integer, ADD COLUMN IF NOT EXISTS inventory_reference text, ADD COLUMN IF NOT EXISTS inventory_product_ids jsonb, ADD COLUMN IF NOT EXISTS inventory_data_issues jsonb, ADD COLUMN IF NOT EXISTS catalogue_sort_rank integer`,
     `ALTER TABLE products ALTER COLUMN ean TYPE text, ALTER COLUMN pack_size TYPE text`,
+    `ALTER TABLE quote_items ALTER COLUMN ean TYPE text`,
+    `ALTER TABLE order_items ALTER COLUMN ean TYPE text`,
     `CREATE UNIQUE INDEX IF NOT EXISTS products_inventory_reference_unique ON products(inventory_reference) WHERE inventory_reference IS NOT NULL`,
     `CREATE UNIQUE INDEX IF NOT EXISTS products_inventory_id_unique ON products(inventory_product_id) WHERE inventory_product_id IS NOT NULL`,
     `CREATE UNIQUE INDEX IF NOT EXISTS products_live_ean_unique ON products((regexp_replace(ean,'\\s','','g'))) WHERE is_active AND nullif(ean,'') IS NOT NULL`,
