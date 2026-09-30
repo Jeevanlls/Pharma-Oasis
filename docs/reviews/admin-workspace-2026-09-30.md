@@ -35,7 +35,13 @@ No database migration, production release or CRM integration is included.
 - Review production build succeeds.
 - TypeScript reports the same 17 existing server errors; none concern these changes.
 - Git whitespace validation passes.
-- Browser verification of the published preview follows deployment.
+- Preview host check: admin route serves, private APIs and write requests return
+  403, no upstream calls occur.
+- Published browser checks: three-character EAN search, quote totals and refresh
+  persistence, EANs and quantities in the email preview, new sample quotation,
+  customer review, catalogue typing focus and campaign draft editing pass.
+- Mobile review uses `/__review/mobile?path=/__review/admin`; table overflow is
+  contained within the table region.
 
 Before live adoption, map the proposed workspace actions to the existing
 authenticated APIs and permission checks, preserve transactional and EAN history,
