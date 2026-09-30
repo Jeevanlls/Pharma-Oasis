@@ -24,3 +24,13 @@ test("public catalogue allowlist excludes all price, supplier and source audit f
  const result=publicProduct({id:1,ean:"0123456789012",productName:"Example",activeCostPrice:"4.99",wholesalePrice:"9.99",rrp:"19.99",notesInternal:"private",inventoryDataIssues:["review"],inventoryProductIds:[1,2],password:"not public"});
  assert.equal(result.ean,"0123456789012");for(const key of ["activeCostPrice","wholesalePrice","rrp","notesInternal","inventoryDataIssues","inventoryProductIds","password"])assert.equal(key in result,false);
 });
+
+import {quoteQuantity} from "../shared/quote-quantity";
+test("quote cases convert to units once and unknown case sizes are rejected",()=>{
+ assert.equal(quoteQuantity({quantity:"3",unit:"cases",product:{caseSize:12}}),36);
+ assert.equal(quoteQuantity({quantity:"36",unit:"units",product:{caseSize:12}}),36);
+ for(const quantity of ["0","-2","1.5","","1000001"])
+  assert.throws(()=>quoteQuantity({quantity,unit:"units",product:{}}));
+ assert.throws(()=>quoteQuantity({quantity:"1",unit:"cases",product:{}}));
+ assert.throws(()=>quoteQuantity({quantity:"100000",unit:"cases",product:{caseSize:12}}));
+});

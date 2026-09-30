@@ -14,7 +14,7 @@ export function Header() {
   const [location] = useLocation();
   const [open, setOpen] = useState(false);
   const { isAuthenticated, isAdmin, logout } = useAuth();
-  const { itemCount } = useBasket();
+  const { itemCount, lines } = useBasket();
   useEffect(() => {
     setOpen(false);
   }, [location]);
@@ -64,7 +64,7 @@ export function Header() {
       <div className="header-actions">
         {isAuthenticated && (
           <Link
-            href="/basket"
+            href={lines.some(l=>l.kind==="portal") ? "/basket" : "/portal/quote"}
             className="po-basket-link"
             aria-label={`Basket, ${itemCount} units`}
           >

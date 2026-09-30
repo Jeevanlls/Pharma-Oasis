@@ -20,7 +20,7 @@ export async function commercialRange() {
         items.forEach(x => products.set(x.product.id, publicProduct(x.product)));
         const start = new Date(o.startDate).toLocaleDateString("en-CA", { timeZone: "Europe/London" });
         const end = new Date(o.endDate).toLocaleDateString("en-CA", { timeZone: "Europe/London" });
-        return { id: o.slug || String(o.id), brandIds: Array.from(new Set(items.map(x => x.product.brandId))), productIds: items.slice(0, 3).map(x => x.product.id),
+        return { id: o.slug || String(o.id), brandIds: Array.from(new Set(allItems[i].filter(x => x.product?.isActive).map(x => x.product.brandId))), productIds: items.slice(0, 3).map(x => x.product.id),
             title: o.title, description: o.description || "Request a quotation for your business.", tone: ["lime", "oat", "rose", "peach", "stone"].includes(o.badgeColor || "") ? o.badgeColor : "oat", start, end, enabled: o.isActive };
     }).filter(c => c.productIds.length > 0);
     cache = { at: Date.now(), data: { capturedAt: new Date().toISOString(), brands: brands.rows, products: Array.from(products.values()), campaigns } };

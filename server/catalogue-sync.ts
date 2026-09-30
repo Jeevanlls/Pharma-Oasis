@@ -50,7 +50,7 @@ export async function syncCatalogue() {
             throw error;
         }
         // Staging has no prices or personal data. Retain failed runs for investigation.
-        await client.query("DELETE FROM catalogue_sync_rows WHERE run_id IN(SELECT id FROM catalogue_sync_runs WHERE status='complete' AND finished_at<now()-interval '7 days')");
+        await client.query("DELETE FROM catalogue_sync_rows WHERE run_id IN(SELECT id FROM catalogue_sync_runs WHERE status='complete' AND finished_at<now()-interval '7 days')").catch(error => console.error('Catalogue staging cleanup failed:', error.message));
         return { runId, ...plan.summary };
     }
     catch (error) {

@@ -1,3 +1,4 @@
+import { quoteQuantity } from "@shared/quote-quantity";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "./auth";
@@ -12,17 +13,6 @@ type Delivery = {
     notes: string;
 };
 const blankDelivery: Delivery = { country: "United Kingdom", city: "", date: "", reference: "", notes: "" };
-export function quoteQuantity(line: QuoteLine) {
-    const amount = Number(line.quantity), caseSize = Number(line.product.caseSize);
-    if (!/^\d+$/.test(line.quantity) || !Number.isSafeInteger(amount) || amount < 1 || amount > 1000000)
-        throw new Error("Enter a whole quantity between 1 and 1,000,000.");
-    if (line.unit === "cases" && (!Number.isSafeInteger(caseSize) || caseSize < 1))
-        throw new Error("Case size is not confirmed. Request units and include your case requirement in the notes.");
-    const result = line.unit === "cases" ? amount * caseSize : amount;
-    if (result > 1000000)
-        throw new Error("The total units on one line cannot exceed 1,000,000.");
-    return result;
-}
 export function useLiveTradeState() {
     const { user, isCustomer, isAdmin } = useAuth();
     const basket = useBasket();
@@ -53,15 +43,23 @@ export function useLiveTradeState() {
             throw new Error("Could not load your quotations"); return r.json(); } });
     const statusLabel = (status: string) => ({ pending: "With your account team", draft: "With your account team", sent: "Response ready", quoted: "Response ready", accepted: "Accepted", declined: "Declined", closed: "Completed" }[status] || status);
     const requests: RequestRecord[] = (quotes.data || []).map(q => ({ id: q.id, reference: `Q-${q.id}`, title: `Quotation Q-${q.id}`, status: statusLabel(q.status), count: q.itemCount || 0, date: new Date(q.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) }));
-    const lines: QuoteLine[] = basket.lines.filter(l => l.kind === "catalog").map(l => ({ product: preferences.products[l.refId] || { id: l.refId, productName: l.name, sku: l.sku || "", ean: l.sku, imageUrl: l.imageUrl, brandId: 0, categoryId: 0, packSize: l.packSize }, quantity: preferences.quantities?.[l.refId] ?? String(l.quantity), unit: preferences.units[l.refId] || "units" }));
+    const lines: QuoteLine[] = basket.lines.filter(l => l.kind === "catalog").map(l => {
+        const product: TradeProduct=preferences.products[l.refId] || {id:l.refId,productName:l.name,sku:l.sku||"",ean:l.sku,imageUrl:l.imageUrl,brandId:0,categoryId:0,packSize:l.packSize};
+        const unit=preferences.units[l.refId]||"units";
+        const invalid=preferences.quantities?.[l.refId];
+        const amount=unit==="cases" && Number(product.caseSize)>0 ? l.quantity/Number(product.caseSize) : l.quantity;
+        let quantity=String(amount);
+        if(invalid!==undefined){try{quoteQuantity({product,quantity:invalid,unit});}catch{quantity=invalid;}}
+        return {product,quantity,unit};
+    });
     const add = (p: TradeProduct) => { if (lines.some(l => l.product.id === p.id))
         return; setPreferences(s => ({ ...s, products: { ...s.products, [p.id]: p }, units: { ...s.units, [p.id]: "units" }, quantities: { ...s.quantities, [p.id]: "1" } })); basket.add({ kind: "catalog", refId: p.id, name: p.productName, sku: p.ean || p.sku, imageUrl: p.imageUrl, packSize: p.packSize, price: null, quantity: 1 }); };
-    const update = (id: number, patch: Partial<Pick<QuoteLine, "quantity" | "unit">>) => { if (patch.quantity !== undefined) {
-        setPreferences(s => ({ ...s, quantities: { ...s.quantities, [id]: patch.quantity! } }));
-        if (/^\d+$/.test(patch.quantity) && Number(patch.quantity) > 0)
-            basket.setQty(`catalog:${id}`, Number(patch.quantity));
-    } if (patch.unit)
-        setPreferences(s => ({ ...s, units: { ...s.units, [id]: patch.unit! } })); };
+    const update = (id:number,patch:Partial<Pick<QuoteLine,"quantity"|"unit">>) => {
+      const line=lines.find(l=>l.product.id===id); if(!line)return;
+      const next={...line,...patch};
+      setPreferences(s=>({...s,quantities:{...s.quantities,[id]:next.quantity},units:{...s.units,[id]:next.unit}}));
+      try {basket.setQty(`catalog:${id}`,quoteQuantity(next));}catch { /* Keep the invalid draft visible, without changing the valid basket. */ }
+    };
     const remove = (id: number) => basket.remove(`catalog:${id}`);
     const save = (p: TradeProduct) => setPreferences(s => ({ ...s, saved: s.saved.some(x => x.id === p.id) ? s.saved.filter(x => x.id !== p.id) : [...s.saved, p] }));
     const setDelivery = (patch: Partial<Delivery>) => setPreferences(s => ({ ...s, delivery: { ...s.delivery, ...patch } }));
