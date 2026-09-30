@@ -3,10 +3,18 @@ import { useAuth } from "@/lib/auth";
 import { usePortalBasket } from "@/lib/portal-basket";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { InstallAppButton } from "@/components/install-app";
-import logoImage from "@assets/01_1772051902531.png";
-import { ShoppingCart, LogOut, LayoutGrid, FileText, Package, ClipboardList, Download, Megaphone } from "lucide-react";
+import { BrandWordmark } from "@/components/brand-wordmark";
+import {
+  ShoppingCart,
+  LogOut,
+  LayoutGrid,
+  FileText,
+  Package,
+  ClipboardList,
+  Download,
+  Megaphone,
+} from "lucide-react";
 
 const navItems = [
   { href: "/portal", label: "Catalogue", icon: LayoutGrid },
@@ -27,25 +35,17 @@ export function PortalLayout({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-muted/30">
+    <div className="po-design min-h-screen flex flex-col bg-muted/30">
       <header className="sticky top-0 z-40 border-b bg-background">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between gap-4">
             <div className="flex items-center gap-6">
               <Link href="/portal" className="flex items-center gap-2">
-                <img src={logoImage} alt="Pharma Oasis" className="h-9 w-auto object-contain" />
-                <span className="hidden sm:inline text-xs font-semibold text-muted-foreground border-l pl-2">Customer Portal</span>
+                <BrandWordmark className="po-portal-logo" />
+                <span className="hidden sm:inline text-xs font-semibold text-muted-foreground border-l pl-2">
+                  Trade space
+                </span>
               </Link>
-              <nav className="hidden md:flex items-center gap-1">
-                {navItems.map((item) => (
-                  <Link key={item.href} href={item.href}>
-                    <Button variant={location === item.href ? "secondary" : "ghost"} size="sm" className="gap-2">
-                      <item.icon className="h-4 w-4" />
-                      {item.label}
-                    </Button>
-                  </Link>
-                ))}
-              </nav>
             </div>
 
             <div className="flex items-center gap-2">
@@ -63,8 +63,13 @@ export function PortalLayout({ children }: { children: React.ReactNode }) {
                 {user?.companyName || user?.email}
               </span>
               <InstallAppButton className="hidden sm:inline-flex" />
-              <ThemeToggle />
-              <Button variant="ghost" size="sm" onClick={handleLogout} className="gap-2">
+
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleLogout}
+                className="gap-2"
+              >
                 <LogOut className="h-4 w-4" />
                 <span className="hidden sm:inline">Logout</span>
               </Button>
@@ -72,10 +77,14 @@ export function PortalLayout({ children }: { children: React.ReactNode }) {
           </div>
 
           {/* Mobile nav */}
-          <nav className="md:hidden flex items-center gap-1 pb-2 overflow-x-auto">
+          <nav className="flex items-center gap-1 pb-3 overflow-x-auto">
             {navItems.map((item) => (
               <Link key={item.href} href={item.href}>
-                <Button variant={location === item.href ? "secondary" : "ghost"} size="sm" className="gap-2 whitespace-nowrap">
+                <Button
+                  variant={location === item.href ? "secondary" : "ghost"}
+                  size="sm"
+                  className="gap-2 whitespace-nowrap"
+                >
                   <item.icon className="h-4 w-4" />
                   {item.label}
                 </Button>
@@ -85,11 +94,14 @@ export function PortalLayout({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <main className="flex-1 mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-6">{children}</main>
+      <main className="flex-1 mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-6">
+        {children}
+      </main>
 
       <footer className="border-t bg-background py-4">
         <div className="mx-auto max-w-7xl px-4 text-xs text-muted-foreground flex items-center gap-2">
-          <Package className="h-3 w-3" /> Pharma Oasis Customer Portal — prices shown are your account prices.
+          <Package className="h-3 w-3" /> Pharma Oasis Customer Portal — prices
+          shown are your account prices.
         </div>
       </footer>
     </div>

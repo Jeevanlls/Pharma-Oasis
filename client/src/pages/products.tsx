@@ -88,10 +88,10 @@ function LazyImage({ src, alt, className }: { src: string; alt: string; classNam
 }
 
 export default function ProductsPage() {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string>("");
-  const [selectedBrand, setSelectedBrand] = useState<string>("");
+  const [searchQuery, setSearchQuery] = useState(() => new URLSearchParams(window.location.search).get("search") || "");
+  const [debouncedSearch, setDebouncedSearch] = useState(searchQuery);
+  const [selectedCategory, setSelectedCategory] = useState<string>(() => new URLSearchParams(window.location.search).get("category") || "");
+  const [selectedBrand, setSelectedBrand] = useState<string>(() => new URLSearchParams(window.location.search).get("brand") || "");
   const [brandPopoverOpen, setBrandPopoverOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [quantities, setQuantities] = useState<Record<number, number>>({});

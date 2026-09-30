@@ -47,7 +47,11 @@ export function usePageTracking(pageTitle?: string) {
   }, [location, pageTitle]);
 }
 
-export function PageTracker({ title }: { title?: string; description?: string }) {
+export function PageTracker({ title, description }: { title?: string; description?: string }) {
+  useEffect(() => {
+    if (title) document.title = title;
+    if (description) document.querySelector('meta[name="description"]')?.setAttribute("content", description);
+  }, [title, description]);
   usePageTracking(title);
   return null;
 }

@@ -33,6 +33,10 @@ import CompliancePage from "@/pages/compliance";
 import PharmaceuticalWholesalersPage from "@/pages/pharmaceutical-wholesalers";
 import ProductDetailPage from "@/pages/product-detail";
 import OffersPage from "@/pages/offers";
+import AboutPage from "@/pages/about";
+import OasisbiomePage from "@/pages/oasisbiome";
+import ReviewAccessPage from "@/pages/review-access";
+const reviewOnly = import.meta.env.VITE_REVIEW_PREVIEW === "true";
 import ForgotPasswordPage from "@/pages/forgot-password";
 import ResetPasswordPage from "@/pages/reset-password";
 
@@ -144,12 +148,12 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={HomePage} />
-      <Route path="/login">{() => <LoginPage />}</Route>
+      <Route path="/login">{() => reviewOnly ? <ReviewAccessPage /> : <LoginPage />}</Route>
       {/* Private admin/staff sign-in — intentionally NOT linked from the public site. */}
-      <Route path="/staff">{() => <LoginPage adminMode />}</Route>
-      <Route path="/forgot-password" component={ForgotPasswordPage} />
-      <Route path="/reset-password" component={ResetPasswordPage} />
-      <Route path="/register" component={RegisterPage} />
+      <Route path="/staff">{() => reviewOnly ? <ReviewAccessPage /> : <LoginPage adminMode />}</Route>
+      <Route path="/forgot-password" component={reviewOnly ? ReviewAccessPage : ForgotPasswordPage} />
+      <Route path="/reset-password" component={reviewOnly ? ReviewAccessPage : ResetPasswordPage} />
+      <Route path="/register" component={reviewOnly ? ReviewAccessPage : RegisterPage} />
       <Route path="/products" component={ProductsPage} />
       <Route path="/products/:idOrSlug" component={ProductDetailPage} />
       <Route path="/brands" component={BrandsPage} />
@@ -171,6 +175,8 @@ function Router() {
       <Route path="/blog/:slug" component={BlogPostPage} />
       <Route path="/compliance" component={CompliancePage} />
       <Route path="/offers" component={OffersPage} />
+      <Route path="/about" component={AboutPage} />
+      <Route path="/oasisbiome" component={OasisbiomePage} />
       <Route path="/pharmaceutical-wholesalers" component={PharmaceuticalWholesalersPage} />
       
       <Route path="/admin">{() => <AdminRoute component={AdminDashboard} />}</Route>

@@ -2,7 +2,7 @@
 // Deliberately minimal + safe: it NEVER intercepts page navigations or /api requests,
 // so login, sessions and live data behave exactly as a normal browser. It only
 // speeds up static assets (JS/CSS/images/fonts/icons) via a cache.
-const VERSION = 'po-v2';
+const VERSION = 'po-v3-concept02';
 const STATIC_CACHE = `po-static-${VERSION}`;
 
 self.addEventListener('install', () => { self.skipWaiting(); });
