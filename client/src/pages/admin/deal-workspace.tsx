@@ -69,21 +69,29 @@ export default function DealWorkspacePage() {
     setDirty(false);
   }, [data, isOrder]);
 
+  const refreshSalesLists = () => {
+    queryClient.invalidateQueries({ predicate: query => {
+      const key = String(query.queryKey[0]);
+      return key.startsWith("/api/admin/quotes") || key.startsWith("/api/admin/orders") ||
+        key.startsWith("/api/admin/workspace/") || key === "/api/admin/stats";
+    } });
+  };
+
   const saveItems = useMutation({
     mutationFn: async () => apiRequest("PUT", `/api/admin/quotes/${id}/items`, { items: lines.map((l) => ({ ...l, unitPrice: l.unitPrice === "" ? null : Number(l.unitPrice), unitCost: l.unitCost === "" ? null : Number(l.unitCost) })) }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [qKey] }); setDirty(false); toast({ title: "Prices saved" }); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [qKey] }); refreshSalesLists(); setDirty(false); toast({ title: "Prices saved" }); },
     onError: (e: any) => toast({ title: "Couldn't save", description: e?.message, variant: "destructive" }),
   });
   const sendQuote = useMutation({
     mutationFn: async () => apiRequest("POST", `/api/admin/quotes/${id}/send`, { message, expiryDate: expiry || null, adminNotes: internalNote, leadTime: leadTime || null }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [qKey] }); toast({ title: "Quote sent to customer" }); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [qKey] }); refreshSalesLists(); toast({ title: "Quote sent to customer" }); },
     onError: (e: any) => toast({ title: "Couldn't send", description: e?.message, variant: "destructive" }),
   });
   const setStatus = useMutation({
     mutationFn: async (s: "accepted" | "declined") => apiRequest("PATCH", `/api/admin/quotes/${id}`, { status: s }),
     onSuccess: async (res) => {
       const body = await res.json();
-      queryClient.invalidateQueries({ queryKey: [qKey] });
+      queryClient.invalidateQueries({ queryKey: [qKey] }); refreshSalesLists();
       toast({ title: body.status === "accepted" ? `Accepted — order O-${body.orderId} created` : "Quote declined" });
     },
     onError: (e: any) => toast({ title: "Action failed", description: e?.message, variant: "destructive" }),
@@ -91,13 +99,13 @@ export default function DealWorkspacePage() {
   const respondOrder = useMutation({
     mutationFn: async (payload: { status?: string; adminResponse: string; sendEmail: boolean }) =>
       apiRequest("POST", `/api/admin/orders/${id}/respond`, payload),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [qKey] }); setOrderMsg(""); toast({ title: "Customer updated" }); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [qKey] }); refreshSalesLists(); setOrderMsg(""); toast({ title: "Customer updated" }); },
     onError: (e: any) => toast({ title: "Couldn't update", description: e?.message, variant: "destructive" }),
   });
 
   const retrySalesEmail = useMutation({
     mutationFn: async () => apiRequest("POST", `/api/admin/quotes/${id}/notify-sales`, {}),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [qKey] }); toast({ title: "Sales notification queued" }); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [qKey] }); refreshSalesLists(); toast({ title: "Sales notification queued" }); },
     onError: (e: any) => toast({ title: "Could not queue email", description: e?.message, variant: "destructive" }),
   });
 

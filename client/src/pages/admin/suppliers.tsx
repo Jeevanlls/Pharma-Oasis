@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useLocation, useSearch } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -40,10 +41,22 @@ export default function AdminSuppliersPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedLead, setSelectedLead] = useState<SupplierLead | null>(null);
   const { toast } = useToast();
+  const queryString = useSearch();
+  const [, navigate] = useLocation();
+  const reviewId = Number(new URLSearchParams(queryString).get("review"));
+  const closeReview = () => {
+    setSelectedLead(null);
+    if (reviewId) navigate("/admin/suppliers", { replace: true });
+  };
 
-  const { data: leads, isLoading } = useQuery<SupplierLead[]>({
+
+  const { data: leads, isLoading, isError, refetch } = useQuery<SupplierLead[]>({
     queryKey: ["/api/admin/supplier-leads"],
   });
+
+  useEffect(() => {
+    if (reviewId && leads) setSelectedLead(leads.find(row => row.id === reviewId) || null);
+  }, [reviewId, leads]);
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: number; updates: Partial<SupplierLead> }) => {
@@ -108,6 +121,7 @@ export default function AdminSuppliersPage() {
         </div>
       </div>
 
+      {isError && <div className="aw-error" role="alert"><span>Records could not load.</span><button onClick={() => { void refetch(); }}>Try again</button></div>}
       {isLoading ? (
         <div className="space-y-4">
           {Array.from({ length: 3 }).map((_, i) => (
@@ -168,7 +182,7 @@ export default function AdminSuppliersPage() {
         </div>
       )}
 
-      <Dialog open={!!selectedLead} onOpenChange={() => setSelectedLead(null)}>
+      <Dialog open={!!selectedLead} onOpenChange={open => !open && closeReview()}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle style={{ fontFamily: "DM Sans, sans-serif" }}>
@@ -307,7 +321,7 @@ export default function AdminSuppliersPage() {
               Delete
             </Button>
             <div className="flex-1" />
-            <Button variant="outline" onClick={() => setSelectedLead(null)}>
+            <Button variant="outline" onClick={closeReview}>
               Close
             </Button>
             <Button asChild>

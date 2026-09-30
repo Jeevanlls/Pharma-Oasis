@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { format } from "date-fns";
+import { WorkspaceError } from "@/components/admin/workspace-status";
 import { Search, FileText, ClipboardList, PackageCheck, Download, Inbox, Truck, CheckCircle2 } from "lucide-react";
 
 type Tab = "active" | "archived";
@@ -52,15 +53,27 @@ export default function AdminSalesPage() {
   const [typeFilter, setTypeFilter] = useState<"all" | "order" | "quote">("all");
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const { toast } = useToast();
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search.trim()), 250);
+    return () => clearTimeout(timer);
+  }, [search]);
+  useEffect(() => { setSelected(new Set()); }, [search, typeFilter, tab]);
+  const productMatches = useQuery<{ quotes: number[]; orders: number[] }>({
+    queryKey: ["/api/admin/workspace/sales-matches", debouncedSearch],
+    queryFn: async () => (await apiRequest("GET", `/api/admin/workspace/sales-matches?q=${encodeURIComponent(debouncedSearch)}`)).json(),
+    enabled: debouncedSearch.length >= 3,
+    staleTime: 30_000,
+  });
 
   const { data: stats } = useQuery<{ newCount: number; toFulfil: number; doneThisWeek: number; activeTotal: number }>({
     queryKey: ["/api/admin/orders/stats"],
   });
-  const { data: orders } = useQuery<any[]>({
+  const { data: orders, isLoading: ordersLoading, isError: ordersError, refetch: refetchOrders } = useQuery<any[]>({
     queryKey: [`/api/admin/orders?archived=${tab === "archived"}`],
   });
-  const { data: quotes } = useQuery<any[]>({ queryKey: ["/api/admin/quotes"] });
-  const { data: users } = useQuery<any[]>({ queryKey: ["/api/admin/users"] });
+  const { data: quotes, isLoading: quotesLoading, isError: quotesError, refetch: refetchQuotes } = useQuery<any[]>({ queryKey: ["/api/admin/quotes"] });
+  const { data: users, isLoading: usersLoading, isError: usersError, refetch: refetchUsers } = useQuery<any[]>({ queryKey: ["/api/admin/users"] });
 
   const userMap = useMemo(() => {
     const m = new Map<number, any>();
@@ -120,9 +133,11 @@ export default function AdminSalesPage() {
     let all = [...orderRows, ...quoteRows];
     if (typeFilter !== "all") all = all.filter((r) => r.kind === typeFilter);
     const q = search.trim().toLowerCase();
-    if (q) all = all.filter((r) => r.ref.toLowerCase().includes(q) || r.customer.toLowerCase().includes(q));
+    if (q) all = all.filter((r) => r.ref.toLowerCase().includes(q) || r.customer.toLowerCase().includes(q) ||
+      (q.length >= 3 && debouncedSearch.toLowerCase() === q &&
+        (r.kind === "quote" ? productMatches.data?.quotes : productMatches.data?.orders)?.includes(r.id)));
     return all.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [orders, quotes, userMap, tab, typeFilter, search]);
+  }, [orders, quotes, userMap, tab, typeFilter, search, debouncedSearch, productMatches.data]);
 
   // Only active orders are selectable for the bulk "entered" handoff.
   const selectableIds = rows.filter((r) => r.kind === "order" && !r.archived && r.status !== "cancelled").map((r) => r.id);
@@ -140,7 +155,7 @@ export default function AdminSalesPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold" style={{ fontFamily: "DM Sans, sans-serif" }}>Sales</h1>
+          <h1 className="text-3xl font-bold" style={{ fontFamily: "DM Sans, sans-serif" }}>Sales desk</h1>
           <p className="mt-2 text-muted-foreground">Quotes and orders in one worklist. Mark an order "entered into inventory" once you've keyed it into your inventory system — it then moves to Archived.</p>
         </div>
         <Link href="/admin/sales/new-quote"><Button data-testid="button-new-quote"><FileText className="h-4 w-4 mr-2" /> New quote</Button></Link>
@@ -164,7 +179,7 @@ export default function AdminSalesPage() {
         <div className="flex flex-1 gap-2 sm:max-w-md sm:ml-auto">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input placeholder="Search ref or customer…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" data-testid="input-sales-search" />
+            <Input aria-label="Search sales by reference, customer, product or EAN" maxLength={80} placeholder="Reference, customer, product or EAN…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" data-testid="input-sales-search" />
           </div>
           <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as any)}>
             <SelectTrigger className="w-32" data-testid="select-type-filter"><SelectValue /></SelectTrigger>
@@ -177,6 +192,9 @@ export default function AdminSalesPage() {
         </div>
       </div>
 
+      {(ordersError || quotesError || usersError) && <WorkspaceError retry={() => { void refetchOrders(); void refetchQuotes(); void refetchUsers(); }} />}
+      {search.trim().length >= 3 && productMatches.isError && <WorkspaceError message="Product and EAN search could not load. Reference and company matches are still shown." retry={() => { void productMatches.refetch(); }} />}
+      {search.trim().length >= 3 && (productMatches.isFetching || debouncedSearch !== search.trim()) && <p role="status" className="text-sm text-muted-foreground">Searching product names and EANs…</p>}
       {/* Bulk action bar */}
       {selected.size > 0 && (
         <div className="flex items-center gap-3 rounded-lg border bg-muted/40 p-3">
@@ -218,7 +236,7 @@ export default function AdminSalesPage() {
             </TableHeader>
             <TableBody>
               {rows.length === 0 ? (
-                <TableRow><TableCell colSpan={8} className="text-center py-10 text-muted-foreground">Nothing here.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center py-10 text-muted-foreground">{ordersLoading || quotesLoading || usersLoading ? "Loading sales…" : ordersError || quotesError || usersError ? "Some sales records could not load." : productMatches.isFetching ? "Searching…" : "No requests match this view."}</TableCell></TableRow>
               ) : rows.map((r) => {
                 const badge = statusBadge[r.status] || { label: r.status, variant: "secondary" as const };
                 const selectable = r.kind === "order" && !r.archived && r.status !== "cancelled";
@@ -249,7 +267,7 @@ export default function AdminSalesPage() {
                           </Button>
                         )}
                         {selectable && (
-                          <Button size="sm" variant="outline" onClick={() => enterMutation.mutate(r.id)} disabled={enterMutation.isPending} data-testid={`button-enter-${r.ref}`}>
+                          <Button size="sm" variant="outline" onClick={() => { if (confirm(`Mark ${r.ref} as entered into your inventory system? It will move to Archived.`)) enterMutation.mutate(r.id); }} disabled={enterMutation.isPending} data-testid={`button-enter-${r.ref}`}>
                             <PackageCheck className="h-4 w-4 mr-1" /> Entered
                           </Button>
                         )}

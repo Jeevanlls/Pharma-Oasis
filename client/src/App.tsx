@@ -38,6 +38,7 @@ import ResetPasswordPage from "@/pages/reset-password";
 
 import AdminDashboard from "@/pages/admin/index";
 import AdminUsersPage from "@/pages/admin/users";
+import AdminAccounts from "@/pages/admin/accounts";
 import AdminProductsPage from "@/pages/admin/products";
 import AdminBrandsPage from "@/pages/admin/brands";
 import AdminCategoriesPage from "@/pages/admin/categories";
@@ -174,6 +175,7 @@ function Router() {
       <Route path="/pharmaceutical-wholesalers" component={PharmaceuticalWholesalersPage} />
       
       <Route path="/admin">{() => <AdminRoute component={AdminDashboard} />}</Route>
+      <Route path="/admin/accounts">{() => <AdminRoute component={AdminAccounts} />}</Route>
       <Route path="/admin/users">{() => <AdminRoute component={AdminUsersPage} />}</Route>
       <Route path="/admin/staff">{() => <AdminRoute component={AdminStaffPage} />}</Route>
       <Route path="/admin/security">{() => <AdminRoute component={AdminSecurityPage} />}</Route>

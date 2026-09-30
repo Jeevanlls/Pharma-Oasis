@@ -3,7 +3,8 @@ import type { Server } from "http";
 import multer from "multer";
 import rateLimit from "express-rate-limit";
 import { storage } from "./storage";
-import { db } from "./db";
+import { db, pool } from "./db";
+import { registerWorkspaceRoutes } from "./admin-workspace";
 import { quoteEan } from "@shared/quote-lines";
 import { ensureQuoteOutbox, quoteNotificationStatus, retrySalesNotification, processQuoteEmailQueue } from "./quote-outbox";
 import { 
@@ -191,6 +192,8 @@ export async function registerRoutes(server: Server, app: Express): Promise<void
     req.user = user;
     next();
   };
+
+  registerWorkspaceRoutes(app, requireAdmin, pool);
 
   const requireActiveCustomer = async (req: any, res: any, next: any) => {
     if (!req.session.userId) {
