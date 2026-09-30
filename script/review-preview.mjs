@@ -44,7 +44,7 @@ export function createPreviewApp(upstreamFetch = fetch) {
         req.url.split("?")[1] || "",
       )) {
         if (
-          ["search", "brand", "category", "page", "limit", "sort"].includes(key)
+          ["search", "q", "brand", "category", "page", "limit", "sort"].includes(key)
         )
           url.searchParams.set(key, value.slice(0, 200));
       }
@@ -83,11 +83,11 @@ export function createPreviewApp(upstreamFetch = fetch) {
   });
   app.use("/api", (_req, res) => res.status(403).json({ message }));
   // A fixed-width frame lets reviewers inspect the real responsive app without device emulation.
-  app.get("/__review/mobile", (_req, res) =>
+  app.get("/__review/mobile", (req, res) =>
     res
       .type("html")
       .send(
-        `<!doctype html><html lang="en"><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mobile review · Pharma Oasis</title><style>body{margin:0;background:#e9e4e7;font:14px Arial;color:#432338}header{padding:14px;text-align:center}iframe{display:block;width:390px;max-width:100%;height:850px;border:0;margin:0 auto;background:white;box-shadow:0 2px 24px #43233822}</style></head><body><header>390px mobile review · <a href="/">Open full website</a></header><iframe title="Pharma Oasis mobile preview" src="/"></iframe></body></html>`,
+        `<!doctype html><html lang="en"><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mobile review · Pharma Oasis</title><style>body{margin:0;background:#e9e4e7;font:14px Arial;color:#432338}header{padding:14px;text-align:center}iframe{display:block;width:390px;max-width:100%;height:850px;border:0;margin:0 auto;background:white;box-shadow:0 2px 24px #43233822}</style></head><body><header>390px mobile review · <a href="/">Open full website</a></header><iframe title="Pharma Oasis mobile preview" src="${["/", "/products", "/portal", "/portal/quote"].includes(req.query.path) ? req.query.path : "/"}"></iframe></body></html>`,
       ),
   );
   app.use(express.static(root, { index: false, dotfiles: "deny" }));
@@ -99,7 +99,7 @@ export function createPreviewApp(upstreamFetch = fetch) {
     );
     html = html.replace(
       "<body>",
-      '<body><div class="po-preview-bar">WEBSITE REVIEW · Browsing only. Login and submissions are disabled. <a href="https://pharmaoasis.co.uk" target="_blank" rel="noopener noreferrer">Open the live website ↗</a></div>',
+      '<body><div class="po-preview-bar">DESIGN PREVIEW · Sample trade account. No live orders or submissions. <a href="https://pharmaoasis.co.uk" target="_blank" rel="noopener noreferrer">Open the live website ↗</a></div>',
     );
     res.type("html").send(html);
   });

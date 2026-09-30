@@ -14,6 +14,7 @@ import {
   useTradeSettings,
   whatsappHref,
 } from "@/lib/trade-site";
+import { SkincareInterest, BrandInterestButton } from "@/components/skincare-interest";
 import { useAuth } from "@/lib/auth";
 
 export default function HomePage() {
@@ -90,21 +91,13 @@ export default function HomePage() {
         </div>
         <figure className="future-hero-image">
           <img
-            src="/brand/editorial.webp"
-            alt="Editorial still life of cosmetic packaging and amber glass on aubergine display blocks"
+            src="/brand/pharmaoasis-skincare.webp"
+            alt="Pharma Oasis future skincare collection with branded cleanser, serum and face creams"
             width="1536"
             height="1024"
             fetchPriority="high"
           />
-          <figcaption>
-            <span>THE SHAPE OF THINGS TO COME</span>
-            <span>PHARMA OASIS</span>
-          </figcaption>
-          <div className="image-stamp" aria-hidden="true">
-            <span>pharma</span>
-            <strong>oasis</strong>
-            <i>°</i>
-          </div>
+          <div className="tp-skin-caption"><span><strong>Pharma Oasis Skincare</strong>A future collection · Packaging concepts</span><a href="#future-skincare">Register your interest ↗</a></div>
         </figure>
         <div className="future-hero-foot">
           <span>UK wholesale expertise. Independent thinking.</span>
@@ -296,6 +289,7 @@ export default function HomePage() {
           </Link>
         </div>
       </section>
+      <SkincareInterest />
       <section className="future-biome">
         <div className="wrap biome-title-row">
           <span className="eyebrow">
@@ -323,6 +317,7 @@ export default function HomePage() {
             <Link className="btn" href="/oasisbiome">
               Meet Oasisbiome
             </Link>
+            <BrandInterestButton brand="OasisBiome" className="text-link" />
             <span className="concept-caption">
               Packaging concept. Launch details to be confirmed.
             </span>

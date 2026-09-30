@@ -1,9 +1,7 @@
 import { PublicLayout } from "@/components/layout/public-layout";
 import { PageTracker } from "@/hooks/use-page-tracking";
-import { useTradeSettings } from "@/lib/trade-site";
+import { BrandInterestButton } from "@/components/skincare-interest";
 export default function OasisbiomePage() {
-  const { data: settings } = useTradeSettings();
-  const enquiry = `mailto:${settings?.contact_email || "trade@pharmaoasis.com"}?subject=${encodeURIComponent("Oasisbiome — early stockist interest")}`;
   return (
     <PublicLayout>
       <PageTracker title="Introducing Oasisbiome | Pharma Oasis" />
@@ -21,9 +19,7 @@ export default function OasisbiomePage() {
               We’re preparing for launch and welcoming conversations with future
               stockists.
             </p>
-            <a className="btn" href={enquiry}>
-              Become an early stockist
-            </a>
+            <BrandInterestButton brand="OasisBiome" className="btn" />
             <p className="soft-note">
               Packaging concept shown. Final packaging, range and launch details
               are to be confirmed.
@@ -51,9 +47,7 @@ export default function OasisbiomePage() {
               stockist opportunities. Our team will share confirmed details as
               they become available.
             </p>
-            <a className="text-link" href={enquiry}>
-              Talk to us about Oasisbiome
-            </a>
+            <BrandInterestButton brand="OasisBiome" className="text-link" label="Tell us about your interest" />
           </div>
         </section>
       </div>

@@ -5,7 +5,7 @@ import { BrandWordmark } from "@/components/brand-wordmark";
 import { useAuth } from "@/lib/auth";
 import { useBasket } from "@/lib/basket";
 const links = [
-  ["/brands", "Discover"],
+  ["/products", "Product catalogue"],
   ["/offers", "The weekly edit"],
   ["/oasisbiome", "Oasisbiome"],
   ["/about", "Our world"],
