@@ -39,6 +39,7 @@ Production build: `node --import tsx script/build.ts`, then existing `npm start`
 - Existing full TypeScript baseline has 17 errors in PM sync/pricing server files. Comparison after implementation shows no new TypeScript diagnostics.
 - Buying-list tests: leading zeroes, duplicate sums, quantity/format limits, exact matching, account price/quote-only values, all-or-nothing failure, ambiguous and out-of-stock products.
 - Review-host test: writes/private routes blocked; anonymous public reads only; no forwarded browser cookies/auth headers; noindex response header.
+- React DOM checks with fixture APIs pass for four public pages, exact EAN search, active/expired offer filtering, authenticated account prices, priced basket order submission, and unpriced basket quote-only submission. These are frontend checks with isolated fixtures, not live trading transactions.
 - Full signed-in customer/order/quote end-to-end testing still needs an isolated website database before production launch. Browsing preview does not claim to test actual order processing.
 
 ## Launch gate
