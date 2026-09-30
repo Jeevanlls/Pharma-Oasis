@@ -1,3 +1,4 @@
+import { WeeklyEditSection } from "@/components/weekly-edit";
 import { useState, type FormEvent } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
@@ -133,7 +134,7 @@ export default function HomePage() {
           {reviewOnly ? "Build your quote" : "Paste your buying list"}
         </Link>
       </section>
-      <section className="future-edit wrap">
+      {reviewOnly ? <WeeklyEditSection /> : <section className="future-edit wrap">
         <div className="future-section-header">
           <div>
             <span className="eyebrow">OUR LATEST PERSPECTIVE</span>
@@ -263,6 +264,7 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+      }
       <section className="future-focus wrap">
         <div className="focus-intro">
           <span className="eyebrow">WHAT WE BRING TO YOUR WORLD</span>

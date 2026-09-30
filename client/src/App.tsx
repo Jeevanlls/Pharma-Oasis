@@ -1,3 +1,4 @@
+import { WeeklyOffersPage, CommercialBrandsPage, CampaignStudio } from "@/components/weekly-edit";
 import { Switch, Route, Redirect, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -158,7 +159,7 @@ function Router() {
       <Route path="/register" component={reviewOnly ? ReviewAccessPage : RegisterPage} />
       <Route path="/products">{() => reviewOnly ? <TradeCatalogue /> : <ProductsPage />}</Route>
       <Route path="/products/:idOrSlug" component={ProductDetailPage} />
-      <Route path="/brands" component={BrandsPage} />
+      <Route path="/brands" component={reviewOnly ? CommercialBrandsPage : BrandsPage} />
       <Route path="/distribution-network" component={DistributionNetworkPage} />
       <Route path="/contact" component={ContactPage} />
       <Route path="/how-to-order" component={HowToOrderPage} />
@@ -176,7 +177,8 @@ function Router() {
       <Route path="/blog" component={BlogPage} />
       <Route path="/blog/:slug" component={BlogPostPage} />
       <Route path="/compliance" component={CompliancePage} />
-      <Route path="/offers" component={OffersPage} />
+      <Route path="/offers" component={reviewOnly ? WeeklyOffersPage : OffersPage} />
+      {reviewOnly && <Route path="/__review/campaigns" component={CampaignStudio} />}
       <Route path="/about" component={AboutPage} />
       <Route path="/oasisbiome" component={OasisbiomePage} />
       <Route path="/pharmaceutical-wholesalers" component={PharmaceuticalWholesalersPage} />

@@ -5,7 +5,7 @@ export type RequestRecord = { reference: string; title: string; status: string; 
 type Delivery = { country: string; city: string; date: string; reference: string; notes: string };
 type State = { lines: QuoteLine[]; saved: TradeProduct[]; requests: RequestRecord[]; delivery: Delivery };
 const initial: State = { lines: [], saved: [], requests: [], delivery: { country: "United Kingdom", city: "", date: "", reference: "", notes: "" } };
-const KEY = "pharmaoasis-trade-design-preview-v1";
+const KEY = "pharmaoasis-trade-design-preview-pm-v2";
 const Context = createContext<ReturnType<typeof usePreviewState> | null>(null);
 function usePreviewState() {
   const [state, setState] = useState<State>(() => { try { const stored = JSON.parse(localStorage.getItem(KEY) || "null"); return stored && Array.isArray(stored.lines) && Array.isArray(stored.saved) && Array.isArray(stored.requests) && stored.delivery ? stored : initial; } catch { return initial; } });

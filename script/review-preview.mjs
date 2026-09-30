@@ -3,6 +3,7 @@ import express from "express";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
+import { mountCommercialReview } from "./commercial-review.mjs";
 const root = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "../dist/public",
@@ -28,6 +29,7 @@ export function createPreviewApp(upstreamFetch = fetch) {
     next();
   });
   app.get("/api/auth/me", (_req, res) => res.json({ user: null }));
+  mountCommercialReview(app);
   app.get("/robots.txt", (_req, res) =>
     res.type("text/plain").send("User-agent: *\nDisallow: /\n"),
   );
@@ -87,7 +89,7 @@ export function createPreviewApp(upstreamFetch = fetch) {
     res
       .type("html")
       .send(
-        `<!doctype html><html lang="en"><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mobile review · Pharma Oasis</title><style>body{margin:0;background:#e9e4e7;font:14px Arial;color:#432338}header{padding:14px;text-align:center}iframe{display:block;width:390px;max-width:100%;height:850px;border:0;margin:0 auto;background:white;box-shadow:0 2px 24px #43233822}</style></head><body><header>390px mobile review · <a href="/">Open full website</a></header><iframe title="Pharma Oasis mobile preview" src="${["/", "/products", "/portal", "/portal/quote"].includes(req.query.path) ? req.query.path : "/"}"></iframe></body></html>`,
+        `<!doctype html><html lang="en"><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mobile review · Pharma Oasis</title><style>body{margin:0;background:#e9e4e7;font:14px Arial;color:#432338}header{padding:14px;text-align:center}iframe{display:block;width:390px;max-width:100%;height:850px;border:0;margin:0 auto;background:white;box-shadow:0 2px 24px #43233822}</style></head><body><header>390px mobile review · <a href="/">Open full website</a></header><iframe title="Pharma Oasis mobile preview" src="${["/", "/products", "/portal", "/portal/quote", "/offers", "/brands", "/__review/campaigns"].includes(req.query.path) ? req.query.path : "/"}"></iframe></body></html>`,
       ),
   );
   app.use(express.static(root, { index: false, dotfiles: "deny" }));
