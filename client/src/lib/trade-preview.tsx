@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 export type TradeProduct = { id: number; productName: string; ean?: string | null; sku: string; imageUrl?: string | null; brandId: number; categoryId: number; packSize?: string | null; caseSize?: string | null; slug?: string | null };
 export type QuoteLine = { product: TradeProduct; quantity: string; unit: "units" | "cases" };
-export type RequestRecord = { reference: string; title: string; status: string; count: number; date: string; lines?: QuoteLine[] };
+export type RequestRecord = { reference: string; title: string; status: string; count: number; date: string; lines?: QuoteLine[]; delivery?: Delivery };
 type Delivery = { country: string; city: string; date: string; reference: string; notes: string };
 type State = { lines: QuoteLine[]; saved: TradeProduct[]; requests: RequestRecord[]; delivery: Delivery };
 const initial: State = { lines: [], saved: [], requests: [], delivery: { country: "United Kingdom", city: "", date: "", reference: "", notes: "" } };
@@ -15,7 +15,7 @@ function usePreviewState() {
   const update = (id: number, patch: Partial<Pick<QuoteLine, "quantity" | "unit">>) => setState(s => ({ ...s, lines: s.lines.map(l => l.product.id === id ? { ...l, ...patch } : l) }));
   const save = (product: TradeProduct) => setState(s => ({ ...s, saved: s.saved.some(p => p.id === product.id) ? s.saved.filter(p => p.id !== product.id) : [...s.saved, product] }));
   const delivery = (patch: Partial<Delivery>) => setState(s => ({ ...s, delivery: { ...s.delivery, ...patch } }));
-  const submit = () => { const reference = `DEMO-${Date.now().toString().slice(-7)}`; setState(s => ({ ...s, requests: [{ reference, title: s.delivery.reference || "New product enquiry", status: "Preview submitted", count: s.lines.length, date: new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short" }), lines: s.lines }, ...s.requests], lines: [], delivery: initial.delivery })); return reference; };
+  const submit = () => { const reference = `DEMO-${Date.now().toString().slice(-7)}`; setState(s => ({ ...s, requests: [{ reference, title: s.delivery.reference || "New product enquiry", status: "Preview submitted", count: s.lines.length, date: new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short" }), lines: s.lines, delivery: { ...s.delivery } }, ...s.requests], lines: [], delivery: initial.delivery })); return reference; };
   const repeat = (lines: QuoteLine[]) => setState(s => ({ ...s, lines: [...s.lines, ...lines.filter(l => !s.lines.some(current => current.product.id === l.product.id))] }));
   return { ...state, add, remove, update, save, setDelivery: delivery, submit, repeat };
 }
