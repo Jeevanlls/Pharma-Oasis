@@ -1,971 +1,177 @@
-import { useState } from "react";
-import { Link, useLocation } from "wouter";
-import { PageTracker } from "@/hooks/use-page-tracking";
-import { useForm } from "react-hook-form";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Link } from "wouter";
+import { useForm, FormProvider, useFormContext, type FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
-import { customerRegistrationSchema, type CustomerRegistrationData } from "@shared/schema";
+import { ArrowRight, ArrowLeft, Check, ChevronDown, Eye, EyeOff, Loader2 } from "lucide-react";
 import { PublicLayout } from "@/components/layout/public-layout";
-import { Package, Loader2, AlertCircle, Building2, User, MapPin, Shield, CreditCard, CheckCircle2 } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
+import { PageTracker } from "@/hooks/use-page-tracking";
+import { apiRequest } from "@/lib/queryClient";
+import { registrationFormSchema, registrationPayload, registrationBusinessTypes, registrationInterests, regulatedBusinessTypes, type RegistrationFormData } from "@shared/registration";
+import "@/styles/registration.css";
 
-const businessTypes = [
-  { value: "pharmacy", label: "Retail Pharmacy" },
-  { value: "hospital_pharmacy", label: "Hospital Pharmacy" },
-  { value: "online_pharmacy", label: "Online Pharmacy" },
-  { value: "dispensing_doctor", label: "Dispensing Doctor" },
-  { value: "dental_practice", label: "Dental Practice" },
-  { value: "care_home", label: "Care Home" },
-  { value: "wholesaler", label: "Wholesaler" },
-  { value: "other", label: "Other Healthcare Provider" },
-];
+type FieldName = keyof RegistrationFormData;
+const businessFields: FieldName[] = ["companyName", "businessType", "primaryContactName", "email", "phoneNumber", "password", "tradingName", "companyRegistrationNumber", "vatNumber", "jobTitle", "mobileNumber"];
+const licenceFields: FieldName[] = ["gphcNumber", "mhraLicenceType", "mhraLicenceNumber", "responsiblePersonName", "responsiblePersonEmail", "coldChainCapability", "interestedInControlledProducts"];
+const extraFields: FieldName[] = ["tradingName", "companyRegistrationNumber", "vatNumber", "jobTitle", "mobileNumber"];
+const preferenceFields: FieldName[] = ["estimatedMonthlySpend", "preferredOrderMethod", "howDidYouHear"];
 
-const estimatedSpendRanges = [
-  { value: "under_5000", label: "Under £5,000/month" },
-  { value: "5000_10000", label: "£5,000 - £10,000/month" },
-  { value: "10000_25000", label: "£10,000 - £25,000/month" },
-  { value: "25000_50000", label: "£25,000 - £50,000/month" },
-  { value: "over_50000", label: "Over £50,000/month" },
-];
-
-const preferredOrderMethods = [
-  { value: "platform", label: "Online Platform" },
-  { value: "email", label: "Email" },
-  { value: "phone", label: "Phone" },
-  { value: "account_manager", label: "Account Manager" },
-];
-
-const howDidYouHearOptions = [
-  { value: "google", label: "Google Search" },
-  { value: "referral", label: "Referral from another pharmacy" },
-  { value: "trade_show", label: "Trade Show / Exhibition" },
-  { value: "linkedin", label: "LinkedIn" },
-  { value: "industry_publication", label: "Industry Publication" },
-  { value: "other", label: "Other" },
-];
-
-type FormStep = "business" | "contact" | "address" | "compliance" | "preferences";
-
-const steps: { id: FormStep; title: string; icon: typeof Building2 }[] = [
-  { id: "business", title: "Business Details", icon: Building2 },
-  { id: "contact", title: "Contact Info", icon: User },
-  { id: "address", title: "Addresses", icon: MapPin },
-  { id: "compliance", title: "Compliance", icon: Shield },
-  { id: "preferences", title: "Preferences", icon: CreditCard },
-];
+function Field({ name, label, required, type = "text", autoComplete, placeholder, maxLength = 255, children }: {
+  name: FieldName; label: string; required?: boolean; type?: string; autoComplete?: string; placeholder?: string; maxLength?: number; children?: ReactNode;
+}) {
+  const { register, formState: { errors } } = useFormContext<RegistrationFormData>();
+  return <div className="reg-field">
+    <label htmlFor={`reg-${name}`}>{label}{required && <span aria-hidden="true"> *</span>}</label>
+    <div className={children ? "reg-input-action" : undefined}>
+      <input id={`reg-${name}`} type={type} autoComplete={autoComplete} placeholder={placeholder} maxLength={maxLength}
+        aria-required={required || undefined} aria-invalid={!!errors[name]} aria-describedby={errors[name] ? `reg-${name}-error` : undefined} {...register(name)} />
+      {children}
+    </div>
+    {errors[name] && <p className="reg-error" id={`reg-${name}-error`} role="alert">{String(errors[name]?.message)}</p>}
+  </div>;
+}
+function SelectField({ name, label, options, required }: { name: FieldName; label: string; options: ReadonlyArray<readonly [string, string]>; required?: boolean }) {
+  const { register, formState: { errors } } = useFormContext<RegistrationFormData>();
+  return <div className="reg-field"><label htmlFor={`reg-${name}`}>{label}{required && <span aria-hidden="true"> *</span>}</label>
+    <select id={`reg-${name}`} aria-required={required || undefined} aria-invalid={!!errors[name]} aria-describedby={errors[name] ? `reg-${name}-error` : undefined} {...register(name)}>
+      <option value="">Choose an option</option>{options.map(([value, text]) => <option key={value} value={value}>{text}</option>)}
+    </select>{errors[name] && <p id={`reg-${name}-error`} className="reg-error" role="alert">{String(errors[name]?.message)}</p>}
+  </div>;
+}
+function Toggle({ name, children }: { name: "deliverySameAsBilling" | "coldChainCapability" | "interestedInControlledProducts" | "marketingConsent"; children: ReactNode }) {
+  const { register } = useFormContext<RegistrationFormData>();
+  return <label className="reg-toggle"><input type="checkbox" {...register(name)} /><span>{children}</span></label>;
+}
+function Details({ title, hint, open, onOpen, children }: { title: string; hint: string; open: boolean; onOpen: (value: boolean) => void; children: ReactNode }) {
+  return <details className="reg-details" open={open} onToggle={e => onOpen(e.currentTarget.open)}>
+    <summary><span><strong>{title}</strong><small>{hint}</small></span><ChevronDown size={18} /></summary>
+    <div className="reg-details-body">{children}</div>
+  </details>;
+}
 
 export default function RegisterPage() {
-  const [, setLocation] = useLocation();
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [currentStep, setCurrentStep] = useState<FormStep>("business");
-  const [isSuccess, setIsSuccess] = useState(false);
-  const { toast } = useToast();
-
-  const form = useForm<CustomerRegistrationData>({
-    resolver: zodResolver(customerRegistrationSchema),
+  const [step, setStep] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [extraOpen, setExtraOpen] = useState(false);
+  const [licenceOpen, setLicenceOpen] = useState(false);
+  const [preferencesOpen, setPreferencesOpen] = useState(false);
+  const [secondAddressLine, setSecondAddressLine] = useState(false);
+  const [useMainEmail, setUseMainEmail] = useState(true);
+  const [interests, setInterests] = useState<string[]>([]);
+  const [focusField, setFocusField] = useState<FieldName | null>(null);
+  const stepHeading = useRef<HTMLHeadingElement>(null);
+  const form = useForm<RegistrationFormData>({
+    resolver: zodResolver(registrationFormSchema), mode: "onBlur", shouldUnregister: false,
     defaultValues: {
-      email: "",
-      password: "",
-      confirmPassword: "",
-      businessType: "",
-      companyName: "",
-      tradingName: "",
-      gphcNumber: "",
-      companyRegistrationNumber: "",
-      vatNumber: "",
-      primaryContactName: "",
-      jobTitle: "",
-      phoneNumber: "",
-      mobileNumber: "",
-      billingAddressLine1: "",
-      billingAddressLine2: "",
-      billingCity: "",
-      billingPostcode: "",
-      billingCountry: "United Kingdom",
-      deliverySameAsBilling: true,
-      deliveryAddressLine1: "",
-      deliveryAddressLine2: "",
-      deliveryCity: "",
-      deliveryPostcode: "",
-      deliveryCountry: "",
-      mhraLicenceType: "",
-      mhraLicenceNumber: "",
-      responsiblePersonName: "",
-      responsiblePersonEmail: "",
-      coldChainCapability: false,
-      interestedInControlledProducts: false,
-      estimatedMonthlySpend: "",
-      orderingContactEmail: "",
-      accountsPayableEmail: "",
-      preferredOrderMethod: "",
-      howDidYouHear: "",
-      notes: "",
-      marketingConsent: false,
+      companyName: "", businessType: "", primaryContactName: "", email: "", phoneNumber: "", password: "",
+      tradingName: "", companyRegistrationNumber: "", vatNumber: "", jobTitle: "", mobileNumber: "",
+      billingAddressLine1: "", billingAddressLine2: "", billingCity: "", billingPostcode: "", billingCountry: "United Kingdom",
+      deliverySameAsBilling: true, deliveryAddressLine1: "", deliveryAddressLine2: "", deliveryCity: "", deliveryPostcode: "", deliveryCountry: "United Kingdom",
+      gphcNumber: "", mhraLicenceType: "", mhraLicenceNumber: "", responsiblePersonName: "", responsiblePersonEmail: "",
+      coldChainCapability: false, interestedInControlledProducts: false, estimatedMonthlySpend: "", orderingContactEmail: "", accountsPayableEmail: "",
+      preferredOrderMethod: "", howDidYouHear: "", notes: "", marketingConsent: false,
     },
-    mode: "onChange",
   });
-
-  const currentStepIndex = steps.findIndex((s) => s.id === currentStep);
-
-  const onSubmit = async (data: CustomerRegistrationData) => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      await apiRequest("POST", "/api/auth/register", data);
-
-      setIsSuccess(true);
-      toast({
-        title: "Registration Submitted!",
-        description: "Your application is pending review. We'll be in touch soon.",
-      });
-    } catch (err: any) {
-      setError(err.message || "Registration failed. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const goToNextStep = async () => {
-    const fieldsToValidate = getFieldsForStep(currentStep);
-    const isValid = await form.trigger(fieldsToValidate as any);
-    if (isValid) {
-      const nextIndex = currentStepIndex + 1;
-      if (nextIndex < steps.length) {
-        setCurrentStep(steps[nextIndex].id);
-      }
-    }
-  };
-
-  const goToPreviousStep = () => {
-    const prevIndex = currentStepIndex - 1;
-    if (prevIndex >= 0) {
-      setCurrentStep(steps[prevIndex].id);
-    }
-  };
-
-  const getFieldsForStep = (step: FormStep): (keyof CustomerRegistrationData)[] => {
-    switch (step) {
-      case "business":
-        return ["email", "password", "confirmPassword", "businessType", "companyName"];
-      case "contact":
-        return ["primaryContactName", "phoneNumber"];
-      case "address":
-        return ["billingAddressLine1", "billingCity", "billingPostcode"];
-      case "compliance":
-        return [];
-      case "preferences":
-        return [];
-      default:
-        return [];
-    }
-  };
-
-  if (isSuccess) {
-    return (
-      <PublicLayout>
-        <div className="min-h-[calc(100vh-200px)] flex items-center justify-center px-4 py-12 sm:px-6 lg:px-8">
-          <Card className="w-full max-w-md text-center">
-            <CardContent className="pt-8 pb-8">
-              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-100 text-green-600 mb-6">
-                <CheckCircle2 className="h-8 w-8" />
-              </div>
-              <CardTitle className="text-2xl mb-4" style={{ fontFamily: "DM Sans, sans-serif" }}>
-                Registration Submitted!
-              </CardTitle>
-              <CardDescription className="text-base mb-6">
-                Thank you for registering with Pharma Oasis. Our team will review your application 
-                and contact you within 24-48 hours to complete your account setup.
-              </CardDescription>
-              <div className="space-y-3">
-                <Link href="/">
-                  <Button className="w-full">Return to Home</Button>
-                </Link>
-                <Link href="/login">
-                  <Button variant="outline" className="w-full">Go to Login</Button>
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </PublicLayout>
-    );
+  const businessType = form.watch("businessType"), deliverySame = form.watch("deliverySameAsBilling"), email = form.watch("email");
+  useEffect(() => { if (regulatedBusinessTypes.includes(businessType) || interests.includes("OTC & healthcare")) setLicenceOpen(true); }, [businessType, interests]);
+  useEffect(() => { if (focusField) { form.setFocus(focusField); setFocusField(null); } }, [focusField, step, extraOpen, licenceOpen, preferencesOpen, useMainEmail, form]);
+  function goTo(next: number) {
+    setStep(next); setError("");
+    requestAnimationFrame(() => { stepHeading.current?.focus(); stepHeading.current?.scrollIntoView({ behavior: "smooth", block: "start" }); });
   }
-
-  return (
-    <PublicLayout>
-      <PageTracker title="Register" />
-      <div className="py-12 px-4 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-3xl">
-          <div className="text-center mb-8">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-lg bg-primary text-primary-foreground mb-4">
-              <Package className="h-6 w-6" />
-            </div>
-            <h1 className="text-3xl font-bold" style={{ fontFamily: "DM Sans, sans-serif" }}>
-              Register Your Business
-            </h1>
-            <p className="mt-2 text-muted-foreground">
-              Complete the form below to apply for a wholesale account
-            </p>
-          </div>
-
-          <div className="mb-8 overflow-x-auto">
-            <div className="flex justify-between min-w-[500px]">
-              {steps.map((step, index) => (
-                <div
-                  key={step.id}
-                  className={`flex flex-col items-center flex-1 ${
-                    index < currentStepIndex
-                      ? "text-primary"
-                      : index === currentStepIndex
-                      ? "text-primary"
-                      : "text-muted-foreground"
-                  }`}
-                >
-                  <div
-                    className={`flex h-10 w-10 items-center justify-center rounded-full border-2 ${
-                      index < currentStepIndex
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : index === currentStepIndex
-                        ? "border-primary text-primary"
-                        : "border-muted text-muted-foreground"
-                    }`}
-                  >
-                    {index < currentStepIndex ? (
-                      <CheckCircle2 className="h-5 w-5" />
-                    ) : (
-                      <step.icon className="h-5 w-5" />
-                    )}
-                  </div>
-                  <span className="mt-2 text-xs font-medium hidden sm:block">{step.title}</span>
-                  {index < steps.length - 1 && (
-                    <div
-                      className={`absolute top-5 left-[55%] w-[90%] h-0.5 ${
-                        index < currentStepIndex ? "bg-primary" : "bg-muted"
-                      }`}
-                      style={{ transform: "translateX(-50%)" }}
-                    />
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2" style={{ fontFamily: "DM Sans, sans-serif" }}>
-                {(() => {
-                  const StepIcon = steps[currentStepIndex].icon;
-                  return <StepIcon className="h-5 w-5" />;
-                })()}
-                {steps[currentStepIndex].title}
-              </CardTitle>
-              <CardDescription>
-                Step {currentStepIndex + 1} of {steps.length}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {error && (
-                <Alert variant="destructive" className="mb-6">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
-
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                  {currentStep === "business" && (
-                    <>
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <FormField
-                          control={form.control}
-                          name="email"
-                          render={({ field }) => (
-                            <FormItem className="sm:col-span-2">
-                              <FormLabel>Email Address *</FormLabel>
-                              <FormControl>
-                                <Input type="email" placeholder="you@company.com" data-testid="input-reg-email" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="password"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Password *</FormLabel>
-                              <FormControl>
-                                <Input type="password" placeholder="Min. 8 characters" data-testid="input-reg-password" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="confirmPassword"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Confirm Password *</FormLabel>
-                              <FormControl>
-                                <Input type="password" placeholder="Confirm password" data-testid="input-reg-confirm-password" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-
-                      <FormField
-                        control={form.control}
-                        name="businessType"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Business Type *</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                              <FormControl>
-                                <SelectTrigger data-testid="select-business-type">
-                                  <SelectValue placeholder="Select your business type" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {businessTypes.map((type) => (
-                                  <SelectItem key={type.value} value={type.value}>
-                                    {type.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <FormField
-                          control={form.control}
-                          name="companyName"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Company Name *</FormLabel>
-                              <FormControl>
-                                <Input placeholder="Legal company name" data-testid="input-company-name" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="tradingName"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Trading Name</FormLabel>
-                              <FormControl>
-                                <Input placeholder="If different from company name" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-
-                      <div className="grid gap-4 sm:grid-cols-3">
-                        <FormField
-                          control={form.control}
-                          name="gphcNumber"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>GPhC Number</FormLabel>
-                              <FormControl>
-                                <Input placeholder="If applicable" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="companyRegistrationNumber"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Company Reg. No.</FormLabel>
-                              <FormControl>
-                                <Input placeholder="Companies House no." {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="vatNumber"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>VAT Number</FormLabel>
-                              <FormControl>
-                                <Input placeholder="If VAT registered" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-                    </>
-                  )}
-
-                  {currentStep === "contact" && (
-                    <>
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <FormField
-                          control={form.control}
-                          name="primaryContactName"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Primary Contact Name *</FormLabel>
-                              <FormControl>
-                                <Input placeholder="Full name" data-testid="input-contact-name" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="jobTitle"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Job Title</FormLabel>
-                              <FormControl>
-                                <Input placeholder="e.g. Pharmacy Manager" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <FormField
-                          control={form.control}
-                          name="phoneNumber"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Phone Number *</FormLabel>
-                              <FormControl>
-                                <Input type="tel" placeholder="+44 20 1234 5678" data-testid="input-phone" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="mobileNumber"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Mobile Number</FormLabel>
-                              <FormControl>
-                                <Input type="tel" placeholder="+44 7700 900000" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-                    </>
-                  )}
-
-                  {currentStep === "address" && (
-                    <>
-                      <div className="space-y-4">
-                        <h3 className="font-medium">Billing Address</h3>
-                        <FormField
-                          control={form.control}
-                          name="billingAddressLine1"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Address Line 1 *</FormLabel>
-                              <FormControl>
-                                <Input placeholder="Street address" data-testid="input-billing-address1" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="billingAddressLine2"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Address Line 2</FormLabel>
-                              <FormControl>
-                                <Input placeholder="Suite, unit, building, etc." {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <div className="grid gap-4 sm:grid-cols-3">
-                          <FormField
-                            control={form.control}
-                            name="billingCity"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>City *</FormLabel>
-                                <FormControl>
-                                  <Input placeholder="City" data-testid="input-billing-city" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={form.control}
-                            name="billingPostcode"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Postcode *</FormLabel>
-                                <FormControl>
-                                  <Input placeholder="Postcode" data-testid="input-billing-postcode" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={form.control}
-                            name="billingCountry"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Country</FormLabel>
-                                <FormControl>
-                                  <Input placeholder="United Kingdom" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-                      </div>
-
-                      <FormField
-                        control={form.control}
-                        name="deliverySameAsBilling"
-                        render={({ field }) => (
-                          <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                            <FormControl>
-                              <Checkbox
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
-                              />
-                            </FormControl>
-                            <div className="space-y-1 leading-none">
-                              <FormLabel>Delivery address is the same as billing address</FormLabel>
-                            </div>
-                          </FormItem>
-                        )}
-                      />
-
-                      {!form.watch("deliverySameAsBilling") && (
-                        <div className="space-y-4 pt-4 border-t">
-                          <h3 className="font-medium">Delivery Address</h3>
-                          <FormField
-                            control={form.control}
-                            name="deliveryAddressLine1"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Address Line 1</FormLabel>
-                                <FormControl>
-                                  <Input placeholder="Street address" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={form.control}
-                            name="deliveryAddressLine2"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Address Line 2</FormLabel>
-                                <FormControl>
-                                  <Input placeholder="Suite, unit, building, etc." {...field} />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <div className="grid gap-4 sm:grid-cols-3">
-                            <FormField
-                              control={form.control}
-                              name="deliveryCity"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>City</FormLabel>
-                                  <FormControl>
-                                    <Input placeholder="City" {...field} />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={form.control}
-                              name="deliveryPostcode"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Postcode</FormLabel>
-                                  <FormControl>
-                                    <Input placeholder="Postcode" {...field} />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={form.control}
-                              name="deliveryCountry"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Country</FormLabel>
-                                  <FormControl>
-                                    <Input placeholder="United Kingdom" {...field} />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  )}
-
-                  {currentStep === "compliance" && (
-                    <>
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <FormField
-                          control={form.control}
-                          name="mhraLicenceType"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>MHRA Licence Type</FormLabel>
-                              <FormControl>
-                                <Input placeholder="e.g. WDA(H)" {...field} />
-                              </FormControl>
-                              <FormDescription>If applicable to your business</FormDescription>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="mhraLicenceNumber"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>MHRA Licence Number</FormLabel>
-                              <FormControl>
-                                <Input placeholder="Licence number" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <FormField
-                          control={form.control}
-                          name="responsiblePersonName"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Responsible Person Name</FormLabel>
-                              <FormControl>
-                                <Input placeholder="Full name" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="responsiblePersonEmail"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Responsible Person Email</FormLabel>
-                              <FormControl>
-                                <Input type="email" placeholder="email@company.com" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-
-                      <div className="space-y-4">
-                        <FormField
-                          control={form.control}
-                          name="coldChainCapability"
-                          render={({ field }) => (
-                            <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                              <FormControl>
-                                <Checkbox
-                                  checked={field.value}
-                                  onCheckedChange={field.onChange}
-                                />
-                              </FormControl>
-                              <div className="space-y-1 leading-none">
-                                <FormLabel>Cold Chain Capability</FormLabel>
-                                <FormDescription>
-                                  We have facilities to receive and store temperature-sensitive products
-                                </FormDescription>
-                              </div>
-                            </FormItem>
-                          )}
-                        />
-
-                        <FormField
-                          control={form.control}
-                          name="interestedInControlledProducts"
-                          render={({ field }) => (
-                            <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                              <FormControl>
-                                <Checkbox
-                                  checked={field.value}
-                                  onCheckedChange={field.onChange}
-                                />
-                              </FormControl>
-                              <div className="space-y-1 leading-none">
-                                <FormLabel>Interest in Controlled Products</FormLabel>
-                                <FormDescription>
-                                  We are interested in purchasing controlled drugs / schedule products
-                                </FormDescription>
-                              </div>
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-                    </>
-                  )}
-
-                  {currentStep === "preferences" && (
-                    <>
-                      <FormField
-                        control={form.control}
-                        name="estimatedMonthlySpend"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Estimated Monthly Spend</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select estimated spend" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {estimatedSpendRanges.map((range) => (
-                                  <SelectItem key={range.value} value={range.value}>
-                                    {range.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <FormField
-                          control={form.control}
-                          name="orderingContactEmail"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Ordering Contact Email</FormLabel>
-                              <FormControl>
-                                <Input type="email" placeholder="orders@company.com" {...field} />
-                              </FormControl>
-                              <FormDescription>For order confirmations</FormDescription>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="accountsPayableEmail"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Accounts Payable Email</FormLabel>
-                              <FormControl>
-                                <Input type="email" placeholder="accounts@company.com" {...field} />
-                              </FormControl>
-                              <FormDescription>For invoices</FormDescription>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-
-                      <FormField
-                        control={form.control}
-                        name="preferredOrderMethod"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Preferred Order Method</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select preferred method" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {preferredOrderMethods.map((method) => (
-                                  <SelectItem key={method.value} value={method.value}>
-                                    {method.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="howDidYouHear"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>How Did You Hear About Us?</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select an option" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {howDidYouHearOptions.map((option) => (
-                                  <SelectItem key={option.value} value={option.value}>
-                                    {option.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="notes"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Additional Notes</FormLabel>
-                            <FormControl>
-                              <Textarea 
-                                placeholder="Any additional information you'd like to share..."
-                                className="min-h-[100px]"
-                                {...field} 
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="marketingConsent"
-                        render={({ field }) => (
-                          <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                            <FormControl>
-                              <Checkbox
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
-                                data-testid="checkbox-marketing-consent"
-                              />
-                            </FormControl>
-                            <div className="space-y-1 leading-none">
-                              <FormLabel>Marketing Communications (Optional)</FormLabel>
-                              <FormDescription>
-                                I agree to receive marketing communications about products, services, and special offers from Pharma Oasis.
-                              </FormDescription>
-                            </div>
-                          </FormItem>
-                        )}
-                      />
-
-                      <div className="rounded-md border border-primary/20 bg-primary/5 p-4">
-                        <p className="text-sm text-muted-foreground">
-                          By submitting this registration, you agree to our{" "}
-                          <Link href="/terms" className="text-primary hover:underline font-medium">
-                            Terms of Service
-                          </Link>{" "}
-                          and{" "}
-                          <Link href="/privacy" className="text-primary hover:underline font-medium">
-                            Privacy Policy
-                          </Link>. 
-                          Your data will be processed in accordance with UK GDPR regulations and used solely for 
-                          managing your wholesale account and fulfilling orders.
-                        </p>
-                      </div>
-                    </>
-                  )}
-
-                  <div className="flex justify-between pt-4 border-t">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={goToPreviousStep}
-                      disabled={currentStepIndex === 0}
-                    >
-                      Previous
-                    </Button>
-
-                    {currentStepIndex < steps.length - 1 ? (
-                      <Button type="button" onClick={goToNextStep} data-testid="button-next-step">
-                        Next
-                      </Button>
-                    ) : (
-                      <Button type="submit" disabled={isLoading} data-testid="button-submit-registration">
-                        {isLoading ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Submitting...
-                          </>
-                        ) : (
-                          "Submit Registration"
-                        )}
-                      </Button>
-                    )}
-                  </div>
-                </form>
-              </Form>
-            </CardContent>
-          </Card>
-
-          <p className="mt-6 text-center text-sm text-muted-foreground">
-            Already have an account?{" "}
-            <Link href="/login" className="font-medium text-primary hover:underline">
-              Sign in
-            </Link>
-          </p>
+  async function next() { if (await form.trigger(businessFields, { shouldFocus: true })) goTo(1); }
+  function showErrors(errors: FieldErrors<RegistrationFormData>) {
+    const names = Object.keys(errors) as FieldName[], first = names[0];
+    if (!first) return;
+    setError("Please check the highlighted details before applying.");
+    setStep(businessFields.includes(first) ? 0 : 1);
+    if (names.some(x => extraFields.includes(x))) setExtraOpen(true);
+    if (names.some(x => licenceFields.includes(x))) setLicenceOpen(true);
+    if (names.some(x => preferenceFields.includes(x))) setPreferencesOpen(true);
+    if (names.includes("orderingContactEmail") || names.includes("accountsPayableEmail")) setUseMainEmail(false);
+    setFocusField(first);
+  }
+  async function submit(data: RegistrationFormData) {
+    if (busy) return;
+    setBusy(true); setError("");
+    try {
+      await apiRequest("POST", "/api/auth/register", registrationPayload(data, { interests, useMainEmail }));
+      form.reset(); setSuccess(true); window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (e) { setError((e as Error).message || "We couldn't submit your application. Your details are still here—please try again."); }
+    finally { setBusy(false); }
+  }
+  if (success) return <PublicLayout><PageTracker title="Application received" /><div className="reg-success wrap">
+    <span className="reg-success-icon"><Check size={32} /></span><span className="eyebrow">YOUR NEXT CHAPTER STARTS HERE</span>
+    <h1>Thank you.<br />We’ll be in touch.</h1><p>Your trade account application has been received. Our team will review your business details and contact you if anything else is needed.</p>
+    <p className="reg-muted">Your account is pending approval. We’ll email you when it’s ready.</p>
+    <Link className="btn plum" href="/products">Explore the catalogue <ArrowRight size={17} /></Link>
+  </div></PublicLayout>;
+  return <PublicLayout><PageTracker title="Apply for a trade account" />
+    <div className="reg-page wrap">
+      <aside className="reg-intro"><span className="eyebrow">LET’S GROW TOGETHER</span><h1>Your next<br /><em>trade partner.</em></h1>
+        <p>Tell us a little about your business. We’ll take it from there.</p>
+        <ul><li><Check size={16} />Two short steps</li><li><Check size={16} />One contact. One address.</li><li><Check size={16} />Extra details when relevant</li></ul>
+        <div className="reg-signin">Already a partner? <Link href="/login">Sign in <ArrowRight size={14} /></Link></div>
+        <small>Every application is reviewed by our team before the trade account is activated.</small>
+      </aside>
+      <section className="reg-panel" aria-label="Trade account application">
+        <nav className="reg-steps" aria-label="Application steps">
+          {["Your business", "Trade details"].map((title, i) => <button key={title} type="button" disabled={busy} aria-current={step === i ? "step" : undefined} onClick={() => goTo(i)}><span>{i + 1}</span>{title}</button>)}
+        </nav>
+        <div className="reg-panel-body"><div className="reg-section-title"><span className="eyebrow">STEP {step + 1} OF 2</span>
+          <h2 ref={stepHeading} tabIndex={-1}>{step === 0 ? "A little introduction." : "Make it your account."}</h2>
+          <p>{step === 0 ? "The essentials for your trade account. Fields marked * are required." : "Your address, your interests and any details that help us look after you."}</p>
         </div>
-      </div>
-    </PublicLayout>
-  );
+        {error && <div className="reg-error-banner" role="alert">{error}</div>}
+        <FormProvider {...form}><form noValidate onSubmit={e => { if (step === 0) { e.preventDefault(); void next(); } else void form.handleSubmit(submit, showErrors)(e); }}>
+          <fieldset disabled={busy} className="reg-form-fields">
+          {step === 0 ? <>
+            <Field name="companyName" label="Company / business name" required autoComplete="organization" placeholder="Your legal business name" />
+            <SelectField name="businessType" label="Business type" required options={registrationBusinessTypes} />
+            <div className="reg-grid"><Field name="primaryContactName" label="Your full name" required autoComplete="name" /><Field name="phoneNumber" label="Phone or mobile" required type="tel" autoComplete="tel" maxLength={50} /></div>
+            <Field name="email" label="Business email" required type="email" autoComplete="email" placeholder="you@company.com" />
+            <Field name="password" label="Create a password" required type={showPassword ? "text" : "password"} autoComplete="new-password" placeholder="At least 8 characters" maxLength={128}>
+              <button type="button" onClick={() => setShowPassword(x => !x)} aria-label={showPassword ? "Hide password" : "Show password"} aria-pressed={showPassword}>{showPassword ? <EyeOff size={17} /> : <Eye size={17} />}<span>{showPassword ? "Hide" : "Show"}</span></button>
+            </Field>
+            <Details title="Company numbers & extra contacts" hint="Optional · add them now if you have them handy" open={extraOpen} onOpen={setExtraOpen}>
+              <Field name="tradingName" label="Trading name, if different" /><div className="reg-grid"><Field name="companyRegistrationNumber" label="Company registration number" maxLength={50} /><Field name="vatNumber" label="VAT number, if registered" maxLength={50} /></div>
+              <div className="reg-grid"><Field name="jobTitle" label="Your role" autoComplete="organization-title" maxLength={100} /><Field name="mobileNumber" label="Additional phone / mobile" type="tel" autoComplete="off" maxLength={50} /></div>
+            </Details>
+          </> : <>
+            <Field name="billingAddressLine1" label="Business / billing address" required autoComplete="billing address-line1" placeholder="Building number and street" />
+            {secondAddressLine ? <Field name="billingAddressLine2" label="Address line 2" autoComplete="billing address-line2" /> : <button type="button" className="reg-inline-link" onClick={() => setSecondAddressLine(true)}>+ Add address line 2</button>}
+            <div className="reg-grid"><Field name="billingCity" label="Town / city" required autoComplete="billing address-level2" maxLength={100} /><Field name="billingPostcode" label="Postcode / ZIP" required autoComplete="billing postal-code" maxLength={20} /></div>
+            <Field name="billingCountry" label="Country" required autoComplete="billing country-name" maxLength={100} />
+            <Toggle name="deliverySameAsBilling">Deliver to this address too</Toggle>
+            {!deliverySame && <div className="reg-inset"><h3>Delivery address</h3><Field name="deliveryAddressLine1" label="Delivery street address" required autoComplete="shipping address-line1" /><Field name="deliveryAddressLine2" label="Delivery address line 2" autoComplete="shipping address-line2" /><div className="reg-grid"><Field name="deliveryCity" label="Delivery town / city" required autoComplete="shipping address-level2" maxLength={100} /><Field name="deliveryPostcode" label="Delivery postcode / ZIP" required autoComplete="shipping postal-code" maxLength={20} /></div><Field name="deliveryCountry" label="Delivery country" required autoComplete="shipping country-name" maxLength={100} /></div>}
+            <div className="reg-email-choice"><label className="reg-toggle"><input type="checkbox" checked={useMainEmail} onChange={e => { setUseMainEmail(e.target.checked); if (e.target.checked) { form.setValue("orderingContactEmail", ""); form.setValue("accountsPayableEmail", ""); form.clearErrors(["orderingContactEmail", "accountsPayableEmail"]); } }} /><span>Use my business email for orders and invoices<small>{email || "The email from step 1"}</small></span></label>
+              {!useMainEmail && <div className="reg-grid"><Field name="orderingContactEmail" label="Order contact email" type="email" autoComplete="off" /><Field name="accountsPayableEmail" label="Invoice contact email" type="email" autoComplete="off" /></div>}
+            </div>
+            <div className="reg-interests"><h3>What would you like to source? <small>Optional</small></h3><div className="reg-chips">{registrationInterests.map(interest => <label key={interest}><input type="checkbox" checked={interests.includes(interest)} onChange={e => setInterests(xs => e.target.checked ? [...xs, interest] : xs.filter(x => x !== interest))} /><span>{interest}</span></label>)}</div></div>
+            <Details title="Licence & regulated supply details" hint="For relevant businesses and product ranges" open={licenceOpen} onOpen={setLicenceOpen}>
+              <p className="reg-muted">Add any applicable details you have. Our team will confirm what’s needed during the account review.</p>
+              <Field name="gphcNumber" label="Pharmacy registration / GPhC number, if applicable" maxLength={50} />
+              <div className="reg-grid"><Field name="mhraLicenceType" label="Licence type" placeholder="e.g. WDA(H)" maxLength={100} /><Field name="mhraLicenceNumber" label="Licence number" maxLength={100} /></div>
+              <div className="reg-grid"><Field name="responsiblePersonName" label="Responsible person’s name" /><Field name="responsiblePersonEmail" label="Responsible person’s email" type="email" autoComplete="off" /></div>
+              <Toggle name="coldChainCapability">We can receive and store temperature-sensitive products</Toggle><Toggle name="interestedInControlledProducts">We would like to discuss controlled products</Toggle>
+            </Details>
+            <Details title="Help us tailor your account" hint="Optional · spend, ordering preferences and referral" open={preferencesOpen} onOpen={setPreferencesOpen}>
+              <SelectField name="estimatedMonthlySpend" label="Estimated monthly spend" options={[["under_5000", "Under £5,000"], ["5000_10000", "£5,000–£10,000"], ["10000_25000", "£10,000–£25,000"], ["25000_50000", "£25,000–£50,000"], ["over_50000", "Over £50,000"]]} />
+              <SelectField name="preferredOrderMethod" label="Preferred way to order" options={[["platform", "Trade portal"], ["email", "Email"], ["phone", "Phone"], ["account_manager", "Account manager"]]} />
+              <SelectField name="howDidYouHear" label="How did you hear about us?" options={[["google", "Search engine"], ["social_media", "Social media"], ["whatsapp", "WhatsApp"], ["referral", "Recommendation"], ["trade_show", "Trade show / exhibition"], ["linkedin", "LinkedIn"], ["industry_publication", "Industry publication"], ["other", "Other"]]} />
+            </Details>
+            <div className="reg-field"><label htmlFor="reg-notes">Anything else we should know? <small>Optional</small></label><textarea id="reg-notes" rows={2} placeholder="Brands you need, delivery requirements or a question for our team…" maxLength={4000} {...form.register("notes")} /></div>
+            <Toggle name="marketingConsent">Send me product news and trade offers <small>Optional. You can unsubscribe at any time.</small></Toggle>
+            <p className="reg-terms">By applying, you agree to our <Link href="/terms" target="_blank" rel="noopener noreferrer">terms</Link>. Read our <Link href="/privacy" target="_blank" rel="noopener noreferrer">privacy notice</Link> for how we use your information.</p>
+          </>}
+          <div className="reg-actions">{step === 1 && <button type="button" className="reg-back" onClick={() => goTo(0)}><ArrowLeft size={16} />Back</button>}
+            {step === 0 ? <button type="button" className="btn plum" onClick={() => void next()}>Continue <ArrowRight size={17} /></button> : <button type="submit" className="btn plum" disabled={busy}>{busy ? <><Loader2 className="animate-spin" size={17} />Sending application…</> : <>Apply for a trade account <ArrowRight size={17} /></>}</button>}
+          </div><p className="reg-bottom-note">{step === 0 ? "Next: address and trade details. Your account is created when you submit." : "Your application goes to our team for approval."}</p>
+          </fieldset>
+        </form></FormProvider></div>
+      </section>
+    </div>
+  </PublicLayout>;
 }
