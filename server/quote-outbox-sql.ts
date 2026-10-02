@@ -31,6 +31,11 @@ export const retrySalesQuoteEmailSql = `INSERT INTO quote_email_outbox (quote_id
  next_attempt_at=now(),locked_until=NULL,last_error=NULL
  WHERE quote_email_outbox.status='failed' RETURNING id`;
 
+// When the worker next has something to do: a pending email whose retry time has
+// come, or an interrupted send whose lock expires. NULL means the queue is idle.
+export const nextQuoteEmailDueSql = `SELECT min(CASE WHEN status='pending' THEN next_attempt_at ELSE locked_until END) AS due
+ FROM quote_email_outbox WHERE status IN ('pending','sending')`;
+
 export function quoteEmailOutcome(success: boolean, attempts: number) {
   return { status: success ? "sent" : attempts >= 6 ? "failed" : "pending",
     delay: success ? 0 : Math.min(3600, 60 * 2 ** Math.max(0, attempts - 1)) };

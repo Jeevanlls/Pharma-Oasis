@@ -4,7 +4,7 @@ import { eq, and, sql } from "drizzle-orm";
 import { storage } from "./storage"; // Used for brand/category creation
 
 const BATCH_SIZE = 50;
-const PROCESS_INTERVAL = 2000; // 2 seconds between batches
+const PROCESS_INTERVAL = 2000; // 2 seconds between batches, only while a job is running
 let isProcessing = false;
 let processorInterval: NodeJS.Timeout | null = null;
 
@@ -191,6 +191,9 @@ async function processBatch() {
         .limit(1);
       
       if (!processingJob) {
+        // Nothing left to import: stop polling so the database can sleep.
+        // createImportJob() and retryImportJobErrors() start it again.
+        stopImportProcessor();
         isProcessing = false;
         return;
       }

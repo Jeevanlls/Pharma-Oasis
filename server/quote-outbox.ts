@@ -3,7 +3,7 @@ import { storage } from "./storage";
 import { logDealEvent } from "./deal-events";
 import { sendQuoteSubmissionNotification, sendQuoteConfirmationToCustomer } from "./email";
 import { quoteTotalLabel } from "@shared/quote-lines";
-import { quoteOutboxDdl, claimQuoteEmailSql, completeQuoteEmailSql, exhaustQuoteEmailSql, retrySalesQuoteEmailSql, quoteEmailOutcome } from "./quote-outbox-sql";
+import { quoteOutboxDdl, claimQuoteEmailSql, completeQuoteEmailSql, exhaustQuoteEmailSql, retrySalesQuoteEmailSql, quoteEmailOutcome, nextQuoteEmailDueSql } from "./quote-outbox-sql";
 
 export async function ensureQuoteOutbox() {
   await pool.query(quoteOutboxDdl);
@@ -21,6 +21,29 @@ export async function retrySalesNotification(quoteId: number) {
 
 let running = false;
 let started = false;
+let timer: NodeJS.Timeout | null = null;
+
+// The worker used to poll every 30 seconds, which kept the Neon database awake
+// around the clock. Now it wakes only when a retry is actually due, and checks
+// in every 30 minutes as a safety net. New quotes are still sent straight away
+// because the routes call processQuoteEmailQueue() directly.
+const MIN_WAIT_MS = 30_000;
+const IDLE_WAIT_MS = 30 * 60_000;
+
+async function scheduleNextRun() {
+  if (!started) return;
+  let wait = IDLE_WAIT_MS;
+  try {
+    const due = (await pool.query(nextQuoteEmailDueSql)).rows[0]?.due;
+    if (due) wait = Math.min(IDLE_WAIT_MS, Math.max(MIN_WAIT_MS, new Date(due).getTime() - Date.now()));
+  } catch {
+    wait = MIN_WAIT_MS * 10;
+  }
+  if (!started) return;
+  if (timer) clearTimeout(timer);
+  timer = setTimeout(() => { void processQuoteEmailQueue(); }, wait);
+  timer.unref();
+}
 export async function processQuoteEmailQueue() {
   if (!started || running) return;
   running = true;
@@ -64,14 +87,15 @@ export async function processQuoteEmailQueue() {
     }
   } catch {
     console.error("[quote-email] Queue processing failed; saved jobs will be retried.");
-  } finally { running = false; }
+  } finally {
+    running = false;
+    void scheduleNextRun();
+  }
 }
 
 export function startQuoteEmailWorker() {
   if (started || process.env.QUOTE_EMAIL_WORKER_ENABLED === "false") return () => {};
   started = true;
   void processQuoteEmailQueue();
-  const timer = setInterval(() => { void processQuoteEmailQueue(); }, 30_000);
-  timer.unref();
-  return () => { clearInterval(timer); started = false; };
+  return () => { started = false; if (timer) clearTimeout(timer); timer = null; };
 }
